@@ -56,3 +56,6 @@ next-env.d.ts
 /САЛОН-МАЗЕРАТІ.JPG
 /progress-screenshots/
 /public 2/
+
+# backup files
+*.bak
