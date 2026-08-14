@@ -1,0 +1,71 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { isLocale, type Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+
+const copy: Record<Locale, { intro: string; items: string[] }> = {
+  uk: {
+    intro: "Цей сайт використовує мінімальний набір технічних файлів cookie для коректної роботи.",
+    items: [
+      "Технічні cookie необхідні для базової роботи сайту та не використовуються для реклами.",
+      "Сайт не використовує сторонні рекламні або трекінгові cookie.",
+      "Ви можете видалити cookie у налаштуваннях свого браузера в будь-який момент.",
+    ],
+  },
+  ru: {
+    intro: "Этот сайт использует минимальный набор технических файлов cookie для корректной работы.",
+    items: [
+      "Технические cookie необходимы для базовой работы сайта и не используются для рекламы.",
+      "Сайт не использует сторонние рекламные или трекинговые cookie.",
+      "Вы можете удалить cookie в настройках своего браузера в любой момент.",
+    ],
+  },
+  en: {
+    intro: "This website uses a minimal set of technical cookies required for it to function correctly.",
+    items: [
+      "Technical cookies are required for the site to work and are not used for advertising.",
+      "The site does not use third-party advertising or tracking cookies.",
+      "You can remove cookies in your browser settings at any time.",
+    ],
+  },
+};
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale: localeParam } = await params;
+  if (!isLocale(localeParam)) return {};
+  const dict = await getDictionary(localeParam);
+  return { title: `${dict.footer.cookies} — ${dict.meta.siteName}` };
+}
+
+export default async function CookiesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: localeParam } = await params;
+  if (!isLocale(localeParam)) notFound();
+  const locale: Locale = localeParam;
+  const dict = await getDictionary(locale);
+  const text = copy[locale];
+
+  return (
+    <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+      <h1 className="font-heading text-3xl font-bold text-gold sm:text-4xl">
+        {dict.footer.cookies}
+      </h1>
+      <p className="mt-6 text-muted">{text.intro}</p>
+      <ul className="mt-6 flex flex-col gap-3">
+        {text.items.map((item) => (
+          <li key={item} className="flex items-start gap-3 text-text">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

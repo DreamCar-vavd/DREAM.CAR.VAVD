@@ -1,0 +1,34 @@
+{
+  "maserati-levante": {
+    "uk": {
+      "title": "Мазераті Леванте",
+      "year": "2022",
+      "service": "Автопідбір під ключ",
+      "clientRequest": "Вибрати надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
+      "completedItems": [
+        "Кузов і лакофарбове покриття. Компютерна діагностика. Помилки невиявлені."
+      ],
+      "result": "Ркомендовано до купівлі"
+    },
+    "ru": {
+      "title": "Мазерати Леванте",
+      "year": "",
+      "service": "Услуга уточняется",
+      "clientRequest": "Информация уточняется.",
+      "completedItems": [
+        "Информация уточняется"
+      ],
+      "result": "Информация уточняется."
+    },
+    "en": {
+      "title": "Maserati Levante",
+      "year": "",
+      "service": "Service to be confirmed",
+      "clientRequest": "Information to be confirmed.",
+      "completedItems": [
+        "Information to be confirmed"
+      ],
+      "result": "Information to be confirmed."
+    }
+  }
+}
