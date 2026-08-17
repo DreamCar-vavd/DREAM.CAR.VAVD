@@ -22,7 +22,10 @@ export interface ProcessStep {
   description: string;
 }
 
-export type CarListingId = "suzuki-sx4-s-cross" | "dacia-sandero-2022";
+export type CarListingId =
+  | "suzuki-sx4-s-cross"
+  | "dacia-sandero-2022"
+  | "dacia-sandero-comfort-2019";
 
 export interface CarListingCopy {
   title: string;

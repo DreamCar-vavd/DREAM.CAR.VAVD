@@ -141,6 +141,14 @@ const dictionary: Dictionary = {
         price: "£9,400",
         viewGallery: "Посмотреть 9 фото и 1 видео",
       },
+      "dacia-sandero-comfort-2019": {
+        title: "Dacia Sandero Comfort",
+        year: "2019",
+        specLine: "1.0 Turbo • Бензин • Механическая • Серый",
+        mileage: "42 488 миль",
+        price: "£3,300",
+        viewGallery: "Посмотреть 11 фото и 1 видео",
+      },
     },
   },
   process: {

@@ -34,7 +34,7 @@ export default async function CarsForSalePage({
         </h1>
       </div>
 
-      <div className="mx-auto mt-12 grid max-w-4xl gap-6 sm:grid-cols-2">
+      <div className="mx-auto mt-12 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {carListings.map((listing) => {
           const copy = dict.carsForSale.listings[listing.id];
           return (

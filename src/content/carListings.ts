@@ -53,4 +53,26 @@ export const carListings: CarListing[] = [
       },
     ],
   },
+  {
+    id: "dacia-sandero-comfort-2019",
+    photos: [
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/01-front.jpeg", width: 2048, height: 1536 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/02-front-right.jpeg", width: 2048, height: 1536 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/03-right-side.jpeg", width: 2048, height: 1536 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/04-rear-right.jpeg", width: 2048, height: 1536 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/05-rear.jpeg", width: 2048, height: 1536 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/06-rear-left.jpeg", width: 1536, height: 2048 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/07-left-side.jpeg", width: 1536, height: 2048 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/08-driver-door.jpeg", width: 1200, height: 1600 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/09-rear-door.jpeg", width: 1200, height: 1600 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/10-front-interior.jpeg", width: 1600, height: 1200 },
+      { src: "/images/cars-for-sale/dacia-sandero-comfort-2019/11-service-book.jpeg", width: 1200, height: 1600 },
+    ],
+    videos: [
+      {
+        src: "/images/cars-for-sale/dacia-sandero-comfort-2019/12-walkaround.mp4",
+        posterSrc: "/images/cars-for-sale/dacia-sandero-comfort-2019/01-front.jpeg",
+      },
+    ],
+  },
 ];
