@@ -47,7 +47,11 @@ export function SiteHeader({ dict, locale }: { dict: Dictionary; locale: Locale 
         </div>
 
         <div className="flex items-center gap-3 xl:hidden">
-          <a href={phoneHref} aria-label={dict.common.phoneLabel} className="text-gold">
+          <a
+            href={phoneHref}
+            aria-label={dict.common.phoneLabel}
+            className="flex h-11 w-11 items-center justify-center text-gold"
+          >
             <Phone size={20} />
           </a>
           <MobileMenu

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, Phone } from "lucide-react";
 import type { NavItem } from "@/lib/nav";
@@ -27,6 +27,21 @@ export function MobileMenu({
 }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   return (
     <div className="xl:hidden">
       <button
@@ -35,7 +50,7 @@ export function MobileMenu({
         aria-expanded={open}
         aria-controls="mobile-drawer"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-10 w-10 items-center justify-center rounded-sm border border-border-gold text-gold"
+        className="flex h-11 w-11 items-center justify-center rounded-sm border border-border-gold text-gold"
       >
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -65,7 +80,7 @@ export function MobileMenu({
 
             <a
               href={phoneHref}
-              className="flex items-center gap-2 text-gold"
+              className="flex min-h-11 items-center gap-2 text-gold"
               aria-label={phoneLabel}
             >
               <Phone size={18} aria-hidden="true" />
