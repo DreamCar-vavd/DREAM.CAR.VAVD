@@ -41,6 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # raw/personal files not part of the site source (root-level only)
+/ДАЧІЯ СІРА-2019-1.0 TURBO/
 /IMG_0140_1x1.png
 /Instagram.JPG
 /TRI PORSA.PNG
