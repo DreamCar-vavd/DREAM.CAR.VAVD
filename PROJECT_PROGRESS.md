@@ -1976,3 +1976,34 @@ default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; 
 
 ### Git / Push / Deployment
 Коміт **не створювався**, push і Vercel deployment **не виконувались** на цьому read-only-адресному етапі.
+
+---
+
+## Етап 3C.1: локальна активація CSP (з Report-Only на активний) — 2026-08-19
+
+### Точна зміна
+У `next.config.ts` замінено лише `key` заголовка: `Content-Security-Policy-Report-Only` → `Content-Security-Policy`. Значення політики **не змінювалось**:
+
+```
+default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-src 'none'; worker-src 'none'; manifest-src 'self';
+```
+
+`NEXT_PUBLIC_FORM_ENDPOINT` підтверджено порожнім (Етап 3C.0) — форма зараз fail-closed, `connect-src 'self'` нічого не ламає.
+
+### Перевірка коду
+- `npx tsc --noEmit` — exit `0`.
+- `npx eslint src` — exit `0`, 0 помилок.
+- `npm test` — 4/4, exit `0`.
+- `npm run build:webpack` — exit `0`, 33/33 сторінок, той самий розподіл `○`/`●`/`ƒ` — статична генерація збережена.
+
+### Production-тест локально (тимчасовий сервер, порт 3099, гарантовано зупинений)
+Активний `Content-Security-Policy` присутній з точним значенням на `/`, `/uk`, `/ru`, `/en`, `/uk/cars-for-sale`, `/uk/privacy-policy`, `/uk/cookies`, брендованій 404, API (`403` збережено), JPEG (`200`), MP4 (`200`+`206` Range). `-Report-Only` варіант ніде не з'явився. 4 базові заголовки збережені, `X-Powered-By` відсутній.
+
+### Чиста браузерна перевірка (0 CSP-порушень)
+Повна матриця: Desktop 1600×1000, Tablet 768×1024, Mobile 390×844 × UK/RU/EN, головна, каталог, Suzuki (10 фото), Dacia Sandero 2022 (9 фото + відео), Dacia Sandero Comfort 2019 (11 фото + відео), мобільне меню (скрол-лок + Escape підтверджені), privacy, cookies, форма (лише візуально), 404, API. **Жодного CSP-блокування чи повідомлення не зафіксовано.** `frame-ancestors 'none'` + `X-Frame-Options: DENY` — обидва механізми clickjacking-захисту активні.
+
+### Dev-сервер
+Після зміни `next.config.ts` попередній процес dev-сервера (порт 3000) самостійно завершився повністю (не 500, а повний вихід процесу — жодної команди зупинки йому не надсилалось). Запущено рівно один новий `npm run dev:webpack`, без `kill -9`, без очищення `.next`, сторонні процеси не зачеплені. `/uk` підтверджено `200` після перезапуску.
+
+### Git / Push / Deployment
+Коміт **не створювався**, push і Vercel deployment **не виконувались** на цьому read-only-адресному етапі.
