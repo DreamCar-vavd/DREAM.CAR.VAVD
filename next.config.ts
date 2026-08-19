@@ -1,5 +1,24 @@
 import type { NextConfig } from "next";
 
+const cspReportOnlyHeader = `
+  default-src 'self';
+  base-uri 'self';
+  object-src 'none';
+  frame-ancestors 'none';
+  form-action 'self';
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob:;
+  font-src 'self' data:;
+  media-src 'self' blob:;
+  connect-src 'self';
+  frame-src 'none';
+  worker-src 'none';
+  manifest-src 'self';
+`
+  .replace(/\s{2,}/g, " ")
+  .trim();
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
@@ -28,6 +47,10 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+          },
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value: cspReportOnlyHeader,
           },
         ],
       },

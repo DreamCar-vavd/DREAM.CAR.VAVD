@@ -1945,3 +1945,34 @@ Desktop UK, Mobile UK (375×812), Tablet (768×1024) — без горизонт
 
 ### Git / Push / Deployment
 Коміт **не створювався**, push і Vercel deployment **не виконувались** на цьому read-only-адресному етапі.
+
+---
+
+## Етап 3B.1: CSP Report-Only (лише спостереження, не активний захист) — 2026-08-19
+
+### Точна політика
+Додано **лише** `Content-Security-Policy-Report-Only` в `next.config.ts` (той самий `headers()`, що й для baseline-заголовків з Етапу 3A):
+
+```
+default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-src 'none'; worker-src 'none'; manifest-src 'self';
+```
+
+**Важливо: це виключно режим спостереження.** Активний `Content-Security-Policy` **не додавався** — жоден ресурс не блокується на живому сайті цим етапом. `worker-src 'none'`, бо аудит (Етап 3B.0) не знайшов жодного Worker/Service Worker у проєкті. Reporting endpoint (route handler, Sentry тощо) свідомо **не створювався** — централізовані звіти не збираються, лише ручна перевірка консолі під час тестування.
+
+### Перевірка коду
+- `npx tsc --noEmit` — exit `0`.
+- `npx eslint next.config.ts` — exit `0`, 0 помилок.
+- `npm test` — 4/4, exit `0`.
+- `npm run build:webpack` — exit `0`, 33/33 сторінок, той самий розподіл `○`/`●`/`ƒ` — статична генерація не порушена (nonce не використовувався).
+
+### Production-тест локально (тимчасовий сервер, порт 3099, гарантовано зупинений)
+`Content-Security-Policy-Report-Only` присутній з точним нормалізованим значенням на `/uk`, `/ru`, `/en`, `/uk/cars-for-sale`, `/uk/privacy-policy`, `/uk/cookies`, брендованій 404, API (`403` збережено), JPEG (`200`), MP4 (`200`+`206` Range). Активний `Content-Security-Policy` ніде не з'явився. `X-Powered-By` відсутній, 4 baseline-заголовки з Етапу 3A збережені без змін.
+
+### Перевірка CSP-порушень (чиста вкладка браузера)
+Повна матриця: Desktop/Tablet/Mobile × UK/RU/EN, головна, каталог, Suzuki (10 фото), Dacia Sandero 2022 (9 фото + відео), Dacia Sandero Comfort 2019 (11 фото + відео), мобільне меню, privacy, cookies, 404, API. **Жодного CSP Report-Only повідомлення не зафіксовано на жодній сторінці/стані.** Єдині записи консолі — очікувані статуси `404`/`403` самих сторінок, не пов'язані з CSP.
+
+### Dev-сервер
+Після зміни `next.config.ts` dev-сервер на порту 3000 самостійно коректно підхопив конфігурацію (внутрішній worker-процес Next.js оновив PID, батьківський процес не чіпався) — цього разу без `500`, перезапуск не знадобився.
+
+### Git / Push / Deployment
+Коміт **не створювався**, push і Vercel deployment **не виконувались** на цьому read-only-адресному етапі.
