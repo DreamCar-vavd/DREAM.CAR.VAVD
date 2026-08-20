@@ -346,6 +346,8 @@ const dictionary: Dictionary = {
       selectService: "Select a service",
       success: "Thank you! Your message has been sent.",
       error: "Your message could not be sent. Please try again or contact us directly.",
+      timeout:
+        "The server is taking too long to respond. Please try again later, or message us on WhatsApp or call.",
       notConfigured:
         "The form isn't connected yet. Please message us on WhatsApp or call — we'll get back to you as soon as possible.",
       required: "This field is required",

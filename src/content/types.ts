@@ -175,6 +175,7 @@ export interface Dictionary {
       selectService: string;
       success: string;
       error: string;
+      timeout: string;
       notConfigured: string;
       required: string;
       invalidEmail: string;

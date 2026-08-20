@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import type { Dictionary } from "@/content/types";
 import { services } from "@/content/services";
 import { GoldButton } from "./GoldButton";
 
 type Status = "idle" | "submitting" | "success" | "error";
+type ErrorKind = "notConfigured" | "timeout" | "generic" | null;
 
 interface Errors {
   name?: string;
@@ -17,11 +18,13 @@ interface Errors {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[+\d][\d\s()-]{6,}$/;
+const SUBMIT_TIMEOUT_MS = 15_000;
 
 export function ContactForm({ dict }: { dict: Dictionary }) {
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Errors>({});
-  const endpoint = process.env.NEXT_PUBLIC_FORM_ENDPOINT;
+  const [errorKind, setErrorKind] = useState<ErrorKind>(null);
+  const isSubmittingRef = useRef(false);
 
   function validate(formData: FormData): Errors {
     const next: Errors = {};
@@ -43,7 +46,12 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const validationErrors = validate(formData);
     setErrors(validationErrors);
 
@@ -51,24 +59,65 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
       return;
     }
 
-    if (!endpoint) {
-      setStatus("error");
-      return;
-    }
-
+    isSubmittingRef.current = true;
     setStatus("submitting");
+    setErrorKind(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
+
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(formData.entries())),
+        body: JSON.stringify({
+          name: String(formData.get("name") ?? ""),
+          phone: String(formData.get("phone") ?? ""),
+          email: String(formData.get("email") ?? ""),
+          service: String(formData.get("service") ?? ""),
+          vehicle: String(formData.get("vehicle") ?? ""),
+          message: String(formData.get("message") ?? ""),
+          consent: formData.get("consent") === "on",
+          website: String(formData.get("website") ?? ""),
+        }),
+        signal: controller.signal,
       });
-      if (!response.ok) throw new Error("Request failed");
-      setStatus("success");
-      event.currentTarget.reset();
-    } catch {
+
+      const body = (await response.json().catch(() => null)) as { ok?: boolean; code?: string } | null;
+
+      if (response.ok && body?.ok) {
+        setStatus("success");
+        setErrorKind(null);
+        form.reset();
+        return;
+      }
+
       setStatus("error");
+      if (body?.code === "NOT_CONFIGURED") {
+        setErrorKind("notConfigured");
+      } else if (body?.code === "UPSTREAM_TIMEOUT") {
+        setErrorKind("timeout");
+      } else {
+        setErrorKind("generic");
+      }
+    } catch (error) {
+      setStatus("error");
+      setErrorKind(error instanceof Error && error.name === "AbortError" ? "timeout" : "generic");
+    } finally {
+      clearTimeout(timeoutId);
+      isSubmittingRef.current = false;
     }
+  }
+
+  let statusMessage: string | null = null;
+  if (status === "success") {
+    statusMessage = dict.contact.form.success;
+  } else if (status === "error" && errorKind === "notConfigured") {
+    statusMessage = dict.contact.form.notConfigured;
+  } else if (status === "error" && errorKind === "timeout") {
+    statusMessage = dict.contact.form.timeout;
+  } else if (status === "error") {
+    statusMessage = dict.contact.form.error;
   }
 
   const inputClass =
@@ -76,6 +125,14 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
 
   return (
     <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <div
+        aria-hidden="true"
+        style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px", overflow: "hidden" }}
+      >
+        <label htmlFor="website">Website</label>
+        <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+      </div>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="name" className="mb-1.5 block text-sm text-muted">
@@ -150,11 +207,16 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
         {dict.contact.form.submit}
       </GoldButton>
 
-      {status === "success" && <p className="text-sm text-gold-light">{dict.contact.form.success}</p>}
-      {status === "error" && !endpoint && (
-        <p className="text-sm text-gold-light">{dict.contact.form.notConfigured}</p>
-      )}
-      {status === "error" && endpoint && <p className="text-sm text-gold-light">{dict.contact.form.error}</p>}
+      {statusMessage &&
+        (status === "error" ? (
+          <p role="alert" className="text-sm text-gold-light">
+            {statusMessage}
+          </p>
+        ) : (
+          <p role="status" aria-live="polite" className="text-sm text-gold-light">
+            {statusMessage}
+          </p>
+        ))}
     </form>
   );
 }
