@@ -4,31 +4,31 @@
       "title": "Мазераті Леванте",
       "year": "2022",
       "service": "Автопідбір під ключ",
-      "clientRequest": "Вибрати надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
+      "clientRequest": "Вибрати надійний, технічно справний, гарний автомобіль відповідно до побажань і бюджету клієнта.",
       "completedItems": [
-        "Кузов і лакофарбове покриття. Компютерна діагностика. Помилки невиявлені."
+        "Кузов і лакофарбове покриття. Комп'ютерна діагностика. Помилок не виявлено."
       ],
-      "result": "Ркомендовано до купівлі"
+      "result": "Рекомендовано до купівлі"
     },
     "ru": {
       "title": "Мазерати Леванте",
-      "year": "",
-      "service": "Услуга уточняется",
-      "clientRequest": "Информация уточняется.",
+      "year": "2022",
+      "service": "Подбор автомобиля под ключ",
+      "clientRequest": "Выбрать надёжный, технически исправный, красивый автомобиль в соответствии с пожеланиями и бюджетом клиента.",
       "completedItems": [
-        "Информация уточняется"
+        "Кузов и лакокрасочное покрытие. Компьютерная диагностика. Ошибок не выявлено."
       ],
-      "result": "Информация уточняется."
+      "result": "Рекомендовано к покупке"
     },
     "en": {
       "title": "Maserati Levante",
-      "year": "",
-      "service": "Service to be confirmed",
-      "clientRequest": "Information to be confirmed.",
+      "year": "2022",
+      "service": "Turnkey car sourcing",
+      "clientRequest": "Select a reliable, technically sound, attractive car matching the client's preferences and budget.",
       "completedItems": [
-        "Information to be confirmed"
+        "Bodywork and paintwork. Computer diagnostics. No faults found."
       ],
-      "result": "Information to be confirmed."
+      "result": "Recommended for purchase"
     }
   }
 }
