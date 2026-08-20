@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { siteUrl, buildLanguageAlternates } from "@/lib/site";
 
 const copy: Record<Locale, { intro: string; items: string[] }> = {
   uk: {
@@ -38,7 +39,25 @@ export async function generateMetadata({
   const { locale: localeParam } = await params;
   if (!isLocale(localeParam)) return {};
   const dict = await getDictionary(localeParam);
-  return { title: `${dict.footer.cookies} — ${dict.meta.siteName}` };
+  const title = `${dict.footer.cookies} — ${dict.meta.siteName}`;
+  const description = copy[localeParam].intro;
+  const canonical = `${siteUrl}/${localeParam}/cookies`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical,
+      languages: buildLanguageAlternates((locale) => `/${locale}/cookies`),
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      images: [{ url: "/images/dream-car-logo.png" }],
+    },
+  };
 }
 
 export default async function CookiesPage({

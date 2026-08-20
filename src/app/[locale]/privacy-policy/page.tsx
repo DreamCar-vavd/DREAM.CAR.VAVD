@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { emailDisplay } from "@/lib/social";
+import { siteUrl, buildLanguageAlternates } from "@/lib/site";
 
 const copy: Record<Locale, { intro: string; items: string[] }> = {
   uk: {
@@ -45,7 +46,25 @@ export async function generateMetadata({
   const { locale: localeParam } = await params;
   if (!isLocale(localeParam)) return {};
   const dict = await getDictionary(localeParam);
-  return { title: `${dict.footer.privacy} — ${dict.meta.siteName}` };
+  const title = `${dict.footer.privacy} — ${dict.meta.siteName}`;
+  const description = copy[localeParam].intro;
+  const canonical = `${siteUrl}/${localeParam}/privacy-policy`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical,
+      languages: buildLanguageAlternates((locale) => `/${locale}/privacy-policy`),
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      images: [{ url: "/images/dream-car-logo.png" }],
+    },
+  };
 }
 
 export default async function PrivacyPolicyPage({

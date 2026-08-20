@@ -50,6 +50,7 @@ export async function generateMetadata({
       description: copy.shortDescription,
       url: `${siteUrl}/${localeParam}/services/${slug}`,
       type: "website",
+      images: [{ url: "/images/dream-car-logo.png" }],
     },
   };
 }

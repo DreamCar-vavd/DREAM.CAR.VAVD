@@ -4,6 +4,7 @@ import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { carListings } from "@/content/carListings";
 import { CarListingGallery } from "@/components/CarListingGallery";
+import { siteUrl, buildLanguageAlternates } from "@/lib/site";
 
 export async function generateMetadata({
   params,
@@ -13,7 +14,22 @@ export async function generateMetadata({
   const { locale: localeParam } = await params;
   if (!isLocale(localeParam)) return {};
   const dict = await getDictionary(localeParam);
-  return { title: `${dict.carsForSale.pageHeading} — ${dict.meta.siteName}` };
+  const title = `${dict.carsForSale.pageHeading} — ${dict.meta.siteName}`;
+  const canonical = `${siteUrl}/${localeParam}/cars-for-sale`;
+
+  return {
+    title,
+    alternates: {
+      canonical,
+      languages: buildLanguageAlternates((locale) => `/${locale}/cars-for-sale`),
+    },
+    openGraph: {
+      title,
+      url: canonical,
+      type: "website",
+      images: [{ url: "/images/dream-car-logo.png" }],
+    },
+  };
 }
 
 export default async function CarsForSalePage({
