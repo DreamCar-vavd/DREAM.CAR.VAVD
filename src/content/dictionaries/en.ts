@@ -343,6 +343,7 @@ const dictionary: Dictionary = {
       message: "Message",
       consent: "I agree to the processing of my personal data",
       submit: "Send",
+      sending: "Sending…",
       selectService: "Select a service",
       success: "Thank you! Your message has been sent.",
       error: "Your message could not be sent. Please try again or contact us directly.",
@@ -350,6 +351,8 @@ const dictionary: Dictionary = {
         "The server is taking too long to respond. Please try again later, or message us on WhatsApp or call.",
       notConfigured:
         "The form isn't connected yet. Please message us on WhatsApp or call — we'll get back to you as soon as possible.",
+      rateLimited:
+        "Too many attempts. Please try again in a little while, or message us on WhatsApp or call.",
       required: "This field is required",
       invalidEmail: "Please check the email address",
       invalidPhone: "Please check the phone number",

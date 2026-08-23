@@ -172,11 +172,13 @@ export interface Dictionary {
       message: string;
       consent: string;
       submit: string;
+      sending: string;
       selectService: string;
       success: string;
       error: string;
       timeout: string;
       notConfigured: string;
+      rateLimited: string;
       required: string;
       invalidEmail: string;
       invalidPhone: string;

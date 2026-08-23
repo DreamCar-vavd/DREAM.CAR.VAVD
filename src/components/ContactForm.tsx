@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Dictionary } from "@/content/types";
 import { services } from "@/content/services";
+import { classifyContactErrorKind, type ContactErrorKind } from "@/lib/contactErrorKind";
+import { CONTACT_MAX_LENGTHS } from "@/lib/contactLimits";
 import { GoldButton } from "./GoldButton";
 
 type Status = "idle" | "submitting" | "success" | "error";
-type ErrorKind = "notConfigured" | "timeout" | "generic" | null;
+type ErrorKind = ContactErrorKind | null;
 
 interface Errors {
   name?: string;
@@ -20,11 +22,38 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[+\d][\d\s()-]{6,}$/;
 const SUBMIT_TIMEOUT_MS = 15_000;
 
+// Priority order for moving focus to the first invalid field — matches
+// the fields' visual/tab order in the form.
+const FIELD_ORDER = ["name", "phone", "email", "message", "consent"] as const;
+
 export function ContactForm({ dict }: { dict: Dictionary }) {
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Errors>({});
   const [errorKind, setErrorKind] = useState<ErrorKind>(null);
   const isSubmittingRef = useRef(false);
+  const pendingFocusRef = useRef<(typeof FIELD_ORDER)[number] | null>(null);
+  const fieldRefs = useRef<Record<(typeof FIELD_ORDER)[number], HTMLElement | null>>({
+    name: null,
+    phone: null,
+    email: null,
+    message: null,
+    consent: null,
+  });
+  const idPrefix = useId();
+  const errorId = (field: keyof Errors) => `${idPrefix}-${field}-error`;
+
+  // Runs after React has committed `errors` to the DOM, so the field
+  // already has its updated `aria-invalid`/`aria-describedby` by the time
+  // it receives focus (a screen reader reading focus-in picks up the
+  // error immediately instead of the pre-error state). A ref (not state)
+  // holds the pending target so this effect only performs the imperative
+  // `.focus()` call — it never triggers a further render itself.
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    pendingFocusRef.current = null;
+    fieldRefs.current[target]?.focus();
+  }, [errors]);
 
   function validate(formData: FormData): Errors {
     const next: Errors = {};
@@ -53,15 +82,22 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const validationErrors = validate(formData);
+
+    // Clear any status/error banner from a previous attempt before
+    // showing this attempt's outcome, so a stale success/error message
+    // never sits next to newly-invalid fields.
+    setStatus("idle");
+    setErrorKind(null);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
+      const firstInvalidField = FIELD_ORDER.find((field) => validationErrors[field]);
+      pendingFocusRef.current = firstInvalidField ?? null;
       return;
     }
 
     isSubmittingRef.current = true;
     setStatus("submitting");
-    setErrorKind(null);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
@@ -93,13 +129,7 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
       }
 
       setStatus("error");
-      if (body?.code === "NOT_CONFIGURED") {
-        setErrorKind("notConfigured");
-      } else if (body?.code === "UPSTREAM_TIMEOUT") {
-        setErrorKind("timeout");
-      } else {
-        setErrorKind("generic");
-      }
+      setErrorKind(classifyContactErrorKind(response.status, body?.code ?? null));
     } catch (error) {
       setStatus("error");
       setErrorKind(error instanceof Error && error.name === "AbortError" ? "timeout" : "generic");
@@ -116,6 +146,8 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
     statusMessage = dict.contact.form.notConfigured;
   } else if (status === "error" && errorKind === "timeout") {
     statusMessage = dict.contact.form.timeout;
+  } else if (status === "error" && errorKind === "rateLimited") {
+    statusMessage = dict.contact.form.rateLimited;
   } else if (status === "error") {
     statusMessage = dict.contact.form.error;
   }
@@ -138,24 +170,74 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
           <label htmlFor="name" className="mb-1.5 block text-sm text-muted">
             {dict.contact.form.name}
           </label>
-          <input id="name" name="name" type="text" required className={inputClass} aria-invalid={Boolean(errors.name)} />
-          {errors.name && <p className="mt-1 text-xs text-gold-light">{errors.name}</p>}
+          <input
+            ref={(el) => {
+              fieldRefs.current.name = el;
+            }}
+            id="name"
+            name="name"
+            type="text"
+            required
+            autoComplete="name"
+            maxLength={CONTACT_MAX_LENGTHS.name}
+            className={inputClass}
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? errorId("name") : undefined}
+          />
+          {errors.name && (
+            <p id={errorId("name")} className="mt-1 text-xs text-gold-light">
+              {errors.name}
+            </p>
+          )}
         </div>
 
         <div>
           <label htmlFor="phone" className="mb-1.5 block text-sm text-muted">
             {dict.contact.form.phone}
           </label>
-          <input id="phone" name="phone" type="tel" required className={inputClass} aria-invalid={Boolean(errors.phone)} />
-          {errors.phone && <p className="mt-1 text-xs text-gold-light">{errors.phone}</p>}
+          <input
+            ref={(el) => {
+              fieldRefs.current.phone = el;
+            }}
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            autoComplete="tel"
+            maxLength={CONTACT_MAX_LENGTHS.phone}
+            className={inputClass}
+            aria-invalid={Boolean(errors.phone)}
+            aria-describedby={errors.phone ? errorId("phone") : undefined}
+          />
+          {errors.phone && (
+            <p id={errorId("phone")} className="mt-1 text-xs text-gold-light">
+              {errors.phone}
+            </p>
+          )}
         </div>
 
         <div>
           <label htmlFor="email" className="mb-1.5 block text-sm text-muted">
             {dict.contact.form.email}
           </label>
-          <input id="email" name="email" type="email" className={inputClass} aria-invalid={Boolean(errors.email)} />
-          {errors.email && <p className="mt-1 text-xs text-gold-light">{errors.email}</p>}
+          <input
+            ref={(el) => {
+              fieldRefs.current.email = el;
+            }}
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            maxLength={CONTACT_MAX_LENGTHS.email}
+            className={inputClass}
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? errorId("email") : undefined}
+          />
+          {errors.email && (
+            <p id={errorId("email")} className="mt-1 text-xs text-gold-light">
+              {errors.email}
+            </p>
+          )}
         </div>
 
         <div>
@@ -178,33 +260,64 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
           <label htmlFor="vehicle" className="mb-1.5 block text-sm text-muted">
             {dict.contact.form.vehicle}
           </label>
-          <input id="vehicle" name="vehicle" type="text" className={inputClass} />
+          <input
+            id="vehicle"
+            name="vehicle"
+            type="text"
+            autoComplete="off"
+            maxLength={CONTACT_MAX_LENGTHS.vehicle}
+            className={inputClass}
+          />
         </div>
 
         <div className="sm:col-span-2">
           <label htmlFor="message" className="mb-1.5 block text-sm text-muted">
             {dict.contact.form.message}
           </label>
-          <textarea id="message" name="message" rows={4} required className={inputClass} aria-invalid={Boolean(errors.message)} />
-          {errors.message && <p className="mt-1 text-xs text-gold-light">{errors.message}</p>}
+          <textarea
+            ref={(el) => {
+              fieldRefs.current.message = el;
+            }}
+            id="message"
+            name="message"
+            rows={4}
+            required
+            maxLength={CONTACT_MAX_LENGTHS.message}
+            className={inputClass}
+            aria-invalid={Boolean(errors.message)}
+            aria-describedby={errors.message ? errorId("message") : undefined}
+          />
+          {errors.message && (
+            <p id={errorId("message")} className="mt-1 text-xs text-gold-light">
+              {errors.message}
+            </p>
+          )}
         </div>
       </div>
 
       <div>
         <label className="flex items-start gap-3 text-sm text-muted">
           <input
+            ref={(el) => {
+              fieldRefs.current.consent = el;
+            }}
             type="checkbox"
             name="consent"
             className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--gold)]"
             aria-invalid={Boolean(errors.consent)}
+            aria-describedby={errors.consent ? errorId("consent") : undefined}
           />
           {dict.contact.form.consent}
         </label>
-        {errors.consent && <p className="mt-1 text-xs text-gold-light">{errors.consent}</p>}
+        {errors.consent && (
+          <p id={errorId("consent")} className="mt-1 text-xs text-gold-light">
+            {errors.consent}
+          </p>
+        )}
       </div>
 
       <GoldButton type="submit" disabled={status === "submitting"} className="self-start">
-        {dict.contact.form.submit}
+        {status === "submitting" ? dict.contact.form.sending : dict.contact.form.submit}
       </GoldButton>
 
       {statusMessage &&

@@ -12,7 +12,7 @@ interface BaseProps {
 }
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-sm text-sm font-semibold tracking-wide transition-transform duration-300 ease-out hover:scale-[1.02] focus-visible:outline-offset-4 motion-reduce:transition-none motion-reduce:hover:scale-100";
+  "inline-flex items-center justify-center gap-2 rounded-sm text-sm font-semibold tracking-wide transition-transform duration-300 ease-out hover:scale-[1.02] focus-visible:outline-offset-4 motion-reduce:transition-none motion-reduce:hover:scale-100 disabled:pointer-events-none disabled:opacity-60 disabled:hover:scale-100";
 
 const sizes: Record<Size, string> = {
   md: "px-6 py-3 text-sm gap-2",
