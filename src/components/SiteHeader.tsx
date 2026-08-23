@@ -54,14 +54,17 @@ export function SiteHeader({ dict, locale }: { dict: Dictionary; locale: Locale 
           >
             <Phone size={20} />
           </a>
+          <LanguageSwitcher
+            currentLocale={locale}
+            label={dict.common.languageLabel}
+            variant="compact"
+          />
           <MobileMenu
             items={items}
-            locale={locale}
             phoneLabel={dict.common.phoneLabel}
             navLabel={dict.nav.mobileLabel}
             openMenuLabel={dict.nav.openMenu}
             closeMenuLabel={dict.nav.closeMenu}
-            languageLabel={dict.common.languageLabel}
           />
         </div>
       </div>

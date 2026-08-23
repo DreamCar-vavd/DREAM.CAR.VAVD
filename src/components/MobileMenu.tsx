@@ -4,26 +4,20 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, Phone } from "lucide-react";
 import type { NavItem } from "@/lib/nav";
-import type { Locale } from "@/lib/i18n/config";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 import { phoneDisplay, phoneHref } from "@/lib/social";
 
 export function MobileMenu({
   items,
-  locale,
   phoneLabel,
   navLabel,
   openMenuLabel,
   closeMenuLabel,
-  languageLabel,
 }: {
   items: NavItem[];
-  locale: Locale;
   phoneLabel: string;
   navLabel: string;
   openMenuLabel: string;
   closeMenuLabel: string;
-  languageLabel: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -86,8 +80,6 @@ export function MobileMenu({
               <Phone size={18} aria-hidden="true" />
               {phoneDisplay}
             </a>
-
-            <LanguageSwitcher currentLocale={locale} label={languageLabel} />
           </div>,
           document.body,
         )}
