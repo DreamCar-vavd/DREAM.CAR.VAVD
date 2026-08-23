@@ -2047,3 +2047,59 @@ Escape тепер закриває лайтбокс каталогу авто н
 - `git diff --check`, `tsc --noEmit`, `eslint .`, `npm test` (42/42), `npm run build:webpack` — усі без помилок.
 
 Функціональний код змінено лише в `src/components/CarListingGallery.tsx`; окремо оновлено цей файл, `PROJECT_PROGRESS.md` — загалом 2 змінені файли. Commit/push/deployment — **не виконувались**, чекає окремого дозволу.
+
+## Коміт `125c029`: повний focus trap задеплоєно — 2026-08-23
+
+Запушено в `origin/main`. Перевірено на живому `dream-car-vavd.com`: mobile 390px (справжня device-емуляція) і desktop, Dacia (з відео) і Suzuki (без відео), 25+ Tab і Shift+Tab, Escape з фокусом на video controls, ArrowLeft/ArrowRight, ×/backdrop, scroll-lock, пауза відео, повернення фокуса, UK/RU/EN, CSP-заголовок ідентичний. Усе підтверджено.
+
+## Комплексне вдосконалення (локально, без commit) — 2026-08-23
+
+**Етап 1 — контактна форма:**
+- `classifyContactErrorKind` (pure-функція): `429` → `rateLimited` незалежно від тіла відповіді (JSON/HTML/порожнє); новий локалізований текст uk/ru/en.
+- `isJsonContentType`: точна перевірка MIME (`application/json[; charset=...]`), відхиляє `text/application/json`, `application/json-fake`, порожній Content-Type.
+- `evaluateRequestOrigin`: явно чужий `Origin` або `Sec-Fetch-Site: cross-site` → `403 FORBIDDEN_ORIGIN`; відсутній `Origin` не блокується (немає доказів, що це безпечно для всіх легітимних клієнтів).
+- `fetch(..., { redirect: "error" })` на upstream-запиті — захист від мовчазного редиректу з довіреного endpoint.
+- `Cache-Control: no-store` на всіх відповідях `/api/contact`.
+- 29 нових тестів (71/71 разом зі старими).
+
+**Етап 3 — аудит модалок:** підтверджено відсутність focus trap у `ServiceModal`, `GalleryProjectModal`, `MobileMenu`; додано спільний хук `useDialogFocusTrap` (з опцією `trapFocus`, лише для справжніх модалок — `CarListingGallery` не чіпався, вже задеплоєний і перевірений). `MobileMenu` — усунено суперечність `role="dialog"`/`aria-modal="true"` з тим, що кнопка-перемикач і `LanguageSwitcher` лишались поза DOM-деревом drawer'а й доступними ззовні: приведено до чистої disclosure-навігації (прибрано `role`/`aria-modal`, `trapFocus: false`), scroll-lock/Escape/повернення фокуса збережені. `LanguageSwitcher`: попап тепер закривається при виході фокуса по Tab.
+
+**Уточнення щодо `requestAnimationFrame` у `ServicesGrid.tsx`/`GalleryGrid.tsx` (pre-commit correction, 2026-08-23):** попереднє припущення про "реальний preexisting-баг" (нібито `requestAnimationFrame` програє гонитву з нативною поведінкою браузера при поверненні фокуса на trigger-картку) **не підтвердилось відтворювано**. Контрольний A/B-тест на свіжій production-збірці (`npm run build:webpack`, сервер за точним PID з `lsof`) з реальними Playwright-подіями клавіатури й миші — Escape і клік по кнопці "Закрити" — показав ідентичний коректний результат для обох реалізацій в обох компонентах. Найімовірніше пояснення попереднього спостереження — відомі проблеми тестового середовища цієї сесії (застарілий сервер на порту, Chrome не frontmost), а не код. Зміну на `window.setTimeout(..., 0)` скасовано, `ServicesGrid.tsx`/`GalleryGrid.tsx` повернуто до оригінального `requestAnimationFrame` (файли ідентичні `HEAD`, `git diff` — порожній). `CarListingGallery.tsx` (уже задеплоєний, `setTimeout(0)`) не чіпався — його поведінка live-підтверджена окремо й це не привід її змінювати.
+
+**Етап 4 — доступність форми:** `aria-describedby` + унікальні id повідомлень про помилки, фокус на першому невалідному полі після невдалого submit, `autoComplete` для name/phone/email, видимий стан "Надсилаємо…" під час відправки (+ `disabled:` стилі кнопки).
+
+**Технічна перевірка після кожного етапу:** `git diff --check`, `tsc --noEmit`, `eslint .` — чисто; `npm test` — 71/71; `npm run build:webpack` — успішно, статична генерація збережена.
+
+**Живі перевірки:** підтверджено на локальному production-білді (порт 3001) — focus trap і повернення фокуса для всіх трьох модалок, Escape+scroll-lock для MobileMenu, `aria-describedby`+фокус-на-помилку для форми, `403`/`415`/`FORBIDDEN_ORIGIN` з `Cache-Control: no-store` для API, `/api/gallery-projects/[id]` досі `403` у продакшн-білді, UK/RU/EN без консольних помилок, відсутність horizontal overflow.
+
+**Виявлена й виправлена проблема тестового процесу:** `pkill -f "next start"` не збігався з реальним процесом (`next-server`), через що старий сервер міг лишатись на порту й обслуговувати застарілий код між деякими перевірками в Етапі 3 — виявлено через розбіжність served HTML і файлу на диску, з того моменту сервер зупиняється за точним PID з `lsof`.
+
+**Виміряно (Етап 6, живий прод, без змін коду):** LCP ≈ 3.3с на мобільній емуляції (вище "Good"-порогу 2.5с) — потребує окремого рішення власника, чи оптимізувати; CLS = 0.0000 на чистому завантаженні (відмінно; попередній замір 1.0 був артефактом resize-після-завантаження, не реальною проблемою).
+
+Commit/push/deployment для Етапів 1, 3, 4 — **не виконувались**, чекає окремого дозволу. `src/lib/useDialogFocusTrap.ts` — новий untracked файл.
+
+## Комплексне вдосконалення задеплоєно: коміти `4cc74a2`–`8c6d5a9` — 2026-08-23
+
+Після pre-commit correction pass (виправлено MobileMenu ARIA-суперечність, скасовано непідтверджений `requestAnimationFrame`→`setTimeout` фікс, доопрацьовано доступність форми, розділено client/server логіку, додано `Accept: application/json` для upstream-провайдера) весь пакет закомічено п'ятьма окремими логічними комітами й запушено в `origin/main` звичайним push (без force):
+
+1. `4cc74a2` — `fix: harden contact API validation and delivery` (`route.ts`, `route.test.ts`, `contact.ts`, `contact.test.ts`, новий `contactLimits.ts`)
+2. `360a4f6` — `fix: improve contact form errors and accessibility` (`ContactForm.tsx`, `GoldButton.tsx`, словники uk/ru/en, `types.ts`, новий `contactErrorKind.ts`+тест)
+3. `3c88c24` — `fix: trap focus in service and gallery dialogs` (новий `useDialogFocusTrap.ts`, `ServiceModal.tsx`, `GalleryProjectModal.tsx`)
+4. `37fb87c` — `fix: improve mobile header keyboard behavior` (`MobileMenu.tsx`, `LanguageSwitcher.tsx`)
+5. `8c6d5a9` — `docs: add security hardening backlog` (новий `SECURITY_BACKLOG.md`)
+
+Кожен коміт перевірено окремо (`tsc`/`eslint`/тести/build) перед переходом до наступного; жодного змішування файлів між комітами. Секретів у жодному коміті не виявлено.
+
+**Production deployment підтверджено незалежною функціональною перевіркою** (загальний відбиток JS-чанків і `Cache-Control`/`age` виявились ненадійними критеріями — статичний HTML кешується, а незмінені content-addressed чанки перевикористовуються навіть після нового білду):
+- HTML `/uk` (і `/ru`, `/en`) містить нові тексти пакета — "Надсилаємо…" та локалізоване "Забагато спроб. Спробуйте ще раз трохи пізніше…" (uk/ru/en, усі `HTTP 200`).
+- Один безпечний негативний запит без персональних даних — `POST /api/contact` з `Content-Type: text/application/json`, порожнє тіло — повернув `HTTP 415`, `{"ok":false,"code":"UNSUPPORTED_MEDIA_TYPE"}`, `Cache-Control: no-store` — саме нова строга перевірка Content-Type і новий no-store, а не стара поведінка.
+- MobileMenu на живому сайті (390px): без `role`/`aria-modal` (disclosure-навігація), scroll-lock активний при відкритті, Escape коректно знімає scroll-lock і повертає фокус на кнопку-перемикач.
+- `ServiceModal` і `GalleryProjectModal` на живому сайті: focus trap утримує фокус (10+ Tab), Escape/кнопка закриття коректно закривають і повертають фокус на trigger-картку.
+- `LanguageSwitcher` (compact, 390px): попап закривається після виходу фокуса по Tab.
+- CSP-заголовок на живому сайті ідентичний попередньому (`default-src 'self'; ...` без змін).
+- Console — 0 помилок на `/uk`; horizontal overflow — відсутній (desktop і 390px).
+- Реальне тестове повідомлення через форму — **не надсилалось**.
+
+**Технічний нюанс середовища (виявлено під час цього етапу):** робота велась у `/Users/apple/Desktop/MY PROEKT-2`, яка синхронізується iCloud Drive. Під час `git stash pop` (проміжна ізоляція коміту для перевірки) iCloud перехопила частину одночасних файлових записів git і створила дублікати "file 2"/"file 3", через що git завершився з помилкою й лишив `.git/index.lock`. Дані не було втрачено: сам stash-об'єкт лишався цілим у `.git`, усі файли відновлено побайтово точно з нього (звірено diff'ом), дублікати видалено. Окремо в `.git/refs/` виявлено й прибрано один пошкоджений iCloud-дублікат ref-файлу (`refs/stash 2`, вказував на вже видалений dangling-коміт) — на активні посилання це не впливало. Найбільший залишковий ризик — саме розташування `.git` всередині iCloud-синхронізованої папки; власнику окремим кроком запропоновано (не виконано без дозволу) клонувати репозиторій у несинхронізовану папку, наприклад `/Users/apple/Projects/DREAM.CAR.VAVD`, без видалення поточної.
+
+**Залишковий High-ризик:** Vercel WAF rate limiting для `POST /api/contact` **ще не налаштований** (див. `SECURITY_BACKLOG.md`) — потрібен доступ власника до Vercel Dashboard. Origin/Sec-Fetch-Site перевірка — лише defense-in-depth, не замінює rate limiting.
