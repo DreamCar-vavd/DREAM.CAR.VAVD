@@ -47,7 +47,7 @@ public/images/gallery/01.jpg … 08.jpg — фото в галереї
 
 ```
 NEXT_PUBLIC_SITE_URL=              # для canonical/OG/sitemap
-NEXT_PUBLIC_FORM_ENDPOINT=         # URL для відправки форми зворотного зв'язку
+CONTACT_FORM_ENDPOINT=             # server-only секрет — URL доставлення форми зворотного зв'язку
 NEXT_PUBLIC_TELEGRAM_URL=
 NEXT_PUBLIC_INSTAGRAM_URL=
 NEXT_PUBLIC_FACEBOOK_URL=
@@ -56,7 +56,9 @@ NEXT_PUBLIC_BUSINESS_ADDRESS=
 NEXT_PUBLIC_GOOGLE_MAPS_URL=
 ```
 
-Кнопки соцмереж і форма зворотного зв'язку показуються лише якщо відповідна змінна задана.
+`CONTACT_FORM_ENDPOINT` — **server-only секрет**, не префіксуй його `NEXT_PUBLIC_*`. Змінні з цим префіксом Next.js вбудовує у клієнтський JS-бандл і вони стають видимими будь-кому в браузері; для доставлення форми це неприпустимо. Не виводь це значення в лог, консоль чи UI, і не комітуй його — `.env*` вже в `.gitignore` (крім `.env.example`, де значення завжди порожнє).
+
+Кнопки соцмереж показуються лише якщо відповідна `NEXT_PUBLIC_*`-змінна задана. Форма зворотного зв'язку показується завжди: `ContactForm` завжди рендериться і надсилає POST на власний same-origin `/api/contact` (див. `src/app/api/contact/route.ts`), який валідує вхідні дані на сервері й лише тоді пересилає їх на `CONTACT_FORM_ENDPOINT`. Якщо змінна не задана, ендпоінт повертає `503 NOT_CONFIGURED`, і форма показує користувачу дружнє повідомлення замість помилки.
 
 ## Структура
 

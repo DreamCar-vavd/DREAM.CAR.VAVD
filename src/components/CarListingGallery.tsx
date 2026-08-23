@@ -70,14 +70,21 @@ export function CarListingGallery({
     const video = videoRef.current;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
       if (event.key === "ArrowLeft") showPrevious();
       if (event.key === "ArrowRight") showNext();
     };
+    // Escape is handled separately, in the capture phase: the native
+    // <video controls> shadow DOM can otherwise keep the key from ever
+    // reaching this bubble-phase listener once it has focus.
+    const handleEscapeCapture = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleEscapeCapture, true);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleEscapeCapture, true);
       video?.pause();
     };
   }, [close, isOpen, showNext, showPrevious]);

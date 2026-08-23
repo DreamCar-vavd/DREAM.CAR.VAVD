@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const cspReportOnlyHeader = `
+const cspHeader = `
   default-src 'self';
   base-uri 'self';
   object-src 'none';
@@ -50,7 +50,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: cspReportOnlyHeader,
+            value: cspHeader,
           },
         ],
       },

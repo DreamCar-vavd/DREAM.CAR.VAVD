@@ -2007,3 +2007,25 @@ default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; 
 
 ### Git / Push / Deployment
 Коміт **не створювався**, push і Vercel deployment **не виконувались** на цьому read-only-адресному етапі.
+
+---
+
+## Коміт `b0e93dc`: компактний мобільний перемикач мови — 2026-08-22/23
+
+Мовну панель перенесено з випадного мобільного меню в сам рядок header (`MobileMenu.tsx`, `SiteHeader.tsx`); на мобільних екранах (`<1280px`) 3 окремі прапорці замінено компактною кнопкою з випадним списком (`LanguageSwitcher.tsx`, новий `CompactLanguageSwitcher`). Desktop (`≥1280px`) лишився без змін — 3 окремі прапорці UA/RU/EN. Доступність: справжня `<button>`, `aria-expanded`, фокус на перший пункт при відкритті, закриття по `Escape` (з поверненням фокуса на кнопку), `pointerdown` поза списком, клавіатурна навігація через звичайний семантичний список посилань (без `role="menu"`). Перевірено на живому `dream-car-vavd.com`: UK/RU/EN, збереження поточного маршруту при зміні мови, desktop, консоль/мережа чисті. tsc/eslint/build (production) — без помилок. Запушено в `origin/main` окремим комітом.
+
+## Read-only технічний аудит — 2026-08-23
+
+Повний аудит без змін коду: git-стан, архітектура/env/конфіг, tsc/eslint/тести (42/42)/production build, security headers на живому домені, CSP (0 порушень у чистій вкладці), `/api/contact` (методи, валідація, ліміт тіла 32KB, timeout, SSRF/CSRF/rate-limiting), `/api/gallery-projects/[id]` (підтверджено закритий у проді — `403`), секрети в git-історії (не знайдено), `npm audit` (0 вразливостей), локалі/404/privacy/cookies/sitemap/robots, фото/відео каталогу авто (Range-запити, `naturalWidth`/`complete`), доступність лайтбоксу, redirects (http→https, www→apex, canonical host).
+
+**Ключові підтверджені знахідки:**
+- **High:** `/api/contact` не має rate limiting (лише прямі скриптові запити — браузерний CSRF вже блокується відсутністю CORS-заголовків, перевірено live `OPTIONS`-тестом). Рекомендація — правило Vercel WAF Rate Limit (Hobby-план підтримує 1 правило/проєкт), **ще не налаштоване, очікує ручної дії власника у Vercel Dashboard**.
+- **Medium:** статичні фото (3–8 МБ оригінали, ~1 МБ оптимізовані) і відео (~48 МБ) віддаються з `Cache-Control: public, max-age=0, must-revalidate` — довший кеш ще не впроваджено.
+- **Medium:** AVIF не увімкнено (`images.formats` не задано) — ще не впроваджено.
+- **Medium (виправлено 2026-08-23):** лайтбокс каталогу авто (`CarListingGallery.tsx`) не закривався по `Escape`, якщо фокус лишався на нативних контролах `<video>` — виправлено окремим capture-phase обробником лише для `Escape`; `ArrowLeft`/`ArrowRight`, закриття кнопкою/backdrop, scroll-lock, повернення фокуса — не зачіпались.
+- **Виявлено, не в скоупі виправлення:** лайтбокс каталогу авто не має повного focus trap (Tab може вивести фокус за межі відкритої модалки в фон сторінки) — лише зафіксовано, розширення скоупу не узгоджувалось.
+- **Low (виправлено 2026-08-23):** `README.md` документував застарілу `NEXT_PUBLIC_FORM_ENDPOINT` замість серверної `CONTACT_FORM_ENDPOINT` — виправлено, додано явне попередження про server-only секрет.
+- **Low (виправлено 2026-08-23):** змінна `cspReportOnlyHeader` у `next.config.ts` перейменована на `cspHeader` (значення й ключ заголовка `Content-Security-Policy` не змінювались — вона й раніше була активною, не report-only).
+- Косметика: "сірі блоки" на `/cars-for-sale`, які одного разу спостерігались на скріншоті, **перевірено і не підтверджено як дефект** (`complete:true`, реальний `naturalWidth` на всіх фото).
+
+Commit/push/deployment на цьому та read-only етапах — **не виконувались**.
