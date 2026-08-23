@@ -90,6 +90,16 @@ function CompactLanguageSwitcher({
       if (event.key === "Escape") {
         setOpen(false);
         buttonRef.current?.focus();
+        return;
+      }
+      // Not a focus trap: this is a small popover, not a modal dialog.
+      // Tabbing out is expected to move focus onward as normal — the
+      // popover just shouldn't stay visibly open once focus has left it.
+      if (event.key === "Tab") {
+        const root = rootRef.current;
+        window.requestAnimationFrame(() => {
+          if (root && !root.contains(document.activeElement)) setOpen(false);
+        });
       }
     };
 

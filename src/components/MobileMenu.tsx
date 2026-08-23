@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, Phone } from "lucide-react";
 import type { NavItem } from "@/lib/nav";
 import { phoneDisplay, phoneHref } from "@/lib/social";
+import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 
 export function MobileMenu({
   items,
@@ -20,25 +21,27 @@ export function MobileMenu({
   closeMenuLabel: string;
 }) {
   const [open, setOpen] = useState(false);
+  const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const firstLinkRef = useRef<HTMLAnchorElement>(null);
+
+  const closeAndReturnFocus = useCallback(() => {
+    setOpen(false);
+    toggleButtonRef.current?.focus();
+  }, []);
+
+  useDialogFocusTrap(drawerRef, open, closeAndReturnFocus, {
+    trapFocus: false,
+  });
 
   useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    if (open) firstLinkRef.current?.focus();
   }, [open]);
 
   return (
     <div className="xl:hidden">
       <button
+        ref={toggleButtonRef}
         type="button"
         aria-label={open ? closeMenuLabel : openMenuLabel}
         aria-expanded={open}
@@ -53,14 +56,16 @@ export function MobileMenu({
         typeof document !== "undefined" &&
         createPortal(
           <div
+            ref={drawerRef}
             id="mobile-drawer"
             className="fixed inset-x-0 top-16 bottom-0 z-40 flex flex-col gap-6 overflow-y-auto bg-background/98 px-6 py-8"
           >
             <nav aria-label={navLabel}>
               <ul className="flex flex-col gap-5 text-lg">
-                {items.map((item) => (
+                {items.map((item, index) => (
                   <li key={item.href}>
                     <a
+                      ref={index === 0 ? firstLinkRef : undefined}
                       href={item.href}
                       onClick={() => setOpen(false)}
                       className="flex min-h-11 items-center font-medium text-text transition-colors hover:text-gold"
