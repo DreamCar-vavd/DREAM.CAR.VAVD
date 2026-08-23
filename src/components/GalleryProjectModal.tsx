@@ -12,6 +12,7 @@ import { DreamLogo } from "./DreamLogo";
 import { GoldLink, GoldButton } from "./GoldButton";
 import { WhatsAppIcon } from "./icons/SocialIcons";
 import { whatsappUrl } from "@/lib/social";
+import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 
 const EDITABLE_PROJECT_IDS = new Set(["maserati-levante", "volvo-xc60-d5"]);
 
@@ -34,6 +35,7 @@ export function GalleryProjectModal({
   const copy = dict.gallery.projects[project.id];
   const [activeIndex, setActiveIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const activeImage = project.images[activeIndex];
 
@@ -45,23 +47,12 @@ export function GalleryProjectModal({
   const [editData, setEditData] = useState<EditState | null>(null);
   const [editLocale, setEditLocale] = useState<Locale>(locale);
 
+  useDialogFocusTrap(dialogRef, true, onClose);
+
   useEffect(() => {
     const frame = requestAnimationFrame(() => setMounted(true));
     closeButtonRef.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   async function startEditing() {
@@ -154,6 +145,7 @@ export function GalleryProjectModal({
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={copy.title}
