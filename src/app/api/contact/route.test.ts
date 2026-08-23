@@ -72,6 +72,26 @@ test("Content-Type with a charset suffix is still accepted", async () => {
   assert.notEqual(response.status, 415);
 });
 
+test("a Content-Type that merely contains application/json as a substring is rejected", async () => {
+  const request = jsonRequest(validBody(), { "Content-Type": "text/application/json" });
+  const response = await POST(request);
+  const json = (await response.json()) as { ok: boolean; code: string };
+  assert.equal(response.status, 415);
+  assert.equal(json.code, "UNSUPPORTED_MEDIA_TYPE");
+});
+
+test("a Content-Type that starts with application/json but isn't exactly that is rejected", async () => {
+  const request = jsonRequest(validBody(), { "Content-Type": "application/json-fake" });
+  const response = await POST(request);
+  assert.equal(response.status, 415);
+});
+
+test("an empty Content-Type header is rejected", async () => {
+  const request = jsonRequest(validBody(), { "Content-Type": "" });
+  const response = await POST(request);
+  assert.equal(response.status, 415);
+});
+
 test("malformed JSON returns 400 INVALID_PAYLOAD without crashing", async () => {
   const request = jsonRequest("{not valid json");
   const response = await POST(request);
@@ -181,6 +201,89 @@ test("a successful upstream delivery returns 200 ok:true without leaking the ups
   const json = (await response.json()) as Record<string, unknown>;
   assert.equal(response.status, 200);
   assert.deepEqual(json, { ok: true });
+});
+
+test("a cross-origin Origin header is rejected with 403 FORBIDDEN_ORIGIN before reaching fetch", async () => {
+  globalThis.fetch = refusingFetch();
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const request = jsonRequest(validBody(), {
+    "Content-Type": "application/json",
+    Origin: "https://evil.example",
+  });
+  const response = await POST(request);
+  const json = (await response.json()) as { ok: boolean; code: string };
+  assert.equal(response.status, 403);
+  assert.equal(json.code, "FORBIDDEN_ORIGIN");
+});
+
+test("an Origin header matching the request's own host is allowed through", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = (async () => new Response(null, { status: 200 })) as typeof fetch;
+  const request = jsonRequest(validBody(), {
+    "Content-Type": "application/json",
+    Origin: "http://localhost",
+  });
+  const response = await POST(request);
+  assert.equal(response.status, 200);
+});
+
+test("a missing Origin header is allowed through, not blocked", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = (async () => new Response(null, { status: 200 })) as typeof fetch;
+  const response = await POST(jsonRequest(validBody()));
+  assert.equal(response.status, 200);
+});
+
+test("Sec-Fetch-Site: cross-site is rejected even without an Origin header", async () => {
+  globalThis.fetch = refusingFetch();
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const request = jsonRequest(validBody(), {
+    "Content-Type": "application/json",
+    "Sec-Fetch-Site": "cross-site",
+  });
+  const response = await POST(request);
+  assert.equal(response.status, 403);
+});
+
+test("responses are never cacheable", async () => {
+  const response = await POST(jsonRequest(validBody({ name: "" })));
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("the upstream fetch refuses to follow redirects (redirect: \"error\")", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  let capturedInit: RequestInit | undefined;
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    capturedInit = init;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  const response = await POST(jsonRequest(validBody()));
+  assert.equal(response.status, 200);
+  assert.equal(capturedInit?.redirect, "error");
+});
+
+test("a redirect response from the upstream (redirect: \"error\" throws) becomes 502 DELIVERY_FAILED", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = (async () => {
+    throw new TypeError("Failed to fetch: redirect mode is 'error'");
+  }) as typeof fetch;
+  const response = await POST(jsonRequest(validBody()));
+  const json = (await response.json()) as { ok: boolean; code: string };
+  assert.equal(response.status, 502);
+  assert.equal(json.code, "DELIVERY_FAILED");
+});
+
+test("the outgoing request asks the upstream provider for a JSON response (Accept: application/json)", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  let capturedInit: RequestInit | undefined;
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    capturedInit = init;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  const response = await POST(jsonRequest(validBody()));
+  assert.equal(response.status, 200);
+  const headers = new Headers(capturedInit?.headers);
+  assert.equal(headers.get("Accept"), "application/json");
 });
 
 test("the outgoing request to the provider excludes website and unknown fields", async () => {

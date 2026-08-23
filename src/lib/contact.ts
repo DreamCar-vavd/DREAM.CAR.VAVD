@@ -1,14 +1,9 @@
+import { CONTACT_MAX_LENGTHS } from "./contactLimits";
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^[+\d][\d\s()-]{6,}$/;
 
-export const CONTACT_MAX_LENGTHS = {
-  name: 100,
-  phone: 30,
-  email: 254,
-  service: 100,
-  vehicle: 200,
-  message: 5000,
-} as const;
+export { CONTACT_MAX_LENGTHS };
 
 export interface NormalizedContactInput {
   name: string;
@@ -101,6 +96,49 @@ export function resolveAllowedEndpoint(rawValue: string | undefined): URL | null
   } catch {
     return null;
   }
+}
+
+/**
+ * Checks a `Content-Type` header value for an exact `application/json`
+ * media type (an optional `;charset=...` parameter is allowed). Unlike a
+ * plain `.includes("application/json")` check, this rejects media types
+ * that merely contain that substring, e.g. `text/application/json` or
+ * `application/json-fake`.
+ */
+export function isJsonContentType(contentType: string): boolean {
+  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
+  return mediaType === "application/json";
+}
+
+export type OriginCheckResult = "same-origin" | "cross-origin" | "unknown";
+
+/**
+ * Evaluates whether a request's `Origin` (and, as a secondary signal,
+ * `Sec-Fetch-Site`) header indicates it came from the site's own origin.
+ *
+ * A missing `Origin` header is deliberately classified as `"unknown"`
+ * rather than `"cross-origin"`: same-origin requests aren't guaranteed to
+ * carry an `Origin` header from every client, and treating an absent
+ * header as hostile would risk rejecting legitimate same-origin
+ * submissions with no corresponding security benefit (a forged request
+ * can omit the header just as easily as a real one).
+ */
+export function evaluateRequestOrigin(
+  originHeader: string | null,
+  secFetchSite: string | null,
+  siteOrigin: string,
+): OriginCheckResult {
+  if (secFetchSite === "cross-site") return "cross-origin";
+
+  if (originHeader) {
+    try {
+      return new URL(originHeader).origin === siteOrigin ? "same-origin" : "cross-origin";
+    } catch {
+      return "cross-origin";
+    }
+  }
+
+  return "unknown";
 }
 
 /**

@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CONTACT_MAX_LENGTHS,
+  evaluateRequestOrigin,
   isHoneypotTriggered,
+  isJsonContentType,
   normalizeContactInput,
   validateContactPayload,
 } from "./contact";
@@ -144,4 +146,70 @@ test("non-object input normalizes to empty strings without throwing", () => {
   assert.equal(normalized.consent, false);
   const result = validateContactPayload(normalized);
   assert.equal(result.valid, false);
+});
+
+// --- isJsonContentType ---
+
+test("isJsonContentType accepts a bare application/json", () => {
+  assert.equal(isJsonContentType("application/json"), true);
+});
+
+test("isJsonContentType accepts application/json with a charset parameter", () => {
+  assert.equal(isJsonContentType("application/json; charset=utf-8"), true);
+});
+
+test("isJsonContentType is case-insensitive", () => {
+  assert.equal(isJsonContentType("Application/JSON; Charset=UTF-8"), true);
+});
+
+test("isJsonContentType rejects text/application/json", () => {
+  assert.equal(isJsonContentType("text/application/json"), false);
+});
+
+test("isJsonContentType rejects application/json-fake", () => {
+  assert.equal(isJsonContentType("application/json-fake"), false);
+});
+
+test("isJsonContentType rejects an empty Content-Type", () => {
+  assert.equal(isJsonContentType(""), false);
+});
+
+test("isJsonContentType rejects a completely unrelated media type", () => {
+  assert.equal(isJsonContentType("text/plain"), false);
+});
+
+// --- evaluateRequestOrigin ---
+
+const SITE_ORIGIN = "https://dream-car-vavd.com";
+
+test("evaluateRequestOrigin treats a matching Origin as same-origin", () => {
+  assert.equal(evaluateRequestOrigin("https://dream-car-vavd.com", null, SITE_ORIGIN), "same-origin");
+});
+
+test("evaluateRequestOrigin treats the Vercel fallback host as same-origin against its own origin", () => {
+  assert.equal(
+    evaluateRequestOrigin("https://dreamcarvavd.vercel.app", null, "https://dreamcarvavd.vercel.app"),
+    "same-origin",
+  );
+});
+
+test("evaluateRequestOrigin treats a different Origin as cross-origin", () => {
+  assert.equal(evaluateRequestOrigin("https://evil.example", null, SITE_ORIGIN), "cross-origin");
+});
+
+test("evaluateRequestOrigin treats a malformed Origin header as cross-origin", () => {
+  assert.equal(evaluateRequestOrigin("not a url", null, SITE_ORIGIN), "cross-origin");
+});
+
+test("evaluateRequestOrigin treats Sec-Fetch-Site: cross-site as cross-origin even without an Origin header", () => {
+  assert.equal(evaluateRequestOrigin(null, "cross-site", SITE_ORIGIN), "cross-origin");
+});
+
+test("evaluateRequestOrigin treats a matching Origin as same-origin even if Sec-Fetch-Site is missing", () => {
+  assert.equal(evaluateRequestOrigin("https://dream-car-vavd.com", null, SITE_ORIGIN), "same-origin");
+});
+
+test("evaluateRequestOrigin treats a missing Origin (and no cross-site signal) as unknown, not blocked", () => {
+  assert.equal(evaluateRequestOrigin(null, null, SITE_ORIGIN), "unknown");
+  assert.equal(evaluateRequestOrigin(null, "same-origin", SITE_ORIGIN), "unknown");
 });
