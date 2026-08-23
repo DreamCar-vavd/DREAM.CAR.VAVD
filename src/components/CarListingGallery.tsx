@@ -43,6 +43,7 @@ export function CarListingGallery({
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -79,12 +80,47 @@ export function CarListingGallery({
     const handleEscapeCapture = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
     };
+    // Focus trap, also in the capture phase so it still applies when
+    // focus is inside the native <video controls> shadow DOM. Only the
+    // boundary (first/last focusable, or focus having escaped the
+    // dialog entirely) is intercepted — everything in between,
+    // including the video's own internal control navigation, is left
+    // to the browser's default Tab handling.
+    const handleTabCapture = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, a[href], video, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled"));
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const isInside = dialog.contains(active);
+
+      if (event.shiftKey) {
+        if (!isInside || active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (!isInside || active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keydown", handleEscapeCapture, true);
+    window.addEventListener("keydown", handleTabCapture, true);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keydown", handleEscapeCapture, true);
+      window.removeEventListener("keydown", handleTabCapture, true);
       video?.pause();
     };
   }, [close, isOpen, showNext, showPrevious]);
@@ -132,6 +168,7 @@ export function CarListingGallery({
 
       {isOpen && (
         <div
+          ref={dialogRef}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-2 backdrop-blur-md sm:p-5"
           role="dialog"
           aria-modal="true"
