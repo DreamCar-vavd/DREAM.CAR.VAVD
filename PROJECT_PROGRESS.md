@@ -2102,4 +2102,21 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
 
 **Технічний нюанс середовища (виявлено під час цього етапу):** робота велась у `/Users/apple/Desktop/MY PROEKT-2`, яка синхронізується iCloud Drive. Під час `git stash pop` (проміжна ізоляція коміту для перевірки) iCloud перехопила частину одночасних файлових записів git і створила дублікати "file 2"/"file 3", через що git завершився з помилкою й лишив `.git/index.lock`. Дані не було втрачено: сам stash-об'єкт лишався цілим у `.git`, усі файли відновлено побайтово точно з нього (звірено diff'ом), дублікати видалено. Окремо в `.git/refs/` виявлено й прибрано один пошкоджений iCloud-дублікат ref-файлу (`refs/stash 2`, вказував на вже видалений dangling-коміт) — на активні посилання це не впливало. Найбільший залишковий ризик — саме розташування `.git` всередині iCloud-синхронізованої папки; власнику окремим кроком запропоновано (не виконано без дозволу) клонувати репозиторій у несинхронізовану папку, наприклад `/Users/apple/Projects/DREAM.CAR.VAVD`, без видалення поточної.
 
-**Залишковий High-ризик:** Vercel WAF rate limiting для `POST /api/contact` **ще не налаштований** (див. `SECURITY_BACKLOG.md`) — потрібен доступ власника до Vercel Dashboard. Origin/Sec-Fetch-Site перевірка — лише defense-in-depth, не замінює rate limiting.
+**Залишковий High-ризик (на момент запису):** Vercel WAF rate limiting для `POST /api/contact` **ще не налаштований** (див. `SECURITY_BACKLOG.md`) — потрібен доступ власника до Vercel Dashboard. Origin/Sec-Fetch-Site перевірка — лише defense-in-depth, не замінює rate limiting.
+
+## Міграція середовища: свіжий clone поза iCloud — 2026-08-24
+
+За дозволом власника створено нову робочу копію напряму з GitHub (не копія `.git`, не `mv`): `/Users/apple/Projects/DREAM.CAR.VAVD`. Підтверджено через `brctl status` — `/Users/apple/Projects` **не** синхронізується iCloud (на відміну від Desktop/Documents, де `FXICloudDriveDesktop=1`). `HEAD = origin/main = 90348c6`, `ahead/behind 0/0`, `git fsck --full` — без пошкоджених/dangling об'єктів (чистий clone). `npm ci` → tsc/eslint/72 тести/`build:webpack` — усі чисто; короткий локальний production-сервер (порт 3199, зупинений за PID) — UK, форма (валідація без мережевого запиту), MobileMenu, LanguageSwitcher, ServiceModal — усе підтверджено, консоль чиста. `.env.local` скопійовано лише як файл (без виводу вмісту), підтверджено `.gitignore`-покриття. Стара папка `/Users/apple/Desktop/MY PROEKT-2` — недоторкана, залишається резервною копією. Надалі вся робота — виключно в новій копії.
+
+## Vercel WAF: правило rate limiting опубліковано в режимі Log — 2026-08-24
+
+Через авторизовану вкладку браузера (Vercel Dashboard, проєкт `dream.car.vavd`, домен `dream-car-vavd.com` підтверджено в Settings → Domains) перевірено відсутність наявних custom rules ("No Custom Rules Yet") і опубліковано нове правило:
+
+- Назва: **Contact form rate limit**
+- Умови (AND): `Request Path equals /api/contact` AND `Request Method equals POST`
+- Дія: **Rate Limit** — Fixed Window, **60 секунд**, **10 запитів**, ключ підрахунку **IP Address**
+- Дія після перевищення ліміту: **Log** (не Default 429, не Deny, не Challenge)
+
+Перед публікацією значення звірено напряму з DOM (`document.querySelector(...).value`), оскільки поля Vercel-форми не відображали введений текст візуально при незмінному реальному значенні — підтверджено: `seconds="60"`, `requests="10"`, IP-чекбокс позначено, "Then" = "Log". Опубліковано через Review Changes → Publish; тост "Your Firewall changes have been applied successfully"; Overview → "Custom Rules: 1 active"; Audit Log → "You published version #1 with 1 change — You created and enabled Contact form rate limit — Just now". Платних підказок/запитів на оновлення тарифу не з'являлось. Штучний трафік для спрацювання ліміту не генерувався. Код, GitHub, Formspree, домен і deployment — **не змінювались**.
+
+**Наступний крок (потребує окремого дозволу власника):** через 3–7 днів переглянути статистику Firewall → Traffic/Overview і, якщо немає легітимних спрацювань, перемкнути дію з Log на `Default (429)`.
