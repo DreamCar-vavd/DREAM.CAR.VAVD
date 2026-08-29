@@ -22,6 +22,15 @@
 - Стара папка `/Users/apple/Desktop/MY PROEKT-2` є резервною історичною
   копією; не використовувати її для нової роботи та не видаляти без окремого
   дозволу власника.
+- **Поточна підтверджена контрольна точка (2026-08-29, після merge PR #5):**
+  `HEAD = origin/main = 69603763b36828c4fbb3858516c5feab33a65fe9`
+  (squash-коміт PR #5, `docs: record GitHub access audit and 2FA`, злито
+  `2026-08-29T20:53:15Z`), ahead/behind `0 0`, робоче дерево чисте; локально
+  й віддалено залишилась лише `main`. CI на `push` у `main` — run
+  `33274634343`, `success`. Production deployment
+  `BwmPSyf47tddUeZPaLECNeUyqarC` — `Ready`, `29s`, джерело `main`/`6960376`.
+  Деталі аудиту доступу — розділ 7; звуження Vercel repository access —
+  розділ 8; практичний PR-тест інтеграції — розділ 9.
 - Остання підтверджена контрольна точка перед документаційною корекцією
   Branch Protection: `HEAD = origin/main = 4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`,
   ahead/behind `0 0`, робоче дерево чисте, активна гілка `main`; локально й
@@ -191,46 +200,80 @@ alerts зараз — `0`.
 - Vercel: Two-Factor Authentication **Active**, Authenticator App (TOTP)
   Enrolled; recovery-коди збережені власником.
 - GitHub: повний read-only аудит доступу та автентифікації, включно з
-  2FA, — розділ 7.
+  2FA, PAT, Security keys і GitHub Apps, — розділ 7 (завершено повністю,
+  без відкритих непідтверджених деталей).
 - Recovery-коди, TOTP-секрети й паролі не передавати асистентам і не
   вставляти в чат.
 
 ## 7. GitHub — аудит доступу та автентифікації (завершено)
 
 Read-only аудит виконано `2026-08-29` через офіційний GitHub UI та `gh api`
-(лише GET-запити), без зміни жодного налаштування.
+(лише GET-запити), без зміни жодного налаштування. Три раніше непідтверджені
+деталі (fine-grained PAT scope/permissions, Security keys, детальні
+permissions Authorized GitHub Apps) незалежно перевірені й закриті
+`2026-08-29`.
 
 **2FA:** Enabled. Preferred method — Authenticator app; метод — Google
 Authenticator, статус **Configured**; recovery codes налаштовані, власник
 підтвердив їх безпечне збереження (роздруковані, перевірені; завантажений
 незахищений файл recovery codes видалено остаточно). Самі коди, QR-код,
 setup key і TOTP-коди ніде не записувались і не переглядались асистентом.
-SMS — не додано. GitHub Mobile — не додано. Passkey — не додано. **Стан
-Security keys не підтверджений однозначно** — кнопка `Edit` на сторінці не є
-достатнім доказом наявності чи відсутності ключа.
+SMS — не додано. GitHub Mobile — не додано. Passkey — не додано.
 
 **Активні сеанси:** 1 поточний очікуваний сеанс; підозрілих сеансів не
 виявлено. IP та інші приватні значення в цьому файлі не записуються.
 
-**Fine-grained PAT:** 1 токен, безпечна назва "DreamCar Git Push"; статус на
-момент аудиту — `Never used`; строк дії — **2026-09-24**. **Точні
-permissions і repository scope підтвердити не вдалось** — сторінка деталей
-не відкрилась одним кліком, повторно не форсувалось. Значення токена не
-переглядалось і не записувалось.
+**Fine-grained PAT (підтверджено `2026-08-29` через `/settings/personal-access-tokens/18727062`):**
+1 токен, назва `DreamCar Git Push`, опис `Git push for DREAM.CAR.VAVD`,
+resource owner `DreamCar-vavd`; створено `Tue, Aug 25 2026`, строк дії —
+`Thu, Sep 24 2026`; на момент аудиту — `Never used`. Repository access:
+`Only select repositories`, вибрано 1 репозиторій —
+`DreamCar-vavd/DREAM.CAR.VAVD`. User permissions — відсутні (`This token
+does not have any user permissions`). Organization permissions — відсутні.
+Repository permissions: `Metadata` — Read; `Code and workflows` — Read and
+Write. Pending approval — відсутній. Значення токена не переглядалось і не
+записувалось.
+
+Оцінка мінімальності (не безумовна): Contents/Code Read and Write відповідає
+потребі `git push`; Workflows Read and Write потрібне лише за умови
+редагування `.github/workflows/*` цим токеном — тому набір є мінімальним
+лише за умови запланованого редагування workflow-файлів. Токен жодного разу
+не використовувався, оскільки фактичні git-операції цієї сесії виконувались
+через окрему OAuth-авторизацію `gh` CLI. Рішення залишити, звузити чи
+видалити токен не прийнято — розділ 12.
 
 **Classic PAT:** 0.
 
 **SSH keys:** 0. **GPG keys:** 0.
+
+**Security keys (підтверджено `2026-08-29`):** `0`. На сторінці `Password
+and authentication` розділ `Security keys` після розгортання (`Edit` →
+`Hide`) показує лише кнопку `Register new security key`, без жодного
+зареєстрованого ключа. Не плутати з SSH keys (0, вище) чи passkeys (не
+додано).
 
 **Authorized OAuth Apps (2):** `GitHub CLI` — офіційний, owned by github,
 використовувався; `Visual Studio Code` — офіційний, owned by
 Visual-Studio-Code, на момент аудиту `Never used`. Доступи не відкликались і
 не змінювались.
 
-**Authorized GitHub Apps (акаунт, 4):** `Claude`, `Copilot Chat App`,
-`Mem0`, `Vercel`. **На рівні репозиторію `DREAM.CAR.VAVD` встановлено лише
-`Vercel`.** Детальні permissions кожного застосунку не перевірялись —
-безпечність не визначається лише назвою чи видавцем.
+**Authorized GitHub Apps (акаунт, 4, деталі підтверджено `2026-08-29`):**
+
+- `Claude` — publisher `anthropics`, на момент аудиту `Never used`.
+- `Copilot Chat App` — publisher `github`, на момент аудиту `Never used`.
+- `Mem0` — publisher `mem0ai`, на момент аудиту `Never used`, user-level
+  доступ включає перегляд email-адреси (`View email addresses`).
+- `Vercel` — publisher `vercel`, використовувався протягом останнього тижня
+  на момент аудиту, user-level доступ включає перегляд email-адреси.
+
+Це user-level авторизації із узагальненими категоріями GitHub (`Verify your
+identity`, `Know what resources...`, `Act on your behalf`) — не точні
+repository permissions; ці категорії не перетворюються в цьому файлі на
+вигадані деталі. **На рівні репозиторію `DREAM.CAR.VAVD` встановлено
+(Installed GitHub Apps) лише `Vercel`** — це окрема, репозиторій-специфічна
+авторизація з детальними permissions, описаними в розділі 8. Доступи
+жодного з чотирьох Authorized GitHub Apps не відкликались і не змінювались
+під час цього аудиту.
 
 **Collaborators:** 0; pending invitations — 0; доступ на запис має лише
 власник.
@@ -244,23 +287,97 @@ Visual-Studio-Code, на момент аудиту `Never used`. Доступи 
 той самий механізм, що fine-grained PAT вище). Значення OAuth-токена не
 переглядалось і не записувалось.
 
-## 8. Потребує окремої перевірки, а не припущення
+## 8. Vercel GitHub App — звуження repository access
 
-- Точні permissions і repository scope fine-grained PAT "DreamCar Git Push"
-  (розділ 7) — не підтверджено, потребує перегляду власником через UI.
-- Фактична наявність або відсутність Security keys на GitHub-акаунті
-  (розділ 7) — не підтверджено однозначно.
-- Детальні permissions кожного Authorized GitHub App (`Claude`,
-  `Copilot Chat App`, `Mem0`, `Vercel`) — не перевірялись.
+- До зміни: `Repository access = All repositories`.
+- `2026-08-29`, у GitHub UI (`/settings/installations/154222719`), виконано
+  єдину зміну: `Repository access → Only select repositories`, вибрано
+  `DreamCar-vavd/DREAM.CAR.VAVD` (1 репозиторій).
+- Permissions застосунку не змінювались: Read — `actions`, `metadata`; Read
+  and Write — `administration`, `checks`, `code`, `commit statuses`,
+  `deployments`, `issues`, `pull requests`, `repository hooks`, `workflows`.
+  Це стандартний набір чинної Vercel installation; UI не дозволяє звужувати
+  ці permissions по одному пункту.
+- Installation не suspended, не uninstalled (у `Danger zone` доступні лише
+  кнопки `Suspend`/`Uninstall`, жодна не натискалась).
+- Production не постраждав: зміна не викликала нового deployment,
+  `dream-car-vavd.com` залишався HTTP 200.
+- Повторно read-only підтверджено `2026-08-29`: `Only select repositories`,
+  вибрано 1 репозиторій — `DreamCar-vavd/DREAM.CAR.VAVD`, permissions без
+  змін; `Save` під час цієї повторної перевірки не натискався.
+
+## 9. Практичний тест PR №6 — GitHub↔Vercel Preview
+
+Мета: підтвердити, що звуження repository access (розділ 8) не порушує
+створення Preview deployment через реальний, одноразовий PR.
+
+- Тестова гілка `codex/test-vercel-repository-scope` від `main`
+  (`69603763b36828c4fbb3858516c5feab33a65fe9`); один тимчасовий файл
+  `VERCEL_INTEGRATION_TEST.md`; commit
+  `63e9c5b69d2507b332a7d60d72ee1160dfc879e6`.
+- [PR #6](https://github.com/DreamCar-vavd/DREAM.CAR.VAVD/pull/6)
+  `test: verify Vercel repository access`.
+- Required check `Verify (TypeScript, ESLint, tests, build)` — `success`,
+  GitHub Actions run `33276771941`.
+- Vercel Preview deployment `3uk9kbtFeVsure97tn9uRzC8d7xq` — `Ready`,
+  тривалість `30s`, environment `Preview`, джерело
+  `codex/test-vercel-repository-scope` / `63e9c5b`.
+- Smoke-check: Preview URL відкрито напряму, сайт (`/uk`) відрендерився
+  повністю, без Deployment Protection чи помилок Vercel; контактна форма не
+  надсилалась.
+- Production не постраждав протягом усього тесту: залишався `main` /
+  `6960376`, `Ready`, `dream-car-vavd.com` — HTTP 200; Preview не
+  promoted.
+- PR #6 закрито без merge (`state: CLOSED`, `mergedAt: null`,
+  `mergeCommit: null`); тестову гілку видалено — remote і локально;
+  тестовий файл відсутній у `main`.
+- Висновок: звуження repository access не порушує GitHub↔Vercel
+  Preview-інтеграцію.
+
+## 10. Preview build incident на PR №5 (історичний, вирішено)
+
+- Перший Preview deployment (`yVuDoJMTSzJX7KoXNJc6hkARgpN1`, гілка
+  `codex/docs-record-github-2fa`, commit `eac715b`) завершився `Error` через
+  `45m 59s`: `Your deployment's build step did not complete within the
+  maximum of 45min`. Build-лог містив лише 4 рядки — до `Cloning
+  completed`, далі без активності протягом усього часу очікування.
+- Виконано рівно один контрольований Redeploy без Build Cache: новий
+  deployment `2uZtxxxmEKRN6TfPE2c4KPinZZvj`, той самий commit `eac715b`,
+  environment `Preview`, результат `Ready` за `42s`.
+- Точна першопричина не доведена; сильна, але непряма гіпотеза — збій
+  відновлення Build Cache або суміжної Vercel orchestration-фази. Код PR і
+  конфігурація проєкту не змінювались і не розглядаються як ймовірна
+  причина.
+- Другий Redeploy не виконувався. Інцидент не вплинув на Production.
+
+## 11. Потребує окремої перевірки, а не припущення
+
 - Стан 2FA, Domain Lock, auto-renew і дати завершення домену в 123-reg не
   записувати як завершений без прямої перевірки або підтвердження власника.
 - DNSSEC не вмикати без окремого read-only аудиту authoritative DNS,
   підтримки провайдера та плану відкату.
 
-## 9. Наступні покращення — не блокують поточну роботу сайту
+## 12. Відкриті рішення власника (не активні проблеми)
+
+Це рішення власника, а не незавершені технічні завдання — жодне з них не
+прийнято в цьому документі:
+
+1. Чи потрібен невикористаний fine-grained PAT `DreamCar Git Push`
+   (на момент аудиту — `Never used`).
+2. Чи потрібне право `Workflows: Read and Write` для цього PAT, якщо
+   редагування `.github/workflows/*` через нього не планується.
+3. Чи відкликати невикористовувані authorizations: `Visual Studio Code`
+   (Authorized OAuth App), `Claude`, `Copilot Chat App`, `Mem0` (Authorized
+   GitHub Apps).
+4. Чи додавати резервний passkey або security key до GitHub-акаунту.
+5. Подальші зовнішні етапи (кожен — окреме рішення і окремий етап):
+   123-reg / DNS / DNSSEC; Vercel WAF Support case; performance/media
+   аудит; SEO; monitoring; актуальність бізнес-даних.
+
+## 13. Наступні покращення — не блокують поточну роботу сайту
 
 Ці пункти не можна називати незавершенням працездатності сайту. Виконувати
-лише окремими етапами після завершення GitHub-захисту та рішення щодо WAF:
+лише окремими етапами після рішення власника щодо розділу 12:
 
 1. Read-only аудит Core Web Vitals і фактичної швидкості production.
 2. За результатами аудиту — окрема оптимізація фотографій.
@@ -272,7 +389,7 @@ Visual-Studio-Code, на момент аудиту `Never used`. Доступи 
    доставки заявок, Formspree quota, строку домену та строку PAT.
 7. Фінальний production-аудит після всіх погоджених змін.
 
-## 10. Правила безпечної роботи
+## 14. Правила безпечної роботи
 
 - Перед будь-якою дією перевіряти, що робота ведеться в
   `/Users/apple/Projects/DREAM.CAR.VAVD`.
@@ -287,16 +404,12 @@ Visual-Studio-Code, на момент аудиту `Never used`. Доступи 
 - Після завершення кожного етапу оновлювати цей файл: переносити пункт із
   активного/очікуваного до завершеного й записувати доказ перевірки.
 
-## 11. Наступна одна дія
+## 15. Наступна одна дія
 
-**Branch Protection для `main` завершено, підтверджено через read-only API
-та практично перевірено через PR #1, PR #2 і PR #3 (розділи 2–3). Dependabot
-read-only аудит завершено; Dependabot Security Updates увімкнено й
-підтверджено трьома незалежними джерелами (розділ 4). GitHub 2FA увімкнено,
-а повний read-only аудит доступу та автентифікації GitHub завершено (розділ
-7) — залишились лише три вузькі непідтверджені деталі (розділ 8). Службові
-гілки видалені локально й на GitHub; локально та віддалено залишилась лише
-`main`. Активна технічна задача наразі не оголошується. Passkey, security
-key та GitHub Mobile свідомо не налаштовувались — окреме майбутнє рішення,
-не розпочато. Не переходити до Vercel/WAF, DNS чи performance без окремого
-рішення.**
+**GitHub/Vercel access audit завершено повністю (розділ 7), включно з
+раніше непідтвердженими деталями PAT, Security keys і Authorized GitHub
+Apps. Vercel repository access звужено до одного репозиторію та підтверджено
+практичним PR-тестом (розділи 8–9). Preview build incident на PR №5
+задокументовано як вирішений, першопричина не доведена (розділ 10). Активна
+технічна задача наразі не оголошується. Наступний етап обирає власник
+окремим рішенням (розділ 12) — жодна нова технічна зміна не розпочата.**
