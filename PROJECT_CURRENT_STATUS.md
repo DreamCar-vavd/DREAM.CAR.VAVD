@@ -48,39 +48,30 @@
 - Для `main` уже заборонені force-push і видалення; `enforce_admins = true`.
 - Нових GitHub Rulesets немає; незбережена форма Ruleset не створює правила,
   доки не натиснуто `Create`.
+- **Classic Branch Protection для `main` завершено й підтверджено через
+  GitHub API 2026-08-29** (власник пройшов GitHub sudo-mode через email;
+  код підтвердження, пароль, токени, TOTP і recovery-коди в чат не
+  передавались):
+  - Require a pull request before merging: **ENABLED**
+    (`required_pull_request_reviews` не `null`);
+  - Require approvals: **DISABLED** (`required_approving_review_count = 0`);
+  - Require status checks to pass before merging: **ENABLED**;
+  - єдиний required check: `Verify (TypeScript, ESLint, tests, build)`;
+  - джерело check: **GitHub Actions** (`app_id = 15368`, незалежно
+    підтверджено через `gh api app/15368` → `{"name":"GitHub Actions"}`);
+  - `strict = false` (Require branches to be up to date — вимкнено);
+  - `enforce_admins = true`; `allow_force_pushes = false`;
+    `allow_deletions = false`;
+  - Rulesets: `[]` — новий Ruleset не створювався, Classic Branch Protection
+    не конвертувався; bypass-користувачі/програми та Vercel checks не
+    додавались.
 
-## 3. Єдина активна задача зараз
+## 3. Немає активної технічної задачі
 
-### Завершити Classic Branch Protection для `main`
-
-Поточний збережений стан перед завершенням:
-
-- `required_status_checks = null`;
-- `required_pull_request_reviews = null`;
-- `allow_force_pushes = false`;
-- `allow_deletions = false`;
-- `enforce_admins = true`;
-- Rulesets: немає.
-
-Підготовлені, але **ще не збережені** налаштування:
-
-- Require a pull request before merging — увімкнути;
-- Require approvals — вимкнути (PR обов'язковий, стороннє схвалення не
-  потрібне для одноосібного власника);
-- Require status checks to pass before merging — увімкнути;
-- єдиний required check —
-  `Verify (TypeScript, ESLint, tests, build)` від GitHub Actions;
-- Require branches to be up to date before merging — вимкнути;
-- не додавати Vercel checks, bypass, signed commits, linear history,
-  deployment requirements, merge queue або інші правила;
-- зберегти чинні заборони force-push/deletion і `enforce_admins = true`.
-
-GitHub перервав збереження запитом sudo-mode `Verify via email`. Зміни не
-збережені. Наступна дія власника — пройти підтвердження особи без передачі
-коду в чат. Після цього потрібно повторно відкрити чинне Classic Branch
-Protection, перевірити всі поля, зберегти й підтвердити результат через
-read-only API. Лише окремим наступним етапом — безпечний тестовий branch/PR
-без злиття в `main`.
+Branch Protection для `main` закрито (розділ 2). Наступний можливий крок —
+безпечна тестова гілка та Pull Request для практичної перевірки захисту,
+**без злиття в `main`**. Цей етап **не розпочато** й потребує окремого
+дозволу власника.
 
 ## 4. Vercel WAF — очікує зовнішньої відповіді
 
@@ -159,6 +150,9 @@ read-only API. Лише окремим наступним етапом — бе�
 
 ## 9. Наступна одна дія
 
-**Завершити GitHub sudo-mode підтвердження та збереження чинного Classic
-Branch Protection для `main`. Не починати Dependabot, WAF, performance або
-інші етапи, доки цей крок не перевірено й не зафіксовано тут.**
+**Branch Protection для `main` завершено й підтверджено через read-only API
+(розділ 2/3). Наступний можливий крок — лише за окремим дозволом власника:
+безпечна тестова гілка та Pull Request для практичної перевірки захисту, без
+злиття в `main`. Commit і push цього оновленого файла також очікують
+окремого дозволу. Не переходити до Dependabot, WAF, performance, DNS чи
+інших етапів.**
