@@ -66,12 +66,29 @@
     не конвертувався; bypass-користувачі/програми та Vercel checks не
     додавались.
 
-## 3. Немає активної технічної задачі
+## 3. Практичний тест Branch Protection — завершено
 
-Branch Protection для `main` закрито (розділ 2). Наступний можливий крок —
-безпечна тестова гілка та Pull Request для практичної перевірки захисту,
-**без злиття в `main`**. Цей етап **не розпочато** й потребує окремого
-дозволу власника.
+Захист `main` перевірено не лише через read-only API (розділ 2), а й
+практичним PR-циклом:
+
+- Тестова гілка: `codex/docs-branch-protection-status`, commit `0e010c0`.
+- Pull Request `#1`, base `main` ← head `codex/docs-branch-protection-status`.
+- Required check `Verify (TypeScript, ESLint, tests, build)` запустився
+  автоматично на PR і завершився `success`.
+- `Vercel` і `Vercel Preview Comments` з'явились автоматично як додаткові
+  checks — вони **не входять** до required status checks Branch Protection.
+- PR #1 мав стан `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`;
+  сторонні approvals не вимагались.
+- PR #1 злито через **Squash and merge**; squash-коміт у `main`:
+  `b9269c17035b8fa937856783623bca42041d677e`.
+- CI run на `push` у `main` після merge: `33262469534` — `success`.
+- Після merge: `HEAD = origin/main = b9269c1`, ahead/behind `0 0`, робоче
+  дерево чисте.
+- Прямий push у `main`, force push, rebase і reset — не використовувались.
+
+Службові гілки (`codex/docs-branch-protection-status` і поточна
+документаційна гілка) поки не видалені — видалення відбувається лише за
+окремим дозволом власника.
 
 ## 4. Vercel WAF — очікує зовнішньої відповіді
 
@@ -150,9 +167,9 @@ Branch Protection для `main` закрито (розділ 2). Наступн�
 
 ## 9. Наступна одна дія
 
-**Branch Protection для `main` завершено й підтверджено через read-only API
-(розділ 2/3). Наступний можливий крок — лише за окремим дозволом власника:
-безпечна тестова гілка та Pull Request для практичної перевірки захисту, без
-злиття в `main`. Commit і push цього оновленого файла також очікують
-окремого дозволу. Не переходити до Dependabot, WAF, performance, DNS чи
-інших етапів.**
+**Branch Protection для `main` завершено, підтверджено через read-only API
+та практично перевірено через PR #1 (розділи 2–3). Активна технічна задача
+наразі не оголошується — наступний етап обирається окремим рішенням
+власника після завершення цієї документаційної контрольної точки. Службові
+гілки залишаються без змін до окремого дозволу на видалення. Не переходити
+до Dependabot, WAF, performance, DNS чи інших етапів.**
