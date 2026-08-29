@@ -22,9 +22,10 @@
 - Стара папка `/Users/apple/Desktop/MY PROEKT-2` є резервною історичною
   копією; не використовувати її для нової роботи та не видаляти без окремого
   дозволу власника.
-- Git перед створенням цього файла: `HEAD = origin/main = dc86a0c`, робоче
-  дерево було чистим. Після створення очікується рівно один новий
-  незакомічений файл — `PROJECT_CURRENT_STATUS.md`.
+- Остання підтверджена контрольна точка перед цією документаційною
+  корекцією: `HEAD = origin/main = 4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`,
+  ahead/behind `0 0`, робоче дерево чисте, активна гілка `main`; локально й
+  віддалено залишилась лише `main`.
 - Живий сайт: `https://dream-car-vavd.com`.
 - Контактна форма працює через Formspree. Власник особисто підтвердив, що
   реальні заявки з сайту доставляються на його електронну пошту.
@@ -68,28 +69,43 @@
 
 ## 3. Практичний тест Branch Protection — завершено
 
-Захист `main` перевірено не лише через read-only API (розділ 2), а й
-практичним PR-циклом:
+Захист `main` перевірено не лише через read-only API (розділ 2), а й двома
+послідовними PR:
+
+**PR #1**
 
 - Тестова гілка: `codex/docs-branch-protection-status`, commit `0e010c0`.
-- Pull Request `#1`, base `main` ← head `codex/docs-branch-protection-status`.
-- Required check `Verify (TypeScript, ESLint, tests, build)` запустився
-  автоматично на PR і завершився `success`.
+- Required check `Verify (TypeScript, ESLint, tests, build)` на PR —
+  `success`.
 - `Vercel` і `Vercel Preview Comments` з'явились автоматично як додаткові
   checks — вони **не входять** до required status checks Branch Protection.
-- PR #1 мав стан `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`;
-  сторонні approvals не вимагались.
-- PR #1 злито через **Squash and merge**; squash-коміт у `main`:
+- Стан PR: `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`; сторонні
+  approvals не вимагались.
+- Злито через **Squash and merge**; squash-коміт у `main`:
   `b9269c17035b8fa937856783623bca42041d677e`.
 - CI run на `push` у `main` після merge: `33262469534` — `success`.
-- Після merge: `HEAD = origin/main = b9269c1`, ahead/behind `0 0`, робоче
-  дерево чисте.
-- Прямий push у `main`, force push, rebase і reset — не використовувались.
 
-Службові гілки, використані для PR #1 і PR #2, не є частиною постійного
-стану проєкту та можуть бути видалені після успішного merge, CI і фінальної
-перевірки `main`. Їх наявність або відсутність не є активною технічною
-задачею.
+**PR #2**
+
+- Документаційна гілка: `codex/docs-record-pr-protection-test`, перший
+  commit `be36740`, останній tip перед merge — `11056b1`.
+- Required check на PR (після проміжного текстового уточнення) — `success`,
+  CI run `33263470326`.
+- Стан PR: `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`.
+- Злито через **Squash and merge**; squash-коміт у `main`:
+  `4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`.
+- CI run на `push` у `main` після merge: `33263520935`, event `push`,
+  head SHA `4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd` — `success`.
+- Merge PR #2 містив лише `PROJECT_CURRENT_STATUS.md`.
+
+Прямий push у `main`, force push, rebase і reset під час обох PR не
+використовувались. Після кожного merge і зеленого CI локальна `main`
+синхронізувалась лише через `git switch main` + `git pull --ff-only`.
+
+Обидві службові гілки (`codex/docs-branch-protection-status` і
+`codex/docs-record-pr-protection-test`) **видалені — як локально, так і на
+GitHub** — після підтвердженого merge і зеленого CI. PR #1 і PR #2
+залишаються доступними в GitHub зі статусом `MERGED` як історичний доказ.
 
 ## 4. Vercel WAF — очікує зовнішньої відповіді
 
@@ -169,8 +185,9 @@
 ## 9. Наступна одна дія
 
 **Branch Protection для `main` завершено, підтверджено через read-only API
-та практично перевірено через PR #1 (розділи 2–3). Активна технічна задача
-наразі не оголошується — наступний етап обирається окремим рішенням
-власника після завершення цієї документаційної контрольної точки. Службові
-гілки залишаються без змін до окремого дозволу на видалення. Не переходити
-до Dependabot, WAF, performance, DNS чи інших етапів.**
+та практично перевірено через PR #1 і PR #2 (розділи 2–3). Службові гілки
+видалені локально й на GitHub; локально та віддалено залишилась лише
+`main`. Активна технічна задача наразі не оголошується. Можливий найближчий
+наступний етап — **read-only перевірка Dependabot Security Updates** — але
+він ще не розпочатий і потребує окремого дозволу власника. Не переходити до
+WAF, performance, DNS чи інших етапів без окремого рішення.**
