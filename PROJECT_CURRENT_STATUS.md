@@ -22,8 +22,12 @@
 - Стара папка `/Users/apple/Desktop/MY PROEKT-2` є резервною історичною
   копією; не використовувати її для нової роботи та не видаляти без окремого
   дозволу власника.
-- Остання підтверджена контрольна точка перед цією документаційною
-  корекцією: `HEAD = origin/main = 4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`,
+- Остання підтверджена контрольна точка перед документаційною корекцією
+  Branch Protection: `HEAD = origin/main = 4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`,
+  ahead/behind `0 0`, робоче дерево чисте, активна гілка `main`; локально й
+  віддалено залишилась лише `main`.
+- Остання підтверджена контрольна точка перед документаційною фіксацією
+  Dependabot Security Updates: `HEAD = origin/main = 364bd6127fae0c8a20c9382688cdd4613d2cbcb0`,
   ahead/behind `0 0`, робоче дерево чисте, активна гілка `main`; локально й
   віддалено залишилась лише `main`.
 - Живий сайт: `https://dream-car-vavd.com`.
@@ -98,16 +102,72 @@
   head SHA `4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd` — `success`.
 - Merge PR #2 містив лише `PROJECT_CURRENT_STATUS.md`.
 
-Прямий push у `main`, force push, rebase і reset під час обох PR не
+**PR #3 — оновлення актуального статусу**
+
+- Гілка: `codex/docs-refresh-current-status`, commit `b24cc6a74061c1543f463f28a1a1b705f807a558`.
+- Required check `Verify (TypeScript, ESLint, tests, build)` — `success`,
+  джерело — GitHub Actions.
+- `Vercel` checks були додатковими, не required.
+- Стан PR: `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`.
+- Злито через **Squash and merge**; squash-коміт у `main`:
+  `364bd6127fae0c8a20c9382688cdd4613d2cbcb0`, commit message
+  `docs: refresh current project status`.
+- Merge містив лише `PROJECT_CURRENT_STATUS.md`.
+- CI на `push` у `main` після merge: run `33264806419` — `success`.
+- Після merge: `HEAD = origin/main`, ahead/behind `0 0`, робоче дерево
+  чисте.
+- Службову гілку PR #3 видалено — локально й на GitHub.
+- PR #3 залишається доступним зі статусом `MERGED`.
+
+Прямий push у `main`, force push, rebase і reset під час усіх трьох PR не
 використовувались. Після кожного merge і зеленого CI локальна `main`
 синхронізувалась лише через `git switch main` + `git pull --ff-only`.
 
-Обидві службові гілки (`codex/docs-branch-protection-status` і
-`codex/docs-record-pr-protection-test`) **видалені — як локально, так і на
-GitHub** — після підтвердженого merge і зеленого CI. PR #1 і PR #2
-залишаються доступними в GitHub зі статусом `MERGED` як історичний доказ.
+Усі три службові гілки (`codex/docs-branch-protection-status`,
+`codex/docs-record-pr-protection-test`, `codex/docs-refresh-current-status`)
+**видалені — як локально, так і на GitHub** — після підтвердженого merge і
+зеленого CI кожного разу. PR #1, PR #2 і PR #3 залишаються доступними в
+GitHub зі статусом `MERGED` як історичний доказ.
 
-## 4. Vercel WAF — очікує зовнішньої відповіді
+## 4. Dependabot — перевірено та налаштовано
+
+**До увімкнення** (розширений read-only аудит, API + UI незалежно
+збігались): Dependabot Alerts — `ENABLED`; Dependabot Security Updates —
+`DISABLED`; open alerts — `0`; fixed alerts — `1`; Dependabot PR — `0`;
+Version Updates — `NOT CONFIGURED` (`.github/dependabot.yml` відсутній);
+Grouped Security Updates — `DISABLED`; Malware Alerts — `DISABLED`;
+auto-merge — `DISABLED`.
+
+**Виконана зміна:** `2026-08-29`, у GitHub UI натиснута лише одна кнопка —
+`Enable dependabot security updates`. Sudo mode не запитувався; жодні коди,
+паролі чи токени не передавались. Жодні інші Dependabot/security
+налаштування не змінювались.
+
+**Після увімкнення — 3 незалежні докази:**
+
+1. Repository API: `security_and_analysis.dependabot_security_updates.status = enabled`.
+2. Automated Security Fixes API: явний результат `enabled = true, paused = false`.
+3. GitHub UI: біля Dependabot Security Updates показується кнопка `Disable`.
+
+**Підсумковий стан:** Dependabot Alerts — `ENABLED`; Dependabot Security
+Updates — `ENABLED`; open alerts — `0`; fixed alerts — `1`; Dependabot PR —
+`0`; Version Updates — `NOT CONFIGURED`; Grouped Security Updates —
+`DISABLED`; Malware Alerts — `DISABLED`; auto-merge — `DISABLED`; API та UI
+узгоджені; побічних змін не виявлено.
+
+**Dependency Graph і локальна перевірка:** Dependency Graph здоровий — SBOM
+API розпізнав 467 пакетів, `package-lock.json` без parsing errors. CI
+сумісний із майбутніми Dependabot PR: `pull_request` trigger,
+`permissions: contents: read`, `persist-credentials: false`, жодних
+`secrets.*`, без write/push/merge/deploy кроків. `npm audit --json`: exit
+`0`, 0 вразливостей локально — використаний лише як додатковий сигнал,
+`package.json`/`package-lock.json` не змінювались.
+
+**Історичний alert (не потребує дій):** `npm` / `nanoid`, severity `high`,
+vulnerable `< 3.3.18`, patched `3.3.18`, scope `runtime`, стан `fixed`; open
+alerts зараз — `0`.
+
+## 5. Vercel WAF — очікує зовнішньої відповіді
 
 - Активне правило `Contact form rate limit`:
   - path equals `/api/contact`;
@@ -124,7 +184,7 @@ GitHub** — після підтвердженого merge і зеленого C
 - До письмової відповіді співробітника Vercel не натискати `Continue` і не
   змінювати WAF або billing.
 
-## 5. Захист акаунтів — підтверджене
+## 6. Захист акаунтів — підтверджене
 
 - Захист основної електронної пошти: власник підтвердив завершення.
 - Formspree: 2FA увімкнено; recovery-коди збережені власником.
@@ -137,13 +197,13 @@ GitHub** — після підтвердженого merge і зеленого C
   проєкті не зберігати. Строк дії, зафіксований під час створення:
   **2026-09-24**; перед завершенням строку токен потрібно замінити або
   видалити, якщо він більше не потрібний.
+- GitHub CLI (`gh`) використовує **окрему OAuth-авторизацію** — це не той
+  самий механізм, що fine-grained PAT для Git-операцій вище. Значення
+  OAuth-токена не записувалось і не показувалось. Активні GitHub OAuth/PAT
+  доступи потребують окремого майбутнього read-only аудиту.
 
-## 6. Потребує окремої перевірки, а не припущення
+## 7. Потребує окремої перевірки, а не припущення
 
-- Dependabot Alerts підтверджені як увімкнені, але API дав суперечливі дані
-  щодо Dependabot Security Updates. Остаточний стан потрібно перевірити в
-  GitHub Settings → Security → Code security. Auto-merge не вмикати без
-  окремого дозволу.
 - Повний стан GitHub 2FA, активних сесій, OAuth/GitHub Apps, SSH/Deploy Keys
   не записувати як завершений без прямої перевірки або підтвердження
   власника.
@@ -152,7 +212,7 @@ GitHub** — після підтвердженого merge і зеленого C
 - DNSSEC не вмикати без окремого read-only аудиту authoritative DNS,
   підтримки провайдера та плану відкату.
 
-## 7. Наступні покращення — не блокують поточну роботу сайту
+## 8. Наступні покращення — не блокують поточну роботу сайту
 
 Ці пункти не можна називати незавершенням працездатності сайту. Виконувати
 лише окремими етапами після завершення GitHub-захисту та рішення щодо WAF:
@@ -167,7 +227,7 @@ GitHub** — після підтвердженого merge і зеленого C
    доставки заявок, Formspree quota, строку домену та строку PAT.
 7. Фінальний production-аудит після всіх погоджених змін.
 
-## 8. Правила безпечної роботи
+## 9. Правила безпечної роботи
 
 - Перед будь-якою дією перевіряти, що робота ведеться в
   `/Users/apple/Projects/DREAM.CAR.VAVD`.
@@ -182,12 +242,18 @@ GitHub** — після підтвердженого merge і зеленого C
 - Після завершення кожного етапу оновлювати цей файл: переносити пункт із
   активного/очікуваного до завершеного й записувати доказ перевірки.
 
-## 9. Наступна одна дія
+## 10. Наступна одна дія
 
 **Branch Protection для `main` завершено, підтверджено через read-only API
-та практично перевірено через PR #1 і PR #2 (розділи 2–3). Службові гілки
-видалені локально й на GitHub; локально та віддалено залишилась лише
-`main`. Активна технічна задача наразі не оголошується. Можливий найближчий
-наступний етап — **read-only перевірка Dependabot Security Updates** — але
-він ще не розпочатий і потребує окремого дозволу власника. Не переходити до
-WAF, performance, DNS чи інших етапів без окремого рішення.**
+та практично перевірено через PR #1, PR #2 і PR #3 (розділи 2–3). Dependabot
+read-only аудит завершено; Dependabot Security Updates увімкнено й
+підтверджено трьома незалежними джерелами (розділ 4). Відкритих alerts і
+Dependabot PR немає; auto-merge вимкнено; Version Updates не налаштовані.
+Службові гілки видалені локально й на GitHub; локально та віддалено
+залишилась лише `main`. Активна технічна задача після цієї документаційної
+контрольної точки не оголошується. Можливий наступний окремий етап —
+**read-only аудит GitHub-автентифікації та активних доступів** (OAuth
+authorizations, fine-grained PAT, SSH keys, Deploy keys, GitHub Apps, активні
+сесії) — цей етап **не розпочато**; нічого не видаляти й не відкликати без
+окремого дозволу власника. Не переходити до Vercel/WAF, DNS чи performance
+без окремого рішення.**
