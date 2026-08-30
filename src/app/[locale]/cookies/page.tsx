@@ -10,6 +10,7 @@ const copy: Record<Locale, { intro: string; items: string[] }> = {
     items: [
       "Технічні cookie необхідні для базової роботи сайту та не використовуються для реклами.",
       "Сайт не використовує сторонні рекламні або трекінгові cookie.",
+      "Vercel Web Analytics і Vercel Speed Insights у поточній конфігурації не використовують аналітичні cookie; вони застосовуються для агрегованої статистики відвідувань і показників продуктивності. Детальніше — у Політиці конфіденційності.",
       "Ви можете видалити cookie у налаштуваннях свого браузера в будь-який момент.",
     ],
   },
@@ -18,6 +19,7 @@ const copy: Record<Locale, { intro: string; items: string[] }> = {
     items: [
       "Технические cookie необходимы для базовой работы сайта и не используются для рекламы.",
       "Сайт не использует сторонние рекламные или трекинговые cookie.",
+      "Vercel Web Analytics и Vercel Speed Insights в текущей конфигурации не используют аналитические cookie; они применяются для агрегированной статистики посещений и показателей производительности. Подробнее — в Политике конфиденциальности.",
       "Вы можете удалить cookie в настройках своего браузера в любой момент.",
     ],
   },
@@ -26,6 +28,7 @@ const copy: Record<Locale, { intro: string; items: string[] }> = {
     items: [
       "Technical cookies are required for the site to work and are not used for advertising.",
       "The site does not use third-party advertising or tracking cookies.",
+      "Vercel Web Analytics and Vercel Speed Insights do not use analytics cookies in the current configuration; they are used for aggregated visit statistics and performance measurements. See the Privacy Policy for more information.",
       "You can remove cookies in your browser settings at any time.",
     ],
   },

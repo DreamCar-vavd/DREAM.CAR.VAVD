@@ -8,31 +8,40 @@ import { siteUrl, buildLanguageAlternates } from "@/lib/site";
 const copy: Record<Locale, { intro: string; items: string[] }> = {
   uk: {
     intro:
-      "Ця сторінка описує, як DREAM.CAR.VAVD обробляє персональні дані, надані через контактну форму, телефон, email або месенджери.",
+      "Ця сторінка описує, як DREAM.CAR.VAVD обробляє дані, надані через контактну форму, телефон, email або месенджери, а також обмежені технічні дані про використання та продуктивність сайту.",
     items: [
-      "Ми збираємо лише ті дані, які ви самі надаєте (ім'я, телефон, email, деталі запиту).",
-      "Дані використовуються виключно для зв'язку з вами та надання консультації чи послуги.",
-      "Ми не передаємо ваші персональні дані третім сторонам без вашої згоди.",
+      "Ми збираємо лише ті контактні дані, які ви самі надаєте (ім'я, телефон, email і деталі запиту).",
+      "Звернення через контактну форму обробляються сервісом Formspree для доставки повідомлення DREAM.CAR.VAVD.",
+      "Для агрегованої статистики відвідувань і вимірювання продуктивності сайту та Core Web Vitals ми використовуємо Vercel Web Analytics і Vercel Speed Insights.",
+      "За документацією Vercel, Web Analytics не використовує аналітичні cookie та зберігає анонімізовану агреговану інформацію. Можуть оброблятися маршрут або URL сторінки, referrer, приблизне місцезнаходження, браузер, операційна система, тип пристрою та показники продуктивності.",
+      "У поточній конфігурації ми не використовуємо власні аналітичні події та не передаємо через ці компоненти значення полів контактної форми, email-адреси або телефонні номери.",
+      "Vercel і Formspree виступають постачальниками технічних послуг, необхідних для роботи сайту, доставки звернень та агрегованого вимірювання використання і продуктивності.",
       `З питань обробки даних звертайтесь на ${emailDisplay}.`,
     ],
   },
   ru: {
     intro:
-      "Эта страница описывает, как DREAM.CAR.VAVD обрабатывает персональные данные, предоставленные через контактную форму, телефон, email или мессенджеры.",
+      "Эта страница описывает, как DREAM.CAR.VAVD обрабатывает данные, предоставленные через контактную форму, телефон, email или мессенджеры, а также ограниченные технические данные об использовании и производительности сайта.",
     items: [
-      "Мы собираем только те данные, которые вы сами предоставляете (имя, телефон, email, детали запроса).",
-      "Данные используются исключительно для связи с вами и предоставления консультации или услуги.",
-      "Мы не передаём ваши персональные данные третьим лицам без вашего согласия.",
+      "Мы собираем только те контактные данные, которые вы предоставляете самостоятельно (имя, телефон, email и детали запроса).",
+      "Обращения через контактную форму обрабатываются сервисом Formspree для доставки сообщения DREAM.CAR.VAVD.",
+      "Для агрегированной статистики посещений и измерения производительности сайта и Core Web Vitals мы используем Vercel Web Analytics и Vercel Speed Insights.",
+      "Согласно документации Vercel, Web Analytics не использует аналитические cookie и хранит анонимизированную агрегированную информацию. Могут обрабатываться маршрут или URL страницы, referrer, приблизительное местоположение, браузер, операционная система, тип устройства и показатели производительности.",
+      "В текущей конфигурации мы не используем собственные аналитические события и не передаём через эти компоненты значения полей контактной формы, email-адреса или номера телефонов.",
+      "Vercel и Formspree выступают поставщиками технических услуг, необходимых для работы сайта, доставки обращений и агрегированного измерения использования и производительности.",
       `По вопросам обработки данных обращайтесь на ${emailDisplay}.`,
     ],
   },
   en: {
     intro:
-      "This page explains how DREAM.CAR.VAVD handles personal data submitted via the contact form, phone, email or messaging apps.",
+      "This page explains how DREAM.CAR.VAVD handles data submitted through the contact form, phone, email or messaging apps, as well as limited technical information about website usage and performance.",
     items: [
-      "We only collect data that you provide yourself (name, phone, email, request details).",
-      "Data is used solely to contact you and provide a consultation or service.",
-      "We do not share your personal data with third parties without your consent.",
+      "We collect only the contact information that you provide (name, phone number, email address and request details).",
+      "Contact-form submissions are processed by Formspree to deliver the message to DREAM.CAR.VAVD.",
+      "We use Vercel Web Analytics and Vercel Speed Insights for aggregated visit statistics and to measure website performance and Core Web Vitals.",
+      "According to Vercel's documentation, Web Analytics does not use analytics cookies and stores anonymised, aggregated information. The page route or URL, referrer, approximate location, browser, operating system, device type and performance measurements may be processed.",
+      "In the current configuration, we do not use custom analytics events or send contact-form field values, email addresses or phone numbers through these analytics components.",
+      "Vercel and Formspree act as technical service providers required to operate the website, deliver enquiries and measure aggregated usage and performance.",
       `For questions about data processing, contact ${emailDisplay}.`,
     ],
   },
