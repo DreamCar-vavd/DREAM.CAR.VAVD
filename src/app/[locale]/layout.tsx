@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Manrope } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { locales, isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { siteUrl } from "@/lib/site";
@@ -111,6 +113,8 @@ export default async function LocaleLayout({
         <SiteHeader dict={dict} locale={locale} />
         <main className="flex-1">{children}</main>
         <SiteFooter dict={dict} locale={locale} />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
