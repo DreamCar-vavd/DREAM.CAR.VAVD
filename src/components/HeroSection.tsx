@@ -63,7 +63,7 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
             <div className="relative flex flex-col lg:block">
               <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[16/9] lg:aspect-[1682/714]">
                 <Image
-                  src="/images/hero-cars-logo-final.png"
+                  src="/images/hero-cars-logo-final.jpg"
                   alt={dict.meta.siteName}
                   fill
                   priority
