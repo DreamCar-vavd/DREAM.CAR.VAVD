@@ -3,11 +3,14 @@
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
+import type { ServiceSection } from "@/content/types";
 
 export interface ServiceModalContent {
   title: string;
   description: string;
   bullets?: string[];
+  modalLead?: string;
+  modalSections?: ServiceSection[];
 }
 
 export function ServiceModal({
@@ -51,16 +54,47 @@ export function ServiceModal({
           <X size={20} aria-hidden="true" />
         </button>
         <h2 className="font-heading pr-10 text-2xl font-bold text-gold">{content.title}</h2>
-        <p className="mt-4 text-base leading-relaxed text-text">{content.description}</p>
-        {content.bullets && content.bullets.length > 0 && (
-          <ul className="mt-4 flex flex-col gap-2">
-            {content.bullets.map((bullet) => (
-              <li key={bullet} className="flex items-start gap-2 text-sm text-muted">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />
-                {bullet}
-              </li>
-            ))}
-          </ul>
+        {content.modalSections && content.modalSections.length > 0 ? (
+          <>
+            {content.modalLead && (
+              <p className="mt-2 text-sm font-medium text-muted">{content.modalLead}</p>
+            )}
+            <div className="mt-4 flex flex-col gap-6">
+              {content.modalSections.map((section) => (
+                <div key={section.heading}>
+                  <h3 className="font-heading text-lg font-semibold text-gold">{section.heading}</h3>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {section.items.map((item) => (
+                      <li key={item} className="flex items-start gap-2 text-sm text-muted">
+                        <span
+                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gold"
+                          aria-hidden="true"
+                        />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-4 text-base leading-relaxed text-text">{content.description}</p>
+            {content.bullets && content.bullets.length > 0 && (
+              <ul className="mt-4 flex flex-col gap-2">
+                {content.bullets.map((bullet) => (
+                  <li key={bullet} className="flex items-start gap-2 text-sm text-muted">
+                    <span
+                      className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gold"
+                      aria-hidden="true"
+                    />
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -5,11 +5,27 @@ export type ServiceSlug =
   | "srs-airbag"
   | "detailing";
 
+export interface ServiceSection {
+  heading: string;
+  items: string[];
+}
+
 export interface ServiceCopy {
   title: string;
   shortDescription: string;
   longDescription: string;
   bullets: string[];
+  /**
+   * Modal-only: short status line shown under the existing modal heading.
+   * Not read by the /[locale]/services/[slug] SEO page.
+   */
+  modalLead?: string;
+  /**
+   * Modal-only: structured sections (heading + items) rendered in the
+   * ServiceModal instead of the flat longDescription + bullets.
+   * Not read by the /[locale]/services/[slug] SEO page.
+   */
+  modalSections?: ServiceSection[];
 }
 
 export interface FaqItem {

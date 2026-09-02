@@ -35,7 +35,13 @@ export function ServicesGrid({ dict }: { dict: Dictionary }) {
   } else if (openId) {
     const copy = dict.services[openId as keyof typeof dict.services];
     if (copy) {
-      activeContent = { title: copy.title, description: copy.longDescription, bullets: copy.bullets };
+      activeContent = {
+        title: copy.title,
+        description: copy.longDescription,
+        bullets: copy.bullets,
+        modalLead: copy.modalLead,
+        modalSections: copy.modalSections,
+      };
     }
   }
 
