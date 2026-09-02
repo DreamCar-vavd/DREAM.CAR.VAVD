@@ -48,14 +48,31 @@ test("modalSections item counts are identical across the three locales", () => {
   assert.deepEqual(perLocale[0], perLocale[2]);
 });
 
-test("no service other than car-service defines modal-only fields", () => {
+test("modalSections is defined only for car-service", () => {
   for (const [name, dict] of Object.entries(locales)) {
     for (const slug of serviceSlugs) {
-      if (slug === "car-service") continue;
       const svc = dict.services[slug];
-      assert.equal(svc.modalLead, undefined, `${name}/${slug}: unexpected modalLead`);
-      assert.equal(svc.modalSections, undefined, `${name}/${slug}: unexpected modalSections`);
+      if (slug === "car-service") {
+        assert.ok(svc.modalSections, `${name}/${slug}: modalSections missing`);
+      } else {
+        assert.equal(svc.modalSections, undefined, `${name}/${slug}: unexpected modalSections`);
+      }
     }
+  }
+});
+
+test("car-service drives its modal via modalSections, not modalDescription", () => {
+  for (const [name, dict] of Object.entries(locales)) {
+    assert.equal(
+      dict.services["car-service"].modalDescription,
+      undefined,
+      `${name}: car-service should not set modalDescription`,
+    );
+    assert.equal(
+      dict.services["car-service"].cardDescription,
+      undefined,
+      `${name}: car-service should not set cardDescription`,
+    );
   }
 });
 

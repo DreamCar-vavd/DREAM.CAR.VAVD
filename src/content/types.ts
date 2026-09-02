@@ -16,10 +16,24 @@ export interface ServiceCopy {
   longDescription: string;
   bullets: string[];
   /**
+   * Closed-card-only: overrides shortDescription as the text shown on the
+   * service card. Falls back to shortDescription when absent.
+   * Not read by the /[locale]/services/[slug] SEO page (which keeps using
+   * shortDescription for its metadata).
+   */
+  cardDescription?: string;
+  /**
    * Modal-only: short status line shown under the existing modal heading.
    * Not read by the /[locale]/services/[slug] SEO page.
    */
   modalLead?: string;
+  /**
+   * Modal-only: a single plain paragraph rendered in the ServiceModal
+   * instead of the flat longDescription + bullets. Ignored when
+   * modalSections is present. Not read by the /[locale]/services/[slug]
+   * SEO page (which keeps using longDescription + bullets).
+   */
+  modalDescription?: string;
   /**
    * Modal-only: structured sections (heading + items) rendered in the
    * ServiceModal instead of the flat longDescription + bullets.

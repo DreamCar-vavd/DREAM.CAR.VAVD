@@ -157,6 +157,11 @@ const dictionary: Dictionary = {
         "Interior care",
         "Protective coating after polishing",
       ],
+      cardDescription:
+        "Polishing. Interior deep cleaning. Detailing. Protective coatings. Everything in one package.",
+      modalLead: "Opening very soon",
+      modalDescription:
+        "Complete care for your vehicle's exterior and interior: polishing, deep cleaning, detailing and protective coatings. The result — an immaculate appearance and reliable protection for the paintwork.",
     },
   },
   carsForSale: {

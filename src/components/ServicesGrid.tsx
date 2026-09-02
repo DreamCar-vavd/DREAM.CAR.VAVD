@@ -40,6 +40,7 @@ export function ServicesGrid({ dict }: { dict: Dictionary }) {
         description: copy.longDescription,
         bullets: copy.bullets,
         modalLead: copy.modalLead,
+        modalDescription: copy.modalDescription,
         modalSections: copy.modalSections,
       };
     }
@@ -63,7 +64,7 @@ export function ServicesGrid({ dict }: { dict: Dictionary }) {
                 key={slug}
                 iconSrc={iconSrc}
                 title={copy.title}
-                description={copy.shortDescription}
+                description={copy.cardDescription ?? copy.shortDescription}
                 readMoreLabel={dict.common.readMore}
                 onOpen={(trigger) => open(slug, trigger)}
               />
