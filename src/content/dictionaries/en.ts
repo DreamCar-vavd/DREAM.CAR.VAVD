@@ -74,6 +74,53 @@ const dictionary: Dictionary = {
         "Cost agreed before work begins",
         "Quality parts and materials",
       ],
+      modalLead: "Opening soon",
+      modalSections: [
+        {
+          heading: "Vehicle servicing",
+          items: [
+            "Scheduled servicing (interim, full and major) in accordance with the manufacturer's service schedule.",
+            "Engine oil and filter replacement: oil, air, cabin and fuel filters.",
+            "Replacement of brake fluid, coolant, power-steering fluid and transmission fluid.",
+            "MOT preparation and rectification of identified issues.",
+          ],
+        },
+        {
+          heading: "Computer diagnostics",
+          items: [
+            "Reading and interpretation of fault codes across all vehicle systems.",
+            "Engine and management-system diagnostics (Check Engine), ABS and ESP.",
+            "SRS and airbags — diagnostics and post-accident restoration.",
+            "Electrical-system diagnostics.",
+          ],
+        },
+        {
+          heading: "Suspension and brake repairs",
+          items: [
+            "Shock absorbers, struts, control arms, bushes and top mounts.",
+            "Ball joints, track-rod ends and anti-roll-bar links.",
+            "Brake pads, discs, calipers, hoses and brake fluid.",
+          ],
+        },
+        {
+          heading: "Engine and auxiliary components",
+          items: [
+            "Replacement of timing belts or chains, tensioners and water pumps.",
+            "Replacement of spark plugs and glow plugs.",
+            "Repair of engine-oil and coolant leaks.",
+          ],
+        },
+        {
+          heading: "Additional services",
+          items: [
+            "Welding work.",
+            "Anti-corrosion treatment and body protection. We remove corrosion from wheel arches, sills and the underbody, apply primer and a protective liquid-rubber coating (stone-chip protection), and treat enclosed cavities with a protective preservative.",
+            "Battery, alternator and starter diagnostics and servicing.",
+            "Pre-purchase vehicle inspection.",
+            "Bespoke vehicle sourcing and delivery/import.",
+          ],
+        },
+      ],
     },
     diagnostics: {
       title: "Computer Diagnostics",
