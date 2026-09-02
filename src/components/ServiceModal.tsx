@@ -10,6 +10,7 @@ export interface ServiceModalContent {
   description: string;
   bullets?: string[];
   modalLead?: string;
+  modalDescription?: string;
   modalSections?: ServiceSection[];
 }
 
@@ -77,6 +78,13 @@ export function ServiceModal({
                 </div>
               ))}
             </div>
+          </>
+        ) : content.modalDescription ? (
+          <>
+            {content.modalLead && (
+              <p className="mt-2 text-sm font-medium text-muted">{content.modalLead}</p>
+            )}
+            <p className="mt-4 text-base leading-relaxed text-text">{content.modalDescription}</p>
           </>
         ) : (
           <>
