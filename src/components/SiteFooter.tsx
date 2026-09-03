@@ -14,7 +14,11 @@ export function SiteFooter({ dict, locale }: { dict: Dictionary; locale: Locale 
     <footer className="border-t border-border-gold bg-surface">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-3 lg:px-8">
         <div>
-          <DreamLogo alt={dict.meta.siteName} wrapperClassName="inline-block aspect-[1413/800] h-[46px]" />
+          <DreamLogo
+            alt={dict.meta.siteName}
+            sizes="81px"
+            wrapperClassName="inline-block aspect-[1413/800] h-[46px]"
+          />
           <p className="mt-4 max-w-xs text-sm text-muted">{dict.footer.description}</p>
         </div>
 

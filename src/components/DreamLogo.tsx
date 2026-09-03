@@ -3,11 +3,11 @@ import Image from "next/image";
 export function DreamLogo({
   alt,
   wrapperClassName,
-  priority,
+  sizes,
 }: {
   alt: string;
   wrapperClassName: string;
-  priority?: boolean;
+  sizes?: string;
 }) {
   return (
     <span className={`dream-logo relative isolate ${wrapperClassName}`}>
@@ -16,7 +16,7 @@ export function DreamLogo({
         alt={alt}
         width={1413}
         height={800}
-        priority={priority}
+        sizes={sizes}
         className="block h-full w-full"
       />
       <span className="dream-logo__shimmer" aria-hidden="true" />

@@ -17,7 +17,7 @@ export function SiteHeader({ dict, locale }: { dict: Dictionary; locale: Locale 
         <Link href={`/${locale}`} className="flex shrink-0 items-center gap-2">
           <DreamLogo
             alt={dict.meta.siteName}
-            priority
+            sizes="(min-width: 1280px) 97px, 81px"
             wrapperClassName="inline-block aspect-[1413/800] h-[46px] xl:h-[55px]"
           />
         </Link>

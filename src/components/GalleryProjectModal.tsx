@@ -161,7 +161,11 @@ export function GalleryProjectModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4 border-b border-border-gold/50 px-5 py-3 sm:px-6">
-          <DreamLogo alt={dict.meta.siteName} wrapperClassName="inline-block aspect-[1413/800] h-9" />
+          <DreamLogo
+            alt={dict.meta.siteName}
+            sizes="64px"
+            wrapperClassName="inline-block aspect-[1413/800] h-9"
+          />
           <button
             ref={closeButtonRef}
             type="button"
