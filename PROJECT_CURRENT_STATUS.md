@@ -1,7 +1,12 @@
 # DREAM.CAR.VAVD — актуальний стан проєкту
 
-Останнє оновлення: **2026-08-29**
+Останнє оновлення: **2026-09-03**
 Основна робоча копія: **`/Users/apple/Projects/DREAM.CAR.VAVD`**
+Поточна контрольна точка: **`ef13ac105c5d9c1d3e128faa874a824252b21652`** (squash-коміт
+PR #13, `perf: improve hero image loading`, злито `2026-09-03T13:13:38Z`).
+Хронологію продуктових, перформанс та observability-етапів після PR #5
+(PR #8–#13) див. розділ 16; зовнішній стан домену й Google Search Console —
+розділ 17; favicon у Google — розділ 18.
 
 ## Призначення цього файла
 
@@ -22,23 +27,28 @@
 - Стара папка `/Users/apple/Desktop/MY PROEKT-2` є резервною історичною
   копією; не використовувати її для нової роботи та не видаляти без окремого
   дозволу власника.
-- **Поточна підтверджена контрольна точка (2026-08-29, після merge PR #5):**
-  `HEAD = origin/main = 69603763b36828c4fbb3858516c5feab33a65fe9`
+- **Поточна підтверджена контрольна точка (2026-09-03, після merge PR #13):**
+  `HEAD = origin/main = ef13ac105c5d9c1d3e128faa874a824252b21652`
+  (squash-коміт PR #13, `perf: improve hero image loading`, злито
+  `2026-09-03T13:13:38Z`), активна гілка `main`, ahead/behind `0 0`, робоче
+  дерево чисте; локально й віддалено залишилась лише `main`. CI на `push` у
+  `main` — run `33759873675` (`Verify (TypeScript, ESLint, tests, build)`),
+  `success`, 93 тести. Vercel Production deployment `6244736017`
+  (ref `5MR4kqizB3uK47ky4EZ9Vwj7C7Gi`) — `success`/`Current`, джерело
+  `main`/`ef13ac1`, домен `dream-car-vavd.com` — HTTP 200. Хронологію
+  PR #8–#13 див. розділ 16.
+- **Попередня контрольна точка (2026-08-29, після merge PR #5):**
+  `origin/main = 69603763b36828c4fbb3858516c5feab33a65fe9`
   (squash-коміт PR #5, `docs: record GitHub access audit and 2FA`, злито
-  `2026-08-29T20:53:15Z`), ahead/behind `0 0`, робоче дерево чисте; локально
-  й віддалено залишилась лише `main`. CI на `push` у `main` — run
-  `33274634343`, `success`. Production deployment
-  `BwmPSyf47tddUeZPaLECNeUyqarC` — `Ready`, `29s`, джерело `main`/`6960376`.
-  Деталі аудиту доступу — розділ 7; звуження Vercel repository access —
-  розділ 8; практичний PR-тест інтеграції — розділ 9.
-- Остання підтверджена контрольна точка перед документаційною корекцією
-  Branch Protection: `HEAD = origin/main = 4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`,
-  ahead/behind `0 0`, робоче дерево чисте, активна гілка `main`; локально й
-  віддалено залишилась лише `main`.
-- Остання підтверджена контрольна точка перед документаційною фіксацією
-  Dependabot Security Updates: `HEAD = origin/main = 364bd6127fae0c8a20c9382688cdd4613d2cbcb0`,
-  ahead/behind `0 0`, робоче дерево чисте, активна гілка `main`; локально й
-  віддалено залишилась лише `main`.
+  `2026-08-29T20:53:15Z`). CI на `push` у `main` — run `33274634343`,
+  `success`. Production deployment `BwmPSyf47tddUeZPaLECNeUyqarC` — `Ready`,
+  `29s`. Деталі аудиту доступу — розділ 7; звуження Vercel repository
+  access — розділ 8; практичний PR-тест інтеграції — розділ 9.
+- **Історичні маркери (не поточні):**
+  - контрольна точка перед документаційною корекцією Branch Protection:
+    `origin/main = 4d30f46ae9bb67f62fee1f9e938eb60870c6d3dd`;
+  - контрольна точка перед документаційною фіксацією Dependabot Security
+    Updates: `origin/main = 364bd6127fae0c8a20c9382688cdd4613d2cbcb0`.
 - Живий сайт: `https://dream-car-vavd.com`.
 - Контактна форма працює через Formspree. Власник особисто підтвердив, що
   реальні заявки з сайту доставляються на його електронну пошту.
@@ -352,10 +362,12 @@ repository permissions; ці категорії не перетворюютьс�
 
 ## 11. Потребує окремої перевірки, а не припущення
 
-- Стан 2FA, Domain Lock, auto-renew і дати завершення домену в 123-reg не
-  записувати як завершений без прямої перевірки або підтвердження власника.
+- Стан 2FA, Domain Lock, auto-renew і дати завершення домену в 123 Reg —
+  станом на `2026-09-03` підтверджено власником (розділ 17). Раніші
+  припущення більше не діють; актуальні значення — лише в розділі 17.
 - DNSSEC не вмикати без окремого read-only аудиту authoritative DNS,
-  підтримки провайдера та плану відкату.
+  підтримки провайдера та плану відкату (станом на `2026-09-03` —
+  `Disabled`, розділ 17).
 
 ## 12. Відкриті рішення власника (не активні проблеми)
 
@@ -379,12 +391,20 @@ repository permissions; ці категорії не перетворюютьс�
 Ці пункти не можна називати незавершенням працездатності сайту. Виконувати
 лише окремими етапами після рішення власника щодо розділу 12:
 
-1. Read-only аудит Core Web Vitals і фактичної швидкості production.
-2. За результатами аудиту — окрема оптимізація фотографій.
-3. Окремо — оптимізація відео та кешування.
-4. Перевірка актуальності бізнес-даних і контенту власником.
+1. ~~Read-only аудит Core Web Vitals і фактичної швидкості production.~~
+   **Виконано 2026-09-03** (read-only аудит мобільної швидкодії та Hero/LCP —
+   розділ 16, PR #13).
+2. За результатами аудиту — окрема оптимізація фотографій. **Частково:**
+   PR #8 (стиснення всіх зображень, розділ 16) і PR #13 (пріоритет Hero,
+   `sizes` логотипів) виконані; глибша оптимізація hero-фото (AVIF,
+   `minimumCacheTTL`/immutable, окремий raw-PNG для shimmer-маски) —
+   залишається відкритою і виконується лише за новими доказами (розділ 15,
+   п. 6).
+3. Окремо — оптимізація відео та кешування. **Відкрито.**
+4. Перевірка актуальності бізнес-даних і контенту власником. **Відкрито.**
 5. Контроль SEO лише за результатами нового аудиту: базові metadata,
    canonical, hreflang, sitemap, robots.txt і JSON-LD вже реалізовані.
+   Sitemap подано в Google Search Console (розділ 17).
 6. Моніторинг доступності сайту, кодів відповіді `/api/contact` без PII,
    доставки заявок, Formspree quota, строку домену та строку PAT.
 7. Фінальний production-аудит після всіх погоджених змін.
@@ -406,10 +426,214 @@ repository permissions; ці категорії не перетворюютьс�
 
 ## 15. Наступна одна дія
 
-**GitHub/Vercel access audit завершено повністю (розділ 7), включно з
-раніше непідтвердженими деталями PAT, Security keys і Authorized GitHub
-Apps. Vercel repository access звужено до одного репозиторію та підтверджено
-практичним PR-тестом (розділи 8–9). Preview build incident на PR №5
-задокументовано як вирішений, першопричина не доведена (розділ 10). Активна
-технічна задача наразі не оголошується. Наступний етап обирає власник
-окремим рішенням (розділ 12) — жодна нова технічна зміна не розпочата.**
+**Активної технічної задачі немає.** Останній завершений етап — PR #13
+(`perf: improve hero image loading`), злитий і перевірений на Production
+`2026-09-03`. Контрольна точка й докази — розділ 1; повний запис PR #8–#13 —
+розділ 16; зовнішній стан — розділ 17.
+
+Історична частина (без змін): GitHub/Vercel access audit — розділ 7; Vercel
+repository access звужено та підтверджено практичним PR-тестом (розділи
+8–9); Preview build incident на PR №5 задокументовано як вирішений (розділ
+10).
+
+Фактично незавершені питання зібрані нижче — жодне не блокує роботу сайту і
+кожне є окремим рішенням власника:
+
+1. Накопичення реальних даних у Google Search Console (розділ 17) — потрібен
+   час і трафік.
+2. Оновлення favicon у видачі Google Search (розділ 18) — залежить від
+   циклу переобходу Google; конкретний строк не гарантується.
+3. Реальні Core Web Vitals у Vercel Speed Insights / CrUX — після
+   накопичення достатнього трафіку; порівняння лише за медіанами, не за
+   одиничним прогоном.
+4. Письмове уточнення від 123 Reg щодо статусу `clientRenewProhibited` для
+   домену (розділ 17).
+5. Окреме рішення власника щодо DNSSEC (наразі `Disabled`, розділ 17) — лише
+   після read-only аудиту authoritative DNS і плану відкату.
+6. Подальше покращення мобільного LCP (глибша оптимізація hero-фото, AVIF,
+   кешування `_next/image`, зменшення client-JS render delay) — тільки за
+   новими доказами, а не за одним лабораторним тестом.
+7. Відкриті рішення власника з розділу 12 (невикористаний fine-grained PAT,
+   `Workflows` scope, невикористані OAuth/GitHub Apps, резервний
+   passkey/security key) — без змін.
+
+## 16. Продуктові, перформанс та observability-етапи (PR #8–#13)
+
+Усі перелічені PR злиті через **Squash and merge**, кожен required CI-check
+`Verify (TypeScript, ESLint, tests, build)` на `main` після merge —
+`success`, кожен Vercel Production deployment — `success`. Службові гілки
+видалені (remote + локально) після кожного merge. `PROJECT_CURRENT_STATUS.md`
+під час PR #8–#13 не редагувався (виносилось окремо — цей запис).
+
+- **PR #8 — `perf: optimize site images`.** Squash-коміт
+  `42ec6bd8caedfc7b0c55905d9dc30cae2501026c`, злито `2026-08-30T12:55:51Z`,
+  CI run на `main` `33312798383`. Стиснення всіх зображень сайту (галерея,
+  автомобілі в продажу, hero, логотип) — сумарний обсяг зменшено з ~140 МБ
+  до ~23 МБ (≈83%). Змінено 34 файли: 33 зображення в `public/images/**` +
+  `src/components/HeroSection.tsx`. Форма, тексти, переклади, маршрути й
+  конфігурація не змінювались.
+- **PR #9 — `feat: update Dream Car favicon`.** Squash-коміт
+  `90fd33108b75959ac156598f09b11d87cf424096`, злито `2026-08-30T14:59:22Z`,
+  CI run на `main` `33318361617`. Новий чорно-золотий favicon із короною
+  (референс наданий і погоджений власником). Змінено рівно 1 файл —
+  `src/app/favicon.ico`. Файл `.ico` містить 6 вбудованих кадрів — 16×16,
+  32×32, 48×48, 64×64, 128×128, 256×256 (256×256 — найбільший, а не єдиний).
+  На Production `/favicon.ico` → HTTP 200, `image/vnd.microsoft.icon`; у
+  `<head>` — `<link rel="icon">` з cache-busting-параметром. Кеш Google —
+  розділ 18.
+- **PR #10 — `feat: add Vercel analytics and speed insights`.** Squash-коміт
+  `c5016b520d09608578c2abebeeb711216212c972`, злито `2026-08-30T19:11:37Z`,
+  CI run на `main` `33330181280`. Додано Vercel Web Analytics і Speed
+  Insights у `src/app/[locale]/layout.tsx` + оновлено сторінки
+  Privacy Policy та Cookies (`src/app/[locale]/privacy-policy/page.tsx`,
+  `src/app/[locale]/cookies/page.tsx`) з розкриттям про збір знеособленої
+  телеметрії, uk/ru/en. Змінено 5 файлів (+`package.json`,
+  `package-lock.json`). Web Analytics отримує реальні дані на Production;
+  Speed Insights приймає Production-події (розділ 17).
+- **PR #11 — `feat: add structured car service modal content`.** Squash-коміт
+  `fd8fcd043ebbb304b2efc9b995c4629e601c0b85`, злито `2026-09-02T08:35:21Z`,
+  CI run на `main` `33609520581` (78 тестів). Структурований опис послуги
+  «Автосервіс» (лід + 5 секцій / 19 пунктів) **виключно в модальному вікні**,
+  uk/ru/en. Змінено 7 файлів: `src/content/types.ts`,
+  `src/content/dictionaries/{uk,ru,en}.ts`, `src/components/ServicesGrid.tsx`,
+  `src/components/ServiceModal.tsx` + новий тест
+  `src/content/carServiceModal.test.ts`. Зміни в словниках — суто
+  additive; SEO-сторінка `/[locale]/services/car-service` (стара
+  longDescription + 4 пункти, JSON-LD `AutoRepair`+`BreadcrumbList`) не
+  змінювалась; інші послуги зберігають старий fallback-рендер.
+- **PR #12 — `content: update detailing service copy`.** Squash-коміт
+  `6e5f705fd8f1ce83b80d903349e609e4679ea883`, злито `2026-09-02T09:31:32Z`,
+  CI run на `main` `33614590155` (93 тести). Оновлено **лише користувацькі
+  тексти** — картки (касети) послуги та розгорнутого опису «Детейлінг і
+  полірування» в модальному вікні, uk/ru/en. Іконка, зображення, графіка
+  (зокрема сама графічна касета), дизайн і функціональність **не
+  змінювалися**. Змінено 8 файлів: `src/content/types.ts`,
+  `src/content/dictionaries/{uk,ru,en}.ts`, `src/components/ServicesGrid.tsx`,
+  `src/components/ServiceModal.tsx`, `src/content/carServiceModal.test.ts` +
+  новий `src/content/detailingModal.test.ts`. SEO-сторінка детейлінгу та
+  назва послуги збережені; структурований модал автосервісу та fallback
+  інших послуг не порушені. CSS/маршрутів/конфігурації зміна не торкалась.
+- **PR #13 — `perf: improve hero image loading`** (гілка
+  `codex/perf-prioritize-hero-images`, назва PR
+  `perf: prioritize hero image loading`). Squash-коміт
+  `ef13ac105c5d9c1d3e128faa874a824252b21652`, злито `2026-09-03T13:13:38Z`,
+  CI run на `main` `33759873675` (93 тести), Vercel Production deployment
+  `6244736017` (ref `5MR4kqizB3uK47ky4EZ9Vwj7C7Gi`) — `success`/`Current`.
+  Змінено 7 файлів у `src/components/` (+23/−9): `HeroSection.tsx`,
+  `DreamLogo.tsx`, `SiteHeader.tsx`, `SiteFooter.tsx`,
+  `CarsForSaleSection.tsx`, `GalleryProjectModal.tsx`, `NotFoundContent.tsx`.
+  Суть:
+  - hero-фото: застарілий проп `priority` замінено на
+    `loading="eager"` + `fetchPriority="high"` (у Next.js 16 `fetchPriority`
+    сам по собі не скасовує lazy);
+  - у `DreamLogo` прибрано проп `priority` повністю, додано опційний
+    `sizes`; коректні `sizes` проставлені на всіх викликах логотипа;
+  - результат на Production перевірено: у `<head>` **рівно один** image
+    preload — hero-фото, з `fetchpriority="high"`; **окремого preload для
+    `dream-car-logo.png` немає** (раніше логотип предзавантажувався як
+    `w=1920`/`w=3840`); hero `<img>` має `loading="eager"` +
+    `fetchpriority="high"`; ручних `<link rel="preload">` не додавалось —
+    єдиний preload генерує сам Next/React;
+  - hero `currentSrc` відповідає viewport (Mobile `w=1200`, Tablet/Desktop
+    `w=1920`, `q=90`); DreamLogo не завантажується як `w=1920`/`w=3840`
+    (максимум `w=1080` на DPR 3, `q=75`); усі 4 логотипи — `loading="lazy"`;
+  - візуал hero не змінився (`object-fit: cover`,
+    `object-position: 50% 38%` / `50% 50%`), CLS ≈ 0, битих зображень і
+    console/CSP-помилок на Production немає на всіх 7 маршрутах.
+  - Дизайн, тексти, переклади, зображення, `next.config.ts`, кешування,
+    анімації та функціональність не змінювались. `priority` (застарілий)
+    свідомо залишено на 2 не-DreamLogo `<Image>` у модальних галереях
+    (`GalleryProjectModal.tsx`, `CarListingGallery.tsx`) — поза областю
+    цього етапу.
+
+  **Формулювання щодо швидкодії (лабораторне, не польове):** PageSpeed /
+  Lighthouse — це лабораторні синтетичні прогони, а не реальні користувацькі
+  Core Web Vitals (польові дані — лише в Google Search Console / CrUX, розділ
+  17). PageSpeed **не запускати** як критерій цього етапу. Порівняння 3+3
+  mobile-прогонів (pagespeed.web.dev) до/після дало медіани Performance
+  83→81, **LCP 4.7 с→4.7 с (у лабораторному порівнянні не покращився)**,
+  CLS 0→0, Speed Index 2.3 с→2.3 с — це **не доводить ані регресію, ані
+  прискорення** (у межах природної варіативності Lighthouse). Єдиний
+  підтверджений технічний результат: аудит *«LCP request discovery /
+  missing `fetchpriority`»* присутній у всіх 3 прогонах Production і зник у
+  всіх 3 прогонах Preview. Коректне формулювання: **усунено конкретний
+  технічний аудит missing `fetchpriority` та надлишковий preload логотипа;
+  один Hero preload залишено; підтвердженої регресії CLS чи LCP немає.**
+  Загальне «сайт став швидшим» без польових доказів не стверджується.
+
+  **Vercel Preview `feedback.js`:** на Preview-деплойментах Vercel інжектує
+  власний скрипт `vercel.live/_next-live/feedback/feedback.js`, який блокує
+  CSP застосунку (`script-src 'self' 'unsafe-inline'`) → одна console-помилка
+  на Preview. Це Preview-артефакт, інжектований Vercel, — **не частина
+  застосунку DREAM.CAR.VAVD** (0 згадок у origin-HTML застосунку, тег несе
+  атрибут `data-deployment-id`). Заголовок `x-vercel-skip-toolbar` ховає
+  Toolbar UI, але в проведеному тесті інжекцію `feedback.js` не прибрав.
+  **На Production цього ресурсу та пов'язаної CSP-помилки немає** (0 згадок
+  `vercel.live` у HTML усіх 7 маршрутів).
+
+## 17. Зовнішній стан: Google Search Console та домен 123 Reg
+
+Значення в цьому розділі станом на `2026-09-03` підтверджені власником за
+результатами його власних read-only перевірок. Секрети (значення Google
+verification TXT, паролі, TOTP, setup keys, recovery-коди, токени) сюди не
+записуються.
+
+**Google Search Console (`dream-car-vavd.com`):**
+
+- Domain property `dream-car-vavd.com` — **підтверджено**; метод
+  підтвердження — **DNS** (значення Google TXT не розкривається й не
+  зберігається).
+- Sitemap `https://dream-car-vavd.com/sitemap.xml` — подано й **успішно
+  оброблено**. Два узгоджені, але **різні** джерела: (а) сам XML на
+  Production містить **27 `<url>`** (незалежно read-only підтверджено); (б)
+  GSC на момент перевірки показав **27 знайдених сторінок**. `robots.txt` →
+  HTTP 200, `Allow: /`, декларує sitemap.
+- `/uk` — у GSC на момент перевірки: «URL is on Google» та окремо пройдено
+  Live Test; повторний запит індексації `/uk` було надіслано (це не
+  гарантує негайного оновлення favicon чи миттєвого переобходу). Read-only
+  на Production: `noindex` відсутній, canonical і hreflang
+  uk/ru/en/x-default присутні.
+- Manual Actions — проблем не виявлено (на момент перевірки).
+- Security Issues — проблем не виявлено (на момент перевірки).
+- HTTPS — критичних проблем немає (на момент перевірки).
+- Core Web Vitals — це **польовий** звіт GSC/CrUX (окремий від лабораторного
+  PageSpeed, розділ 16); реальних польових даних поки недостатньо, звіт ще
+  накопичується.
+
+**Домен у 123 Reg:**
+
+- 2-Step Verification — **Enabled**; Authenticator app — **DEFAULT**
+  (секрети не розкривались).
+- Auto-renew — **On**; Domain Lock — **On**; рівень захисту — **Full
+  Protection**.
+- DNSSEC — **Disabled** (на момент перевірки). Це не означає, що DNSSEC не
+  потрібен — рішення відкрите (розділ 15, п. 5) і потребує окремого
+  read-only аудиту authoritative DNS та плану відкату.
+- Після додавання Google verification TXT у таблиці DNS **8 записів** —
+  стан на момент перевірки (саме значення verification TXT у документ не
+  додається).
+- Інші параметри домену не змінювались.
+- Невирішене питання для 123 Reg Support: письмове уточнення щодо статусу
+  `clientRenewProhibited` для домену (розділ 15, п. 4).
+
+**Vercel (read-only, без змін налаштувань):**
+
+- Production `Current` відповідає `main` / `ef13ac1`.
+- Web Analytics — працює (отримує реальні події на Production).
+- Speed Insights — приймає Production-події.
+- Домен `dream-car-vavd.com` — працює (HTTP 200).
+
+## 18. favicon у видачі Google Search
+
+- Production-favicon коректний: `src/app/favicon.ico` (PR #9) містить 6
+  вбудованих кадрів від 16×16 до 256×256 (256×256 — найбільший, не єдиний).
+  `/favicon.ico` → HTTP 200, `image/vnd.microsoft.icon`; `<link rel="icon">`
+  присутній у `<head>` з cache-busting-параметром.
+- Google у видачі може **ще деякий час показувати старий значок** через
+  власний кеш і цикл повторного сканування — це очікувано і не є дефектом
+  реалізації.
+- Search Console підключено, повторну індексацію `/uk` замовлено (розділ
+  17) — це коректні кроки, щоб пришвидшити переобхід, але **вони не
+  гарантують строку** оновлення значка.
+- **Конкретний строк оновлення favicon у результатах пошуку Google не
+  гарантується** і не фіксується в цьому документі.
