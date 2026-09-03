@@ -68,7 +68,7 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
                   fill
                   loading="eager"
                   fetchPriority="high"
-                  quality={90}
+                  quality={75}
                   sizes="(min-width: 1024px) 100vw, 100vw"
                   className="object-cover object-[center_38%] lg:object-center"
                 />
