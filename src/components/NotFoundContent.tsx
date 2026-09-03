@@ -34,7 +34,11 @@ export function NotFoundContent() {
 
   return (
     <section className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 py-20 text-center sm:px-6">
-      <DreamLogo alt={text.alt} wrapperClassName="h-24 w-auto sm:h-28" />
+      <DreamLogo
+        alt={text.alt}
+        sizes="(min-width: 640px) 198px, 170px"
+        wrapperClassName="h-24 w-auto sm:h-28"
+      />
       <p className="font-heading mt-8 text-6xl font-bold text-gold sm:text-7xl">404</p>
       <h1 className="font-heading mt-4 text-2xl font-bold text-text sm:text-3xl">{text.title}</h1>
       <p className="mt-3 max-w-md text-muted">{text.message}</p>

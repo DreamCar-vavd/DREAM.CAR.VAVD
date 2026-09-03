@@ -66,7 +66,8 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
                   src="/images/hero-cars-logo-final.jpg"
                   alt={dict.meta.siteName}
                   fill
-                  priority
+                  loading="eager"
+                  fetchPriority="high"
                   quality={90}
                   sizes="(min-width: 1024px) 100vw, 100vw"
                   className="object-cover object-[center_38%] lg:object-center"
@@ -80,7 +81,7 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
               <div className="relative z-10 flex flex-col items-start gap-5 p-6 sm:p-8 lg:absolute lg:inset-y-0 lg:left-0 lg:w-[52%] lg:justify-center lg:p-10 animate-in">
                 <DreamLogo
                   alt={`${dict.hero.title} — ${dict.hero.brandTag}`}
-                  priority
+                  sizes="(min-width: 1024px) 414px, (min-width: 640px) 368px, 322px"
                   wrapperClassName="block aspect-[1413/800] w-full max-w-[322px] sm:max-w-[368px] lg:max-w-[414px]"
                 />
 

@@ -46,6 +46,7 @@ export function CarsForSaleSection({ dict, locale }: { dict: Dictionary; locale:
               <div className="flex flex-col items-start gap-5 p-8 sm:p-10 lg:w-[46%] lg:p-12">
                 <DreamLogo
                   alt={dict.meta.siteName}
+                  sizes="190px"
                   wrapperClassName="block aspect-[1413/800] w-full max-w-[190px]"
                 />
                 <h2 className="font-heading text-3xl font-bold leading-tight text-gold sm:text-4xl lg:text-[2.75rem]">
