@@ -1,9 +1,12 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 import type { ServiceSection } from "@/content/types";
+import { GoldLink } from "./GoldButton";
+import { setRequestedService } from "@/lib/serviceContactIntent";
+import { isModifiedClick } from "@/lib/isModifiedClick";
 
 export interface ServiceModalContent {
   title: string;
@@ -18,10 +21,18 @@ export function ServiceModal({
   content,
   closeLabel,
   onClose,
+  onNavigate,
+  slug,
+  contactHref,
+  contactCtaLabel,
 }: {
   content: ServiceModalContent;
   closeLabel: string;
   onClose: () => void;
+  onNavigate: () => void;
+  slug: string;
+  contactHref: string;
+  contactCtaLabel: string;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -31,6 +42,30 @@ export function ServiceModal({
   useEffect(() => {
     closeButtonRef.current?.focus();
   }, []);
+
+  // Closes the modal (restoring body scroll via useDialogFocusTrap's own
+  // cleanup) and hands the requested service slug to the contact form
+  // (see serviceContactIntent.ts) — ContactForm both consumes it at mount
+  // and listens live to pre-select a matching <option>, if any.
+  //
+  // Uses `onNavigate`, not `onClose`: this CTA navigates the page to
+  // `#contacts`, so — unlike the X button/backdrop/Escape, which use
+  // `onClose` and correctly return focus to the card that opened this
+  // modal — returning focus to that same card here would strand a
+  // keyboard/screen-reader user on an element that's now scrolled far
+  // off-screen (confirmed with real keyboard events while testing this).
+  // ContactForm moves focus to the contacts heading itself once the hash
+  // navigation lands.
+  function handleContactClick(event: MouseEvent<HTMLAnchorElement>) {
+    // A Ctrl/Cmd/Shift/Alt/middle-click opens the link in a new tab — this
+    // tab isn't navigating anywhere, so it must not close this modal or
+    // write a same-tab contact-intent that could later misfire on an
+    // unrelated visit (see isModifiedClick.ts). Default browser behavior
+    // (open in new tab) proceeds untouched.
+    if (isModifiedClick(event)) return;
+    setRequestedService(slug);
+    onNavigate();
+  }
 
   return (
     <div
@@ -104,6 +139,9 @@ export function ServiceModal({
             )}
           </>
         )}
+        <GoldLink href={contactHref} onClick={handleContactClick} className="mt-6">
+          {contactCtaLabel}
+        </GoldLink>
       </div>
     </div>
   );

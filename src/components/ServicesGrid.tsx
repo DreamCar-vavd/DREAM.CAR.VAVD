@@ -9,9 +9,10 @@ import { ServiceModal, type ServiceModalContent } from "./ServiceModal";
 
 const SPECIAL_ORDER_ID = "special-order";
 
-export function ServicesGrid({ dict }: { dict: Dictionary }) {
+export function ServicesGrid({ dict, locale }: { dict: Dictionary; locale: string }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
+  const contactHref = `/${locale}#contacts`;
 
   function open(id: string, trigger: HTMLElement) {
     lastTriggerRef.current = trigger;
@@ -24,6 +25,18 @@ export function ServicesGrid({ dict }: { dict: Dictionary }) {
     if (trigger) {
       requestAnimationFrame(() => trigger.focus());
     }
+  }
+
+  // Used only by the modal's "go to contacts" CTA. Deliberately skips the
+  // trigger refocus above: that CTA navigates the page to `#contacts`
+  // (often scrolling far down), so returning focus to the card that
+  // opened the modal would strand a keyboard/screen-reader user on an
+  // element that's now off-screen. ContactForm moves focus to the
+  // contacts heading itself once the hash lands (see its `hashchange`
+  // effect) — confirmed necessary by testing this exact flow with real
+  // keyboard events.
+  function closeForNavigation() {
+    setOpenId(null);
   }
 
   let activeContent: ServiceModalContent | null = null;
@@ -75,7 +88,15 @@ export function ServicesGrid({ dict }: { dict: Dictionary }) {
       </div>
 
       {activeContent && (
-        <ServiceModal content={activeContent} closeLabel={dict.common.closeLabel} onClose={close} />
+        <ServiceModal
+          content={activeContent}
+          closeLabel={dict.common.closeLabel}
+          onClose={close}
+          onNavigate={closeForNavigation}
+          slug={openId ?? ""}
+          contactHref={contactHref}
+          contactCtaLabel={dict.hero.ctaPrimary}
+        />
       )}
     </section>
   );
