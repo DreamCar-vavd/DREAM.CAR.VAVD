@@ -95,8 +95,8 @@ body {
   background-size: 250% 100%;
   background-position: 120% 0;
 
-  -webkit-mask-image: url("/images/dream-car-logo.png");
-  mask-image: url("/images/dream-car-logo.png");
+  -webkit-mask-image: url("/images/dream-logo-mask.png");
+  mask-image: url("/images/dream-logo-mask.png");
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
