@@ -7,6 +7,7 @@ import { classifyContactErrorKind, type ContactErrorKind } from "@/lib/contactEr
 import { CONTACT_MAX_LENGTHS } from "@/lib/contactLimits";
 import { consumeRequestedService, onServiceRequested } from "@/lib/serviceContactIntent";
 import { consumeRequestedVehicle, onVehicleRequested } from "@/lib/vehicleContactIntent";
+import { focusContactsHeading } from "@/lib/focusContactsHeading";
 import { GoldButton } from "./GoldButton";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -27,21 +28,6 @@ const SUBMIT_TIMEOUT_MS = 15_000;
 // Priority order for moving focus to the first invalid field — matches
 // the fields' visual/tab order in the form.
 const FIELD_ORDER = ["name", "phone", "email", "message", "consent"] as const;
-
-// Called from the service/vehicle CTA-intent effects below, whenever a
-// service modal or car listing's "go to contacts" CTA actually fired —
-// moves keyboard/screen-reader focus onto the contacts heading itself.
-// Both CTAs deliberately skip refocusing their own trigger for this path
-// (see ServicesGrid.closeForNavigation / CarListingGallery.closeForNavigation)
-// because that trigger can end up scrolled far off-screen once the page
-// lands on `#contacts` — confirmed with real keyboard events. A plain
-// `hashchange` listener was tried first and doesn't work here: Next.js's
-// <Link> updates the URL via the History API, which never dispatches a
-// `hashchange` event, so this is tied directly to the same CTA-intent
-// signal that already reliably drives the service/vehicle pre-fill.
-function focusContactsHeading() {
-  document.getElementById("contacts-heading")?.focus();
-}
 
 export function ContactForm({ dict }: { dict: Dictionary }) {
   const [status, setStatus] = useState<Status>("idle");
