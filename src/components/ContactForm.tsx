@@ -5,6 +5,7 @@ import type { Dictionary } from "@/content/types";
 import { services } from "@/content/services";
 import { classifyContactErrorKind, type ContactErrorKind } from "@/lib/contactErrorKind";
 import { CONTACT_MAX_LENGTHS } from "@/lib/contactLimits";
+import { consumeRequestedService, onServiceRequested } from "@/lib/serviceContactIntent";
 import { GoldButton } from "./GoldButton";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -26,6 +27,21 @@ const SUBMIT_TIMEOUT_MS = 15_000;
 // the fields' visual/tab order in the form.
 const FIELD_ORDER = ["name", "phone", "email", "message", "consent"] as const;
 
+// Called from the service CTA-intent effect below, whenever the service
+// modal's "go to contacts" CTA actually fired — moves keyboard/screen-reader
+// focus onto the contacts heading itself. The CTA deliberately skips
+// refocusing its own trigger for this path (see
+// ServicesGrid.closeForNavigation) because that trigger can end up scrolled
+// far off-screen once the page lands on `#contacts` — confirmed with real
+// keyboard events. A plain
+// `hashchange` listener was tried first and doesn't work here: Next.js's
+// <Link> updates the URL via the History API, which never dispatches a
+// `hashchange` event, so this is tied directly to the same CTA-intent
+// signal that already reliably drives the service pre-fill.
+function focusContactsHeading() {
+  document.getElementById("contacts-heading")?.focus();
+}
+
 export function ContactForm({ dict }: { dict: Dictionary }) {
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Errors>({});
@@ -39,6 +55,55 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
     message: null,
     consent: null,
   });
+  const serviceSelectRef = useRef<HTMLSelectElement>(null);
+
+  // Applies a requested service slug to the <select> — used both for a
+  // value already waiting in sessionStorage at mount time, and for a live
+  // request while this form is already mounted (see serviceContactIntent
+  // for why both paths are needed: the modal's CTA is a same-page hash
+  // link, so ContactForm is typically *already* mounted when the request
+  // happens, not freshly mounted). An unmatched/unknown slug is a silent
+  // no-op.
+  //
+  // `autoFilled` distinguishes "this value was set by an earlier CTA" from
+  // "the visitor chose this themselves": a native `input` event only ever
+  // fires for real user interaction, never for a plain `.value = x`
+  // assignment, so it's a reliable signal to stop treating the field as
+  // ours. Without this, picking one service's CTA and then a *different*
+  // service's CTA in the same session would silently keep the first
+  // choice — confirmed while testing this patch — because a plain "only
+  // fill when empty" guard can't tell our own earlier fill apart from a
+  // deliberate choice. A value already there when the effect first runs
+  // (e.g. bfcache-restored) is treated as the visitor's, not ours.
+  useEffect(() => {
+    const select = serviceSelectRef.current;
+    let autoFilled = false;
+    function markUserEdited() {
+      autoFilled = false;
+    }
+    select?.addEventListener("input", markUserEdited);
+    function applyService(slug: string) {
+      // Runs regardless of whether `slug` turns out to match a real
+      // option below (e.g. the special-order pseudo-service never will)
+      // — a CTA fired and the visitor followed a "go to contacts" link
+      // either way, so focus should land there regardless of the match.
+      focusContactsHeading();
+      if (!select) return;
+      if (select.value && !autoFilled) return;
+      if (services.some((service) => service.slug === slug)) {
+        select.value = slug;
+        autoFilled = true;
+      }
+    }
+    const stored = consumeRequestedService();
+    if (stored) applyService(stored);
+    const unsubscribe = onServiceRequested(applyService);
+    return () => {
+      unsubscribe();
+      select?.removeEventListener("input", markUserEdited);
+    };
+  }, []);
+
   const idPrefix = useId();
   const errorId = (field: keyof Errors) => `${idPrefix}-${field}-error`;
 
@@ -244,7 +309,13 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
           <label htmlFor="service" className="mb-1.5 block text-sm text-muted">
             {dict.contact.form.service}
           </label>
-          <select id="service" name="service" className={inputClass} defaultValue="">
+          <select
+            ref={serviceSelectRef}
+            id="service"
+            name="service"
+            className={inputClass}
+            defaultValue=""
+          >
             <option value="" disabled>
               {dict.contact.form.selectService}
             </option>
