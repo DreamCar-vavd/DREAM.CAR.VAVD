@@ -36,9 +36,11 @@ npm run build:webpack
 
 ```
 public/images/dream-car-logo.png    — логотип (шапка, hero, footer)
-public/images/hero-cars.png         — фото автомобілів на головному екрані
+public/images/hero-cars-logo-final.jpg — фото автомобілів на головному екрані
 public/images/reference-banner.png  — лише референс дизайну, на сайті не показується
-public/images/gallery/01.jpg … 08.jpg — фото в галереї
+public/images/gallery/01.jpg … 06.jpg — 6 фото загальної секції галереї
+public/images/gallery/<album-id>/*.jpg — фотоальбоми проєктів (зараз: maserati-levante — 8 фото, volvo-xc60-d5 — 5 фото)
+# gallery/07.jpg, gallery/08.jpg наразі на диску, кодом не використовуються
 ```
 
 ## Змінні середовища
