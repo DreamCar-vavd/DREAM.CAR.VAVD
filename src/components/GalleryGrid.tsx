@@ -56,23 +56,42 @@ const cardButtonClass =
 
 export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
-  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // The exact card element that opened the current modal, captured on click.
+  // Same pattern as ServicesGrid's `lastTriggerRef` — a single stable ref
+  // holding the real node, rather than a Record rebuilt by inline callback
+  // refs on every re-render (which briefly go null when the modal toggles).
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
 
   const activeProject = galleryProjects.find((p) => p.id === openProjectId) ?? null;
 
+  function openModal(id: string, trigger: HTMLElement) {
+    lastTriggerRef.current = trigger;
+    setOpenProjectId(id);
+  }
+
   function closeModal() {
-    const id = openProjectId;
     setOpenProjectId(null);
-    if (id) {
-      requestAnimationFrame(() => triggerRefs.current[id]?.focus());
-    }
+    const trigger = lastTriggerRef.current;
+    // Deferred with setTimeout(0), not requestAnimationFrame: rAF callbacks
+    // are paused while the tab is backgrounded, so an rAF-scheduled focus
+    // restore is silently dropped if the tab isn't visible at close time
+    // (confirmed: with `document.hidden` the rAF callback never fires,
+    // setTimeout still does). Matches CarListingGallery's existing close().
+    // The 0ms delay only lets React commit the modal's removal first.
+    window.setTimeout(() => {
+      // No-op (not an error) if the card is gone or detached — e.g. after
+      // a content refresh — and never pulls focus onto a hidden node.
+      if (trigger?.isConnected) trigger.focus();
+    }, 0);
   }
 
   // Used only by the modal's "go to contacts" CTA. Deliberately skips the
   // trigger refocus above — see ServiceModal/CarListingGallery's identical
   // `closeForNavigation` for why: that trigger card can end up scrolled far
   // off-screen once the page lands on `#contacts`, so returning focus to it
-  // would strand a keyboard/screen-reader user there instead of at the form.
+  // would strand a keyboard/screen-reader user there — and would scroll the
+  // gallery back into view, undoing the jump to `#contacts`. GalleryProjectModal
+  // moves focus to the contacts heading itself instead.
   function closeForNavigation() {
     setOpenProjectId(null);
   }
@@ -93,11 +112,8 @@ export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale
             return (
               <button
                 key={album.id}
-                ref={(el) => {
-                  triggerRefs.current[album.id] = el;
-                }}
                 type="button"
-                onClick={() => setOpenProjectId(album.id)}
+                onClick={(event) => openModal(album.id, event.currentTarget)}
                 className={cardButtonClass}
               >
                 <GalleryCardFrame />
@@ -141,11 +157,8 @@ export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale
             return (
               <button
                 key={image.src}
-                ref={(el) => {
-                  triggerRefs.current[id] = el;
-                }}
                 type="button"
-                onClick={() => setOpenProjectId(id)}
+                onClick={(event) => openModal(id, event.currentTarget)}
                 aria-label={`${dict.gallery.heading} ${index + 1}`}
                 className={cardButtonClass}
               >
