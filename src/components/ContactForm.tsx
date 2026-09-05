@@ -6,6 +6,7 @@ import { services } from "@/content/services";
 import { classifyContactErrorKind, type ContactErrorKind } from "@/lib/contactErrorKind";
 import { CONTACT_MAX_LENGTHS } from "@/lib/contactLimits";
 import { consumeRequestedService, onServiceRequested } from "@/lib/serviceContactIntent";
+import { consumeRequestedVehicle, onVehicleRequested } from "@/lib/vehicleContactIntent";
 import { GoldButton } from "./GoldButton";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -27,17 +28,17 @@ const SUBMIT_TIMEOUT_MS = 15_000;
 // the fields' visual/tab order in the form.
 const FIELD_ORDER = ["name", "phone", "email", "message", "consent"] as const;
 
-// Called from the service CTA-intent effect below, whenever the service
-// modal's "go to contacts" CTA actually fired — moves keyboard/screen-reader
-// focus onto the contacts heading itself. The CTA deliberately skips
-// refocusing its own trigger for this path (see
-// ServicesGrid.closeForNavigation) because that trigger can end up scrolled
-// far off-screen once the page lands on `#contacts` — confirmed with real
-// keyboard events. A plain
+// Called from the service/vehicle CTA-intent effects below, whenever a
+// service modal or car listing's "go to contacts" CTA actually fired —
+// moves keyboard/screen-reader focus onto the contacts heading itself.
+// Both CTAs deliberately skip refocusing their own trigger for this path
+// (see ServicesGrid.closeForNavigation / CarListingGallery.closeForNavigation)
+// because that trigger can end up scrolled far off-screen once the page
+// lands on `#contacts` — confirmed with real keyboard events. A plain
 // `hashchange` listener was tried first and doesn't work here: Next.js's
 // <Link> updates the URL via the History API, which never dispatches a
 // `hashchange` event, so this is tied directly to the same CTA-intent
-// signal that already reliably drives the service pre-fill.
+// signal that already reliably drives the service/vehicle pre-fill.
 function focusContactsHeading() {
   document.getElementById("contacts-heading")?.focus();
 }
@@ -56,6 +57,7 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
     consent: null,
   });
   const serviceSelectRef = useRef<HTMLSelectElement>(null);
+  const vehicleInputRef = useRef<HTMLInputElement>(null);
 
   // Applies a requested service slug to the <select> — used both for a
   // value already waiting in sessionStorage at mount time, and for a live
@@ -103,6 +105,40 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
       select?.removeEventListener("input", markUserEdited);
     };
   }, []);
+
+  // Same mechanism as above (including the `autoFilled`/`input`-event
+  // distinction — see the comment above), for a car listing's requested
+  // id -> the vehicle text field. The id is looked up against this
+  // locale's own `dict.carsForSale.listings` (the same data the
+  // catalogue page renders) rather than trusting a free-form name, so an
+  // id that doesn't match any current listing is silently ignored
+  // instead of being injected as text.
+  useEffect(() => {
+    const input = vehicleInputRef.current;
+    let autoFilled = false;
+    function markUserEdited() {
+      autoFilled = false;
+    }
+    input?.addEventListener("input", markUserEdited);
+    function applyVehicle(listingId: string) {
+      focusContactsHeading();
+      if (!input) return;
+      if (input.value && !autoFilled) return;
+      const listings = dict.carsForSale.listings as Record<string, { title: string }>;
+      const title = listings[listingId]?.title;
+      if (title) {
+        input.value = title;
+        autoFilled = true;
+      }
+    }
+    const stored = consumeRequestedVehicle();
+    if (stored) applyVehicle(stored);
+    const unsubscribe = onVehicleRequested(applyVehicle);
+    return () => {
+      unsubscribe();
+      input?.removeEventListener("input", markUserEdited);
+    };
+  }, [dict]);
 
   const idPrefix = useId();
   const errorId = (field: keyof Errors) => `${idPrefix}-${field}-error`;
@@ -332,6 +368,7 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
             {dict.contact.form.vehicle}
           </label>
           <input
+            ref={vehicleInputRef}
             id="vehicle"
             name="vehicle"
             type="text"
