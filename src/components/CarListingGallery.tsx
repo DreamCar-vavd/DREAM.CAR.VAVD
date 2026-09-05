@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Images, Play, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import type { CarListing } from "@/content/carListings";
 import type { CarListingCopy } from "@/content/types";
+import { setRequestedVehicle } from "@/lib/vehicleContactIntent";
+import { isModifiedClick } from "@/lib/isModifiedClick";
 
 interface GalleryLabels {
   status: string;
@@ -61,6 +63,19 @@ export function CarListingGallery({
     videoRef.current?.pause();
     setIsOpen(false);
     window.setTimeout(() => triggerRef.current?.focus(), 0);
+  }, []);
+
+  // Used only by the "contact us about this car" CTA, which navigates to
+  // `/${locale}#contacts` (usually a real cross-page navigation from this
+  // catalogue page to the homepage). Deliberately skips the trigger
+  // refocus above for the same reason as ServicesGrid's equivalent: the
+  // destination is elsewhere, so refocusing this lightbox's own trigger
+  // would be meaningless at best and, if this component somehow survives
+  // the navigation, would strand focus on a stale element. ContactForm
+  // moves focus to the contacts heading itself once the hash lands.
+  const closeForNavigation = useCallback(() => {
+    videoRef.current?.pause();
+    setIsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -273,7 +288,27 @@ export function CarListingGallery({
                     <p>{copy.mileage}</p>
                   </div>
                   <p className="my-7 font-heading text-4xl font-bold text-gold sm:text-5xl">{copy.price}</p>
-                  <Link href={contactHref} onClick={close} className="inline-flex min-h-12 items-center justify-center border border-gold bg-gradient-to-b from-[#e2c35b] to-[#a9780b] px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-black transition-[filter,transform] hover:brightness-110 active:scale-[0.99]">
+                  <Link
+                    href={contactHref}
+                    onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                      // `contactHref` is built by the page from
+                      // `/${locale}#contacts` — usually a real cross-page
+                      // navigation from this catalogue page to the
+                      // homepage. An unrecognized listing.id is harmless,
+                      // ContactForm ignores anything that isn't one of its
+                      // own listings. Uses `closeForNavigation`, not
+                      // `close` — see its comment for why.
+                      //
+                      // A Ctrl/Cmd/Shift/Alt/middle-click opens a new tab
+                      // instead — this tab isn't navigating, so it must not
+                      // close the lightbox or write an intent for it (see
+                      // isModifiedClick.ts).
+                      if (isModifiedClick(event)) return;
+                      setRequestedVehicle(listing.id);
+                      closeForNavigation();
+                    }}
+                    className="inline-flex min-h-12 items-center justify-center border border-gold bg-gradient-to-b from-[#e2c35b] to-[#a9780b] px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-black transition-[filter,transform] hover:brightness-110 active:scale-[0.99]"
+                  >
                     {labels.contactCta}
                   </Link>
                 </aside>
