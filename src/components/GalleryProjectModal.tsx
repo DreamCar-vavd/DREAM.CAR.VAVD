@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Car, Check, ClipboardCheck, Pencil, Plus, ShieldCheck, Trash2, User, X } from "lucide-react";
@@ -13,6 +13,8 @@ import { GoldLink, GoldButton } from "./GoldButton";
 import { WhatsAppIcon } from "./icons/SocialIcons";
 import { whatsappUrl } from "@/lib/social";
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
+import { isModifiedClick } from "@/lib/isModifiedClick";
+import { focusContactsHeading } from "@/lib/focusContactsHeading";
 
 const EDITABLE_PROJECT_IDS = new Set(["maserati-levante", "volvo-xc60-d5"]);
 
@@ -25,11 +27,13 @@ export function GalleryProjectModal({
   locale,
   project,
   onClose,
+  onNavigate,
 }: {
   dict: Dictionary;
   locale: Locale;
   project: GalleryProjectEntry;
   onClose: () => void;
+  onNavigate: () => void;
 }) {
   const router = useRouter();
   const copy = dict.gallery.projects[project.id];
@@ -142,6 +146,21 @@ export function GalleryProjectModal({
   }
 
   const editCopy = editData?.[editLocale];
+
+  // Closes the modal (via `onNavigate`, not `onClose` — see its comment on
+  // the `GalleryGrid` call site for why) and moves focus onto the contacts
+  // heading. Without this, the link's default navigation still ran (the
+  // URL hash did change to `#contacts`), but nothing ever told this modal
+  // to stop rendering: its full-screen overlay kept covering the page,
+  // making the CTA look like it did nothing at all — confirmed by
+  // reproducing the reported bug before writing this fix. Deliberately
+  // does not pass any project data into the form — only navigation and
+  // focus, matching what was actually requested.
+  function handleContactClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (isModifiedClick(event)) return;
+    onNavigate();
+    focusContactsHeading();
+  }
 
   return (
     <div
@@ -271,6 +290,7 @@ export function GalleryProjectModal({
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <GoldLink
                   href={`/${locale}#contacts`}
+                  onClick={handleContactClick}
                   variant="solid"
                   className="w-full whitespace-nowrap sm:w-auto"
                 >

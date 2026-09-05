@@ -68,6 +68,15 @@ export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale
     }
   }
 
+  // Used only by the modal's "go to contacts" CTA. Deliberately skips the
+  // trigger refocus above — see ServiceModal/CarListingGallery's identical
+  // `closeForNavigation` for why: that trigger card can end up scrolled far
+  // off-screen once the page lands on `#contacts`, so returning focus to it
+  // would strand a keyboard/screen-reader user there instead of at the form.
+  function closeForNavigation() {
+    setOpenProjectId(null);
+  }
+
   return (
     <section id="gallery" className="scroll-mt-20 border-b border-border-gold/60 bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -159,6 +168,7 @@ export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale
           locale={locale}
           project={activeProject}
           onClose={closeModal}
+          onNavigate={closeForNavigation}
         />
       )}
     </section>
