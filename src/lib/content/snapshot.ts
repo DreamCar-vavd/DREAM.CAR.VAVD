@@ -30,6 +30,7 @@ function assertCarSane(car: CmsCar): void {
 function assertGallerySane(p: CmsGalleryProject): void {
   const w = `published.json → gallery "${p?.id ?? "?"}"`;
   if (!p?.id) throw new Error(`${w}: missing id`);
+  if (!p.photos?.filter((x) => x?.image?.trim()).length) throw new Error(`${w}: no photos`);
   for (const l of LOCALES) {
     if (!String(p[l]?.title ?? "").trim()) throw new Error(`${w}: ${l.toUpperCase()} title empty`);
   }

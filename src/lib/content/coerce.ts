@@ -62,6 +62,12 @@ export function coerceGalleryProject(
     order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 100,
     kind: raw.kind === "showcase" ? "showcase" : "album",
     year: str(raw.year),
+    photos: Array.isArray(raw.photos)
+      ? (raw.photos as Record<string, unknown>[]).map((p) => ({
+          image: str(p?.image),
+          caption: str(p?.caption),
+        }))
+      : [],
     videoUrl: str(raw.videoUrl),
     showContactCta: raw.showContactCta !== false,
     uk: galleryLang(raw.uk),

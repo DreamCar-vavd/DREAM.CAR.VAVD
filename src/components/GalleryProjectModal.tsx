@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Car, Check, ClipboardCheck, ShieldCheck, User, X } from "lucide-react";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
-import type { GalleryProjectEntry } from "@/content/galleryProjects";
 import { DreamLogo } from "./DreamLogo";
 import { GoldLink } from "./GoldButton";
 import { WhatsAppIcon } from "./icons/SocialIcons";
@@ -19,6 +18,11 @@ import { focusContactsHeading } from "@/lib/focusContactsHeading";
  * panel (/keystatic + /panel); the former in-modal dev editor and its
  * /api/gallery-projects backend were removed with the panel work.
  */
+export interface GalleryModalProject {
+  id: string;
+  images: { src: string; width: number; height: number }[];
+}
+
 export function GalleryProjectModal({
   dict,
   locale,
@@ -28,7 +32,7 @@ export function GalleryProjectModal({
 }: {
   dict: Dictionary;
   locale: Locale;
-  project: GalleryProjectEntry;
+  project: GalleryModalProject;
   onClose: () => void;
   onNavigate: () => void;
 }) {

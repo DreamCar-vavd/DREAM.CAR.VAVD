@@ -46,7 +46,17 @@ const GAL_L = {
   result: "",
 };
 const galJson = (over: Record<string, unknown> = {}) =>
-  JSON.stringify({ id: "g1", order: 1, kind: "album", year: "", uk: GAL_L, en: GAL_L, ru: GAL_L, ...over });
+  JSON.stringify({
+    id: "g1",
+    order: 1,
+    kind: "album",
+    year: "",
+    photos: [{ image: "/g.jpg" }],
+    uk: GAL_L,
+    en: GAL_L,
+    ru: GAL_L,
+    ...over,
+  });
 
 /** In-memory file store with real version bumps + conflict checks. */
 class FakeStorage implements PanelStorage {

@@ -212,6 +212,24 @@ export default config({
           defaultValue: "album",
         }),
         year: fields.text({ label: "Рік (спільний)" }),
+        photos: fields.array(
+          fields.object({
+            image: fields.image({
+              label: "Фото",
+              directory: "public/images/cms/gallery",
+              publicPath: "/images/cms/gallery",
+              validation: { isRequired: true },
+            }),
+            caption: fields.text({ label: "Підпис / alt (необов'язково)" }),
+          }),
+          {
+            label: "Фотографії роботи",
+            description:
+              "Перше фото = обкладинка картки. Порядок — перетягуванням або стрілками ↑ ↓.",
+            itemLabel: (props) => props.fields.caption.value || "Фото",
+            validation: { length: { min: 1 } },
+          },
+        ),
         videoUrl: fields.url({ label: "Посилання на відео (необов'язково)" }),
         showContactCta: fields.checkbox({
           label: "Показувати кнопку «Замовити консультацію»",

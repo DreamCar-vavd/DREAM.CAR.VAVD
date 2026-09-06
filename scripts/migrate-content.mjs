@@ -103,6 +103,7 @@ function confirmedText(lang) {
 const hash = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
 const GALLERY_DIR = path.join(ROOT, "src/content/cms/gallery");
+const GALLERY_DIR_MEDIA = path.join(ROOT, "public/images/cms/gallery");
 
 /** Gallery TEXT captured verbatim on 2026-09-06 from:
  *   maserati-levante  <- src/content/gallery-project-overrides.json (real, ×3)
@@ -123,6 +124,26 @@ const PLACEHOLDER = {
   en: G("Vehicle", "Service to be confirmed", "Information to be confirmed.", ["Information to be confirmed"], "Information to be confirmed."),
   ru: G("Автомобиль", "Услуга уточняется", "Информация уточняется.", ["Информация уточняется"], "Информация уточняется."),
 };
+const GALLERY_SRC = path.join(ROOT, "public/images/gallery");
+const GALLERY_MEDIA = {
+  "maserati-levante": [
+    "maserati-levante-front.jpg", "maserati-levante-side-left.jpg",
+    "maserati-levante-side-front-right.jpg", "maserati-levante-rear.jpg",
+    "maserati-levante-front-interior-left.jpg", "maserati-levante-front-interior-right.jpg",
+    "maserati-levante-rear-interior-left.jpg", "maserati-levante-dashboard.jpg",
+  ].map((n) => [`maserati-levante/${n}`, n]),
+  "volvo-xc60-d5": [
+    "volvo-xc60-side-right.jpg", "volvo-xc60-front.jpg", "volvo-xc60-rear.jpg",
+    "volvo-xc60-interior-front.jpg", "volvo-xc60-interior-rear.jpg",
+  ].map((n) => [`volvo-xc60-d5/${n}`, n]),
+  ...Object.fromEntries(
+    Array.from({ length: 6 }, (_, i) => {
+      const id = `showcase-${String(i + 1).padStart(2, "0")}`;
+      return [id, [[`${String(i + 1).padStart(2, "0")}.jpg`, `${String(i + 1).padStart(2, "0")}.jpg`]]];
+    }),
+  ),
+};
+
 const GALLERY = [
   {
     id: "maserati-levante", order: 1, kind: "album", year: "2022",
@@ -269,11 +290,28 @@ async function main() {
   const publishedGallery = [];
   const at = "2026-09-06T00:00:00.000Z";
   for (const g of GALLERY) {
+    // Move photos into the Keystatic image-field layout, same as cars.
+    const gDir = path.join(GALLERY_DIR_MEDIA, g.id);
+    const photoEntries = [];
+    const media = GALLERY_MEDIA[g.id] ?? [];
+    for (let i = 0; i < media.length; i++) {
+      const [srcRel, origName] = media[i];
+      const ext = origName.split(".").pop();
+      const rel = `photos/${i}/image.${ext}`;
+      await placeMedia(
+        path.join(gDir, rel),
+        path.join(gDir, origName),
+        path.join(GALLERY_SRC, srcRel),
+      );
+      photoEntries.push({ image: `/images/cms/gallery/${g.id}/${rel}`, caption: "" });
+    }
+
     const record = {
       id: g.id,
       order: g.order,
       kind: g.kind,
       year: g.year,
+      photos: photoEntries,
       videoUrl: "",
       showContactCta: true,
       uk: g.uk,
@@ -326,6 +364,17 @@ async function main() {
       }
     }
   }
+  // Gallery: drop the now-empty pre-panel folders/files that were moved.
+  // 07.jpg / 08.jpg were never referenced — keep them (no mass deletion).
+  for (const id of Object.keys(GALLERY_MEDIA)) {
+    for (const [srcRel] of GALLERY_MEDIA[id]) {
+      await fs.rm(path.join(GALLERY_SRC, srcRel), { force: true });
+    }
+  }
+  for (const sub of ["maserati-levante", "volvo-xc60-d5"]) {
+    await fs.rm(path.join(GALLERY_SRC, sub), { recursive: true, force: true });
+  }
+
   console.log("\nMigration complete. Review: git status");
 }
 

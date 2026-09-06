@@ -197,6 +197,40 @@
       "order": 1,
       "kind": "album",
       "year": "2022",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/0/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/1/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/2/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/3/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/4/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/5/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/6/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/7/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -238,6 +272,28 @@
       "order": 2,
       "kind": "album",
       "year": "2018",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/1/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/2/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/3/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/4/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -279,6 +335,12 @@
       "order": 10,
       "kind": "showcase",
       "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-01/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -320,6 +382,12 @@
       "order": 11,
       "kind": "showcase",
       "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-02/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -361,6 +429,12 @@
       "order": 12,
       "kind": "showcase",
       "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-03/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -402,6 +476,12 @@
       "order": 13,
       "kind": "showcase",
       "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-04/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -443,6 +523,12 @@
       "order": 14,
       "kind": "showcase",
       "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-05/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {
@@ -484,6 +570,12 @@
       "order": 15,
       "kind": "showcase",
       "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-06/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
       "videoUrl": "",
       "showContactCta": true,
       "uk": {

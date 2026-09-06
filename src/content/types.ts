@@ -190,7 +190,7 @@ export interface Dictionary {
       checkedLabel: string;
       resultLabel: string;
     };
-    projects: Record<GalleryProjectId, GalleryProjectCopy>;
+    projects: Record<string, GalleryProjectCopy>;
   };
   about: {
     heading: string;

@@ -35,6 +35,7 @@ export interface CmsGalleryProject {
   order: number;
   kind: GalleryKind;
   year: string;
+  photos: { image: string; caption: string }[];
   videoUrl: string;
   showContactCta: boolean;
   uk: CmsGalleryLanguage;
@@ -75,6 +76,11 @@ export function getGalleryPublishBlockers(
   ctx: GateContext = {},
 ): GateFailure[] {
   const failures: GateFailure[] = [];
+  const realPhotos = Array.isArray(project.photos)
+    ? project.photos.filter((p) => p?.image?.trim())
+    : [];
+  if (realPhotos.length === 0) failures.push({ kind: "no-photos" });
+
   for (const locale of LOCALES) {
     const lang = project[locale];
     for (const field of REQUIRED) {

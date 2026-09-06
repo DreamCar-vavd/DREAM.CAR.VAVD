@@ -3,6 +3,40 @@
   "order": 1,
   "kind": "album",
   "year": "2022",
+  "photos": [
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/0/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/1/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/2/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/3/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/4/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/5/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/6/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/7/image.jpg",
+      "caption": ""
+    }
+  ],
   "videoUrl": "",
   "showContactCta": true,
   "uk": {

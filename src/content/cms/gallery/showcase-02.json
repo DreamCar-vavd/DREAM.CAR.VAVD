@@ -3,6 +3,12 @@
   "order": 11,
   "kind": "showcase",
   "year": "",
+  "photos": [
+    {
+      "image": "/images/cms/gallery/showcase-02/photos/0/image.jpg",
+      "caption": ""
+    }
+  ],
   "videoUrl": "",
   "showContactCta": true,
   "uk": {
