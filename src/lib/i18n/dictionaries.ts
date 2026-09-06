@@ -2,7 +2,7 @@ import "server-only";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "./config";
 import { readGalleryProjectOverrides } from "@/lib/galleryProjectOverrides";
-import { getCarListingCopy } from "@/lib/content/cars";
+import { getCarListingCopy } from "@/lib/content/publishedCars";
 
 const dictionaries: Record<Locale, () => Promise<Dictionary>> = {
   uk: () => import("@/content/dictionaries/uk").then((m) => m.default),

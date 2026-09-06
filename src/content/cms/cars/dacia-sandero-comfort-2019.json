@@ -1,7 +1,6 @@
 {
   "id": "dacia-sandero-comfort-2019",
   "order": 3,
-  "publishState": "published",
   "saleStatus": "for-sale",
   "year": "2019",
   "price": "£3,300",
@@ -50,21 +49,18 @@
     "title": "Dacia Sandero Comfort",
     "specLine": "1.0 Turbo • Бензин • Механічна • Сірий",
     "description": "",
-    "viewGalleryLabel": "Переглянути 11 фото і 1 відео",
-    "reviewState": "confirmed"
+    "viewGalleryLabel": "Переглянути 11 фото і 1 відео"
   },
   "en": {
     "title": "Dacia Sandero Comfort",
     "specLine": "1.0 Turbo • Petrol • Manual • Grey",
     "description": "",
-    "viewGalleryLabel": "View 11 photos and 1 video",
-    "reviewState": "confirmed"
+    "viewGalleryLabel": "View 11 photos and 1 video"
   },
   "ru": {
     "title": "Dacia Sandero Comfort",
     "specLine": "1.0 Turbo • Бензин • Механическая • Серый",
     "description": "",
-    "viewGalleryLabel": "Посмотреть 11 фото и 1 видео",
-    "reviewState": "confirmed"
+    "viewGalleryLabel": "Посмотреть 11 фото и 1 видео"
   }
 }

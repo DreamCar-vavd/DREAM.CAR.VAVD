@@ -10,8 +10,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
-    "content:check": "node --import tsx scripts/content-check.ts",
-    "content:confirm": "node scripts/content-confirm.mjs",
+    "content:check": "node scripts/content-check.mjs",
     "cars:migrate": "node scripts/migrate-cars.mjs"
   },
   "dependencies": {

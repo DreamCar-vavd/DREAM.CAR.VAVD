@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { getPublicCarMedia } from "@/lib/content/cars";
+import { getPublicCarMedia } from "@/lib/content/publishedCars";
 import { CarListingGallery } from "@/components/CarListingGallery";
 import { siteUrl, buildLanguageAlternates } from "@/lib/site";
 

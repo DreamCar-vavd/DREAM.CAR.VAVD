@@ -12,6 +12,9 @@ export function proxy(request: NextRequest) {
   if (pathname === "/keystatic" || pathname.startsWith("/keystatic/")) {
     return NextResponse.next();
   }
+  if (pathname === "/panel" || pathname.startsWith("/panel/")) {
+    return NextResponse.next();
+  }
   if (pathname.startsWith("/_next")) return NextResponse.next();
   if (pathname === "/favicon.ico") return NextResponse.next();
   if (pathname === "/robots.txt") return NextResponse.next();

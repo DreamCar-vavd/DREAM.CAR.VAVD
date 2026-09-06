@@ -84,18 +84,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Every route EXCEPT the panel — keeps the strict public CSP.
-        source: "/((?!keystatic|api/keystatic).*)",
+        // Every route EXCEPT the management panel — keeps the strict public CSP.
+        source: "/((?!keystatic|api/keystatic|panel|api/panel).*)",
         headers: [...sharedHeaders, { key: "Content-Security-Policy", value: publicCsp }],
       },
-      {
-        source: "/keystatic/:path*",
-        headers: [...sharedHeaders, { key: "Content-Security-Policy", value: panelCsp }],
-      },
-      {
-        source: "/api/keystatic/:path*",
-        headers: [...sharedHeaders, { key: "Content-Security-Policy", value: panelCsp }],
-      },
+      ...["/keystatic/:path*", "/api/keystatic/:path*", "/panel/:path*", "/api/panel/:path*"].map(
+        (source) => ({
+          source,
+          headers: [...sharedHeaders, { key: "Content-Security-Policy", value: panelCsp }],
+        }),
+      ),
     ];
   },
 };

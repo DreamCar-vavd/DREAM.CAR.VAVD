@@ -3,6 +3,12 @@ import { config, fields, collection, singleton } from "@keystatic/core";
 /**
  * DREAM.CAR.VAVD — content model for the management panel.
  *
+ * Keystatic edits the WORKING copy only. Nothing here reaches the public site
+ * until it is published from the panel dashboard at /panel:
+ *   Keystatic (edit) → /panel «Позначити перевіреним» (per language) →
+ *   /panel «Опублікувати зміни» → src/content/cms/published.json → deploy.
+ * The site reads published.json exclusively — see report/34.
+ *
  * Storage:
  *  - `local`  — reads/writes plain files in this repo while running `next dev`.
  *               Used for local development and for the migration/spike.
@@ -25,39 +31,24 @@ const storage =
       } as const)
     : ({ kind: "local" } as const);
 
-/** Per-language text block for a car. One card holds all three. */
+/**
+ * Per-language text block for a car. One card holds all three.
+ * Review confirmation is NOT a field here — editing content must never carry
+ * its own "reviewed" flag. It is tracked in src/content/cms/review-state.json
+ * and set from the panel dashboard (/panel), so any text edit auto-invalidates
+ * the prior confirmation (hash mismatch).
+ */
 const carLanguage = (label: string) =>
   fields.object(
     {
-      title: fields.text({ label: `${label} — назва`, validation: { isRequired: false } }),
+      title: fields.text({ label: `${label} — назва` }),
       specLine: fields.text({
         label: `${label} — характеристики (двигун • пальне • КПП • колір)`,
-        validation: { isRequired: false },
       }),
-      description: fields.text({
-        label: `${label} — опис`,
-        multiline: true,
-        validation: { isRequired: false },
-      }),
+      description: fields.text({ label: `${label} — опис`, multiline: true }),
       viewGalleryLabel: fields.text({
         label: `${label} — підпис кнопки галереї`,
         description: 'Напр. «Переглянути 10 фото». Якщо порожньо — згенерується автоматично.',
-        validation: { isRequired: false },
-      }),
-      /**
-       * The editor sets this to "Перевірено" only after reading this
-       * language. The publish gate (src/lib/content/carsGate.ts) refuses to
-       * show a car publicly unless all three languages are "Перевірено" AND
-       * their required fields are non-empty AND the confirmed text still
-       * matches what was confirmed (translation-lock check in CI + build).
-       */
-      reviewState: fields.select({
-        label: `${label} — стан перевірки`,
-        options: [
-          { label: "Чернетка (не перевірено)", value: "draft" },
-          { label: "Перевірено цією мовою", value: "confirmed" },
-        ],
-        defaultValue: "draft",
       }),
     },
     { label },
@@ -78,7 +69,7 @@ export default config({
       slugField: "id",
       path: "src/content/cms/cars/*",
       format: { data: "json" },
-      columns: ["id", "saleStatus", "publishState"],
+      columns: ["id", "saleStatus", "order"],
       schema: {
         id: fields.slug({
           name: {
@@ -96,20 +87,10 @@ export default config({
           defaultValue: 100,
           validation: { isRequired: true },
         }),
-        publishState: fields.select({
-          label: "Стан публікації",
-          description:
-            "Чернетка ніколи не потрапляє на публічний сайт і в sitemap. «Опубліковано» показує авто (якщо статус продажу це дозволяє й усі три мови перевірені).",
-          options: [
-            { label: "Чернетка", value: "draft" },
-            { label: "Опубліковано", value: "published" },
-          ],
-          defaultValue: "draft",
-        }),
         saleStatus: fields.select({
           label: "Статус продажу",
           description:
-            "«Продано» і «Готується до продажу» ховають авто з публічного сайту, але картка лишається в панелі.",
+            "«Продано» і «Готується до продажу» ховають авто з сайту після публікації, але картка лишається в панелі. Зміна набуває сили після «Опублікувати зміни» в /panel.",
           options: [
             { label: "Готується до продажу", value: "preparing" },
             { label: "У продажі", value: "for-sale" },

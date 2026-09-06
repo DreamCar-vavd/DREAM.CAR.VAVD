@@ -1,7 +1,6 @@
 {
   "id": "dacia-sandero-2022",
   "order": 2,
-  "publishState": "published",
   "saleStatus": "for-sale",
   "year": "2022",
   "price": "£9,400",
@@ -44,21 +43,18 @@
     "title": "Dacia Sandero",
     "specLine": "1.0 Turbo • Бензин • Автомат",
     "description": "",
-    "viewGalleryLabel": "Переглянути 9 фото і 1 відео",
-    "reviewState": "confirmed"
+    "viewGalleryLabel": "Переглянути 9 фото і 1 відео"
   },
   "en": {
     "title": "Dacia Sandero",
     "specLine": "1.0 Turbo • Petrol • Automatic",
     "description": "",
-    "viewGalleryLabel": "View 9 photos and 1 video",
-    "reviewState": "confirmed"
+    "viewGalleryLabel": "View 9 photos and 1 video"
   },
   "ru": {
     "title": "Dacia Sandero",
     "specLine": "1.0 Turbo • Бензин • Автомат",
     "description": "",
-    "viewGalleryLabel": "Посмотреть 9 фото и 1 видео",
-    "reviewState": "confirmed"
+    "viewGalleryLabel": "Посмотреть 9 фото и 1 видео"
   }
 }

@@ -11,14 +11,15 @@
  * and availability are copied unchanged.
  *
  * What it does:
- *  1. moves each car's photos + video from public/images/cars-for-sale/<id>/
- *     into the flat Keystatic upload dir public/images/cms/cars/ (prefixed
- *     with the car id so names stay unique). Existing files already tracked
- *     by git — this is a move, the repo does not grow.
- *  2. writes src/content/cms/cars/<id>.json in the Keystatic shape.
- *  3. writes src/content/cms/translation-locks.json (one level ABOVE the
- *     collection dir so Keystatic does not treat it as a car) — the hash of
- *     the confirmed per-language text, used by `npm run content:check`.
+ *  1. moves each car's photos + video into the Keystatic image-field layout
+ *     public/images/cms/cars/<id>/photos/<N>/image.<ext> (+ video/). The
+ *     files are git-mv'd — the repo does not grow, no video is duplicated.
+ *  2. writes src/content/cms/cars/<id>.json — the WORKING copy Keystatic edits
+ *     (content + shared facts only, no publish/review flags).
+ *  3. writes src/content/cms/published.json — the public snapshot. All three
+ *     cars are currently live, so all three go in.
+ *  4. writes src/content/cms/review-state.json — every locale of every car is
+ *     confirmed (the existing copy is what production already ships).
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -127,7 +128,8 @@ async function main() {
   await fs.mkdir(NEW_DIR, { recursive: true });
   await fs.mkdir(CARS_DIR, { recursive: true });
 
-  const locks = {};
+  const review = {};
+  const publishedCars = [];
 
   for (const car of CARS) {
     const carDir = path.join(NEW_DIR, car.id);
@@ -172,22 +174,20 @@ async function main() {
       };
     }
 
-    const withReview = (lang) => ({ ...lang, reviewState: "confirmed" });
     const record = {
       // fields.slug stores its "name" here; the filename is the slug. Keep
       // them identical so the stable id is unambiguous.
       id: car.id,
       order: car.order,
-      publishState: car.publishState,
       saleStatus: car.saleStatus,
       year: car.year,
       price: car.price,
       mileageValue: car.mileageValue,
       photos: photoEntries,
       video,
-      uk: withReview(car.uk),
-      en: withReview(car.en),
-      ru: withReview(car.ru),
+      uk: car.uk,
+      en: car.en,
+      ru: car.ru,
     };
     await fs.writeFile(
       path.join(CARS_DIR, `${car.id}.json`),
@@ -195,17 +195,26 @@ async function main() {
       "utf8",
     );
 
-    locks[car.id] = {
-      uk: hash(confirmedText(car.uk)),
-      en: hash(confirmedText(car.en)),
-      ru: hash(confirmedText(car.ru)),
+    // The published snapshot stores the same record shape (frozen at publish).
+    publishedCars.push({ ...record, photos: photoEntries, video });
+
+    const at = "2026-09-06T00:00:00.000Z";
+    review[car.id] = {
+      uk: { hash: hash(confirmedText(car.uk)), at },
+      en: { hash: hash(confirmedText(car.en)), at },
+      ru: { hash: hash(confirmedText(car.ru)), at },
     };
     console.log(`✓ ${car.id}: ${photoEntries.length} photos${car.video ? " + video" : ""}`);
   }
 
   await fs.writeFile(
-    path.join(ROOT, "src/content/cms/translation-locks.json"),
-    `${JSON.stringify(locks, null, 2)}\n`,
+    path.join(ROOT, "src/content/cms/published.json"),
+    `${JSON.stringify({ publishedAt: "2026-09-06T00:00:00.000Z", cars: publishedCars }, null, 2)}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(ROOT, "src/content/cms/review-state.json"),
+    `${JSON.stringify(review, null, 2)}\n`,
     "utf8",
   );
 
