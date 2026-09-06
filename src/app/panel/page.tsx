@@ -190,6 +190,18 @@ export default async function PanelPage() {
         Процес: <em>редагувати</em> → <em>позначити кожну мову перевіреною</em> →{" "}
         <em>«Опублікувати зміни»</em> → дочекатися завершення збірки.
       </p>
+      <p className="mt-2 text-sm">
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- route handler, needs a full request */}
+        <a
+          className="rounded border border-amber-500 bg-amber-50 px-2 py-1 text-amber-900 underline dark:bg-amber-950 dark:text-amber-200"
+          href="/api/panel/preview?path=/uk"
+        >
+          Переглянути чернетку на сайті →
+        </a>{" "}
+        <span className="text-xs text-neutral-500">
+          (робоча версія на реальному макеті сайту, ще не опублікована)
+        </span>
+      </p>
 
       <DeployBanner deploy={data.deploy} mode={data.mode} />
       {data.publishedAt && (

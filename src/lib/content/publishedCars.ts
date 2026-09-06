@@ -2,7 +2,7 @@ import "server-only";
 import type { ContentLocale } from "./carsGate";
 import { isRenderable, type CmsCar } from "./carsGate";
 import { formatMileage } from "./mileage";
-import { readPublishedSnapshot } from "./snapshot";
+import { readSiteContent } from "./siteContent";
 
 /** Shapes the existing site components already consume. */
 export interface CarListingCopy {
@@ -20,7 +20,7 @@ export interface CarMedia {
 }
 
 async function getVisibleCars(): Promise<CmsCar[]> {
-  const { cars } = await readPublishedSnapshot();
+  const { cars } = await readSiteContent();
   return cars.filter(isRenderable);
 }
 

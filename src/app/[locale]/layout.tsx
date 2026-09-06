@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { draftMode } from "next/headers";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Manrope } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
@@ -11,6 +12,7 @@ import { phoneDisplay, emailDisplay } from "@/lib/social";
 import { getSocialLinks } from "@/lib/social";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { DraftPreviewBanner } from "@/components/DraftPreviewBanner";
 import "../globals.css";
 
 const heading = Playfair_Display({
@@ -83,6 +85,7 @@ export default async function LocaleLayout({
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
   const social = getSocialLinks();
+  const isDraftPreview = (await draftMode()).isEnabled;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -110,6 +113,7 @@ export default async function LocaleLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {isDraftPreview && <DraftPreviewBanner />}
         <SiteHeader dict={dict} locale={locale} />
         <main className="flex-1">{children}</main>
         <SiteFooter dict={dict} locale={locale} />

@@ -1,7 +1,7 @@
 import "server-only";
 import type { ContentLocale } from "./carsGate";
 import type { GalleryProjectCopy } from "@/content/types";
-import { readPublishedSnapshot } from "./snapshot";
+import { readSiteContent } from "./siteContent";
 
 /**
  * Gallery TEXT for one locale, keyed by project id — a drop-in for
@@ -12,7 +12,7 @@ import { readPublishedSnapshot } from "./snapshot";
 export async function getGalleryProjectCopy(
   locale: ContentLocale,
 ): Promise<Record<string, GalleryProjectCopy>> {
-  const { gallery } = await readPublishedSnapshot();
+  const { gallery } = await readSiteContent();
   const out: Record<string, GalleryProjectCopy> = {};
   for (const p of gallery) {
     const lang = p[locale];
@@ -30,7 +30,7 @@ export async function getGalleryProjectCopy(
 
 /** Published project ids (for the grid to know which cards to render). */
 export async function getPublishedGalleryIds(): Promise<Set<string>> {
-  const { gallery } = await readPublishedSnapshot();
+  const { gallery } = await readSiteContent();
   return new Set(gallery.map((p) => p.id));
 }
 
@@ -39,6 +39,6 @@ export async function getGalleryAlbumTitle(
   id: string,
   locale: ContentLocale,
 ): Promise<string | undefined> {
-  const { gallery } = await readPublishedSnapshot();
+  const { gallery } = await readSiteContent();
   return gallery.find((p) => p.id === id)?.[locale].title;
 }
