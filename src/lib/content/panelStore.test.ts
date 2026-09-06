@@ -1,153 +1,220 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { confirmedText, type CmsCar } from "./carsGate";
+import { confirmedText } from "./carsGate";
+import { galleryConfirmedText } from "./galleryGate";
 import {
   ConflictError,
+  assertAllowedDir,
+  assertAllowedFile,
+  type AllowedDir,
+  type AllowedFile,
   type DeployStatus,
+  type DirEntry,
   type PanelStorage,
-  type Snapshot,
   type Versioned,
 } from "./store/adapter";
-import { confirmLocale, getPanelData, publishCar, unpublishCar } from "./panelStore";
-import type { ReviewState } from "./carsGate";
+import { confirmLocale, getPanelData, publishItem, unpublishItem } from "./panelStore";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 
-function car(over: Partial<CmsCar> = {}): CmsCar {
-  const L = { title: "T", specLine: "S", description: "", viewGalleryLabel: "" };
-  return {
+const CAR_L = { title: "T", specLine: "S", description: "", viewGalleryLabel: "" };
+const carJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
     id: "c1",
     order: 1,
     saleStatus: "for-sale",
     year: "2020",
     price: "£1",
     mileageValue: 1,
-    photos: [{ image: "/x.jpg", caption: "" }],
-    video: { mode: "none", src: "", posterSrc: "" },
-    uk: { ...L },
-    en: { ...L },
-    ru: { ...L },
+    photos: [{ image: "/x.jpg" }],
+    video: { mode: "none" },
+    uk: CAR_L,
+    en: CAR_L,
+    ru: CAR_L,
     ...over,
-  };
-}
+  });
 
-/** In-memory PanelStorage with real version bumps and conflict checks. */
+const GAL_L = {
+  title: "G",
+  shortDescription: "",
+  longDescription: "",
+  service: "",
+  clientRequest: "",
+  completedItems: [],
+  result: "",
+};
+const galJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({ id: "g1", order: 1, kind: "album", year: "", uk: GAL_L, en: GAL_L, ru: GAL_L, ...over });
+
+/** In-memory file store with real version bumps + conflict checks. */
 class FakeStorage implements PanelStorage {
   readonly mode = "github" as const;
-  cars: CmsCar[];
-  review: ReviewState;
-  published: Snapshot;
-  vWorking = "w0";
-  vReview = "r0";
-  vPublished = "p0";
+  files = new Map<string, string>();
+  dirs = new Map<string, DirEntry[]>();
   deploy: DeployStatus = { state: "ready" };
 
-  constructor(cars: CmsCar[], review: ReviewState = {}, published: Snapshot = { publishedAt: "", cars: [] }) {
-    this.cars = cars;
-    this.review = review;
-    this.published = published;
+  seedDir(dir: AllowedDir, entries: DirEntry[]) {
+    this.dirs.set(dir, entries);
   }
-  async readWorkingCars(): Promise<Versioned<CmsCar[]>> {
-    return { data: this.cars, version: this.vWorking };
+  seedFile(file: AllowedFile, text: string) {
+    this.files.set(file, text);
   }
-  async readReview(): Promise<Versioned<ReviewState>> {
-    return { data: this.review, version: this.vReview };
+
+  async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
+    assertAllowedDir(dir);
+    const entries = this.dirs.get(dir) ?? [];
+    return {
+      data: entries,
+      version: entries.length ? hash(entries.map((e) => `${e.name}:${e.text}`).join("\n")) : "",
+    };
   }
-  async readPublished(): Promise<Versioned<Snapshot>> {
-    return { data: this.published, version: this.vPublished };
+  async readFile(file: AllowedFile): Promise<Versioned<string | null>> {
+    assertAllowedFile(file);
+    const text = this.files.get(file) ?? null;
+    return { data: text, version: text ? hash(text) : "" };
   }
-  async writeReview(data: ReviewState, expected: string) {
-    if (expected !== this.vReview) throw new ConflictError("перевірки");
-    this.review = data;
-    this.vReview = `r${Math.random()}`;
-    return { data, version: this.vReview };
-  }
-  async writePublished(data: Snapshot, expected: string) {
-    if (expected !== this.vPublished) throw new ConflictError("знімок");
-    this.published = data;
-    this.vPublished = `p${Math.random()}`;
-    return { data, version: this.vPublished };
+  async writeFile(file: AllowedFile, text: string, expected: string): Promise<Versioned<string>> {
+    assertAllowedFile(file);
+    const cur = this.files.get(file) ?? null;
+    if ((cur ? hash(cur) : "") !== expected) throw new ConflictError("файл");
+    this.files.set(file, text);
+    return { data: text, version: hash(text) };
   }
   async deployStatus() {
     return this.deploy;
   }
 }
 
-const reviewedAll = (c: CmsCar): ReviewState => ({
-  [c.id]: {
-    uk: { hash: sha(confirmedText(c.uk)), at: "t" },
-    en: { hash: sha(confirmedText(c.en)), at: "t" },
-    ru: { hash: sha(confirmedText(c.ru)), at: "t" },
+function baseStore() {
+  const s = new FakeStorage();
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson() }]);
+  s.seedDir("src/content/cms/gallery", [{ name: "g1.json", text: galJson() }]);
+  return s;
+}
+const carReviewAll = {
+  c1: {
+    uk: { hash: sha(confirmedText(CAR_L)), at: "t" },
+    en: { hash: sha(confirmedText(CAR_L)), at: "t" },
+    ru: { hash: sha(confirmedText(CAR_L)), at: "t" },
   },
+};
+const galReviewAll = {
+  g1: {
+    uk: { hash: sha(galleryConfirmedText(GAL_L)), at: "t" },
+    en: { hash: sha(galleryConfirmedText(GAL_L)), at: "t" },
+    ru: { hash: sha(galleryConfirmedText(GAL_L)), at: "t" },
+  },
+};
+
+async function versions(s: FakeStorage) {
+  const d = await getPanelData(s);
+  return d.versions;
+}
+
+test("adapter allowlist rejects arbitrary paths", () => {
+  assert.throws(() => assertAllowedFile("src/proxy.ts" as never), /allowlist/);
+  assert.throws(() => assertAllowedDir("node_modules" as never), /allowlist/);
 });
 
-const V = (s: FakeStorage) => ({ working: s.vWorking, review: s.vReview, published: s.vPublished });
-
-test("confirmLocale writes the review hash and is version-guarded", async () => {
-  const s = new FakeStorage([car()]);
-  const r = await confirmLocale(s, "c1", "uk", { review: s.vReview, working: s.vWorking });
+test("confirmLocale writes the review hash, version-guarded", async () => {
+  const s = baseStore();
+  const v = await versions(s);
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
   assert.equal(r.ok, true);
-  assert.ok(s.review.c1?.uk?.hash);
+  assert.ok(JSON.parse(s.files.get("src/content/cms/review-state.json")!).c1.uk.hash);
 });
 
-test("confirmLocale conflicts when the working set changed since the page loaded", async () => {
-  const s = new FakeStorage([car()]);
-  s.vWorking = "w-moved";
-  const r = await confirmLocale(s, "c1", "uk", { review: s.vReview, working: "w0" });
-  assert.equal(r.ok, false);
+test("confirmLocale conflicts when the working set moved since page load", async () => {
+  const s = baseStore();
+  const v = await versions(s);
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ price: "£999" }) }]);
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
   assert.equal((r as { conflict?: boolean }).conflict, true);
 });
 
-test("publishCar is blocked by the gate and never writes", async () => {
-  const s = new FakeStorage([car({ ru: { title: "", specLine: "", description: "", viewGalleryLabel: "" } })], reviewedAll(car()));
-  const r = await publishCar(s, "c1", V(s));
+test("publishItem is blocked by the gate and never writes", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/cars", [
+    { name: "c1.json", text: carJson({ ru: { title: "", specLine: "" } }) },
+  ]);
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const v = await versions(s);
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
   assert.equal(r.ok, false);
   assert.ok((r as { blockers?: unknown[] }).blockers!.length > 0);
-  assert.equal(s.published.cars.length, 0);
+  assert.equal(s.files.has("src/content/cms/published.json"), false);
 });
 
-test("publishCar conflicts (no write) when the snapshot moved between view and publish", async () => {
-  const c = car();
-  const s = new FakeStorage([c], reviewedAll(c));
-  const stale = V(s);
-  s.vPublished = "p-moved-by-someone-else";
-  const r = await publishCar(s, "c1", stale);
+test("publishItem conflicts (no write) when the snapshot moved between view and publish", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const v = await versions(s);
+  s.seedFile("src/content/cms/published.json", JSON.stringify({ publishedAt: "x", cars: [], gallery: [] }));
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
   assert.equal((r as { conflict?: boolean }).conflict, true);
-  assert.equal(s.published.cars.length, 0);
 });
 
-test("publishCar freezes the working car into the snapshot; a second identical publish is a no-op success", async () => {
-  const c = car();
-  const s = new FakeStorage([c], reviewedAll(c));
-  const r1 = await publishCar(s, "c1", V(s));
+test("publishItem freezes the car into snapshot; a second identical publish is a no-op success", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  let v = await versions(s);
+  const r1 = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
   assert.equal(r1.ok, true);
-  assert.equal(s.published.cars.length, 1);
-  // simulate the client re-reading versions (as router.refresh would)
-  const r2 = await publishCar(s, "c1", V(s));
+  assert.equal(JSON.parse(s.files.get("src/content/cms/published.json")!).cars.length, 1);
+  v = await versions(s);
+  const r2 = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
   assert.equal(r2.ok, true);
   assert.match(r2.message, /вже опубліков/);
-  assert.equal(s.published.cars.length, 1);
 });
 
-test("unpublishCar removes from the snapshot, guarded by version", async () => {
-  const c = car();
-  const s = new FakeStorage([c], reviewedAll(c), { publishedAt: "t", cars: [c] });
-  const bad = await unpublishCar(s, "c1", "p-wrong");
+test("publishing a gallery item does not disturb the cars array and vice-versa", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ ...carReviewAll, ...galReviewAll }),
+  );
+  let v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  v = await versions(s);
+  await publishItem(s, "gallery", "g1", {
+    working: v.gallery,
+    review: v.review,
+    published: v.published,
+  });
+  const snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(snap.cars.map((c: { id: string }) => c.id), ["c1"]);
+  assert.deepEqual(snap.gallery.map((g: { id: string }) => g.id), ["g1"]);
+});
+
+test("unpublishItem removes from the snapshot, version-guarded", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [JSON.parse(carJson())], gallery: [] }),
+  );
+  const bad = await unpublishItem(s, "car", "c1", { published: "wrong" });
   assert.equal((bad as { conflict?: boolean }).conflict, true);
-  const ok = await unpublishCar(s, "c1", s.vPublished);
+  const v = await versions(s);
+  const ok = await unpublishItem(s, "car", "c1", { published: v.published });
   assert.equal(ok.ok, true);
-  assert.equal(s.published.cars.length, 0);
+  assert.equal(JSON.parse(s.files.get("src/content/cms/published.json")!).cars.length, 0);
 });
 
-test("getPanelData reports modified vs in-sync and surfaces the deploy state", async () => {
-  const c = car();
-  const s = new FakeStorage([c], reviewedAll(c), { publishedAt: "t", cars: [c] });
+test("getPanelData groups cars + gallery and reports modified vs in-sync + deploy state", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [JSON.parse(carJson())], gallery: [] }),
+  );
   let d = await getPanelData(s);
-  assert.equal(d.rows[0].publishState, "in-sync");
+  assert.deepEqual(d.groups.map((g) => g.kind), ["car", "gallery"]);
+  assert.equal(d.groups[0].rows[0].publishState, "in-sync");
+  assert.equal(d.groups[1].rows[0].publishState, "not-published");
   assert.equal(d.deploy.state, "ready");
 
-  s.cars = [car({ price: "£999" })];
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ price: "£999" }) }]);
   d = await getPanelData(s);
-  assert.equal(d.rows[0].publishState, "modified");
+  assert.equal(d.groups[0].rows[0].publishState, "modified");
 });

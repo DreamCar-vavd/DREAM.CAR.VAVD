@@ -38,6 +38,23 @@ const storage =
  * and set from the panel dashboard (/panel), so any text edit auto-invalidates
  * the prior confirmation (hash mismatch).
  */
+const galleryLanguage = (label: string) =>
+  fields.object(
+    {
+      title: fields.text({ label: `${label} — назва роботи` }),
+      shortDescription: fields.text({ label: `${label} — короткий опис`, multiline: true }),
+      longDescription: fields.text({ label: `${label} — докладний опис`, multiline: true }),
+      service: fields.text({ label: `${label} — вид послуги` }),
+      clientRequest: fields.text({ label: `${label} — проблема / запит клієнта`, multiline: true }),
+      completedItems: fields.array(fields.text({ label: "Пункт" }), {
+        label: `${label} — виконані роботи`,
+        itemLabel: (p) => p.value || "Пункт",
+      }),
+      result: fields.text({ label: `${label} — результат`, multiline: true }),
+    },
+    { label },
+  );
+
 const carLanguage = (label: string) =>
   fields.object(
     {
@@ -59,7 +76,7 @@ export default config({
   ui: {
     brand: { name: "DREAM.CAR.VAVD — панель" },
     navigation: {
-      Контент: ["cars"],
+      Контент: ["cars", "galleryProjects"],
       Налаштування: ["siteSettings"],
     },
   },
@@ -163,6 +180,46 @@ export default config({
         uk: carLanguage("Українська"),
         en: carLanguage("English"),
         ru: carLanguage("Русский"),
+      },
+    }),
+
+    galleryProjects: collection({
+      label: "Галерея (тексти)",
+      slugField: "id",
+      path: "src/content/cms/gallery/*",
+      format: { data: "json" },
+      columns: ["id", "kind", "order"],
+      schema: {
+        id: fields.slug({
+          name: {
+            label: "ID роботи",
+            description:
+              "Стабільний ідентифікатор. Фотографії роботи прив'язані до цього ID. Не змінюйте у наявних.",
+            validation: { isRequired: true },
+          },
+        }),
+        order: fields.integer({
+          label: "Порядок показу",
+          defaultValue: 100,
+          validation: { isRequired: true },
+        }),
+        kind: fields.select({
+          label: "Тип картки",
+          options: [
+            { label: "Альбом роботи", value: "album" },
+            { label: "Загальна картка (showcase)", value: "showcase" },
+          ],
+          defaultValue: "album",
+        }),
+        year: fields.text({ label: "Рік (спільний)" }),
+        videoUrl: fields.url({ label: "Посилання на відео (необов'язково)" }),
+        showContactCta: fields.checkbox({
+          label: "Показувати кнопку «Замовити консультацію»",
+          defaultValue: true,
+        }),
+        uk: galleryLanguage("Українська"),
+        en: galleryLanguage("English"),
+        ru: galleryLanguage("Русский"),
       },
     }),
   },

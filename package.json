@@ -11,7 +11,7 @@
     "lint": "eslint",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
     "content:check": "node scripts/content-check.mjs",
-    "cars:migrate": "node scripts/migrate-cars.mjs"
+    "content:migrate": "node scripts/migrate-content.mjs"
   },
   "dependencies": {
     "@keystatic/core": "^0.6.9",

@@ -44,7 +44,7 @@ async function main() {
   const warnings = [];
 
   for (const car of snapshot.cars ?? []) {
-    const w = `published.json → «${car?.id ?? "?"}»`;
+    const w = `published.json → авто «${car?.id ?? "?"}»`;
     if (!car?.id) errors.push(`${w}: немає id`);
     const photos = Array.isArray(car.photos) ? car.photos.filter((p) => p?.image?.trim()) : [];
     if (photos.length === 0) errors.push(`${w}: жодного фото`);
@@ -55,6 +55,14 @@ async function main() {
       if (!String(car[l]?.title ?? "").trim() || !String(car[l]?.specLine ?? "").trim()) {
         errors.push(`${w}: ${l.toUpperCase()} назва/характеристики порожні`);
       }
+    }
+  }
+
+  for (const p of snapshot.gallery ?? []) {
+    const w = `published.json → галерея «${p?.id ?? "?"}»`;
+    if (!p?.id) errors.push(`${w}: немає id`);
+    for (const l of LOCALES) {
+      if (!String(p[l]?.title ?? "").trim()) errors.push(`${w}: ${l.toUpperCase()} назва порожня`);
     }
   }
 
@@ -89,7 +97,8 @@ async function main() {
     process.exit(1);
   }
   console.log(
-    `\n✓ published.json: ${(snapshot.cars ?? []).length} авто, усі придатні.` +
+    `\n✓ published.json: ${(snapshot.cars ?? []).length} авто + ` +
+      `${(snapshot.gallery ?? []).length} робіт галереї, усі придатні.` +
       (warnings.length ? ` (${warnings.length} попереджень у робочих чернетках)` : ""),
   );
 }

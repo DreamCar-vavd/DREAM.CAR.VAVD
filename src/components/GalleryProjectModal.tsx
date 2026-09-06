@@ -16,7 +16,10 @@ import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 import { isModifiedClick } from "@/lib/isModifiedClick";
 import { focusContactsHeading } from "@/lib/focusContactsHeading";
 
-const EDITABLE_PROJECT_IDS = new Set(["maserati-levante", "volvo-xc60-d5"]);
+// The in-modal dev editor is superseded by the management panel
+// (/keystatic + /panel). Disabled here; the code below is kept only until a
+// follow-up removes it. `canEdit` is now always false.
+const EDITABLE_PROJECT_IDS = new Set<string>();
 
 type EditState = Record<Locale, GalleryProjectCopy>;
 

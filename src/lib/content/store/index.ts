@@ -15,40 +15,29 @@ export class NotConnectedError extends Error {
 
 /**
  * Picks the storage adapter for the current request.
- *  - not `github` mode  -> local files (only meaningful in `next dev`)
+ *  - not `github` mode -> local files (only meaningful in `next dev`)
  *  - `github` mode      -> GitHub API with the signed-in user's Keystatic
- *                          token; missing token -> NotConnectedError (the
- *                          caller turns this into a clear 401, never a
- *                          silent local write that would be lost on redeploy)
+ *                          token; a missing token is a clear error, never a
+ *                          silent local write that a redeploy would lose.
  */
 export async function getStorage(): Promise<PanelStorage> {
-  if (process.env.KEYSTATIC_STORAGE_KIND !== "github") {
-    return new LocalFsStorage();
-  }
+  if (process.env.KEYSTATIC_STORAGE_KIND !== "github") return new LocalFsStorage();
 
-  const jar = await cookies();
-  const token = jar.get("keystatic-gh-access-token")?.value;
+  const token = (await cookies()).get("keystatic-gh-access-token")?.value;
   if (!token) {
     throw new NotConnectedError(
-      "Ви не увійшли через GitHub. Відкрийте /keystatic і увійдіть, потім поверніться сюди.",
+      "Ви не увійшли через GitHub. Відкрийте /keystatic, увійдіть, і поверніться сюди.",
     );
   }
-
   const owner = process.env.KEYSTATIC_GITHUB_REPO_OWNER;
   const repo = process.env.KEYSTATIC_GITHUB_REPO_NAME;
   if (!owner || !repo) {
-    throw new NotConnectedError(
-      "Не налаштовано KEYSTATIC_GITHUB_REPO_OWNER / KEYSTATIC_GITHUB_REPO_NAME.",
-    );
+    throw new NotConnectedError("Не налаштовано KEYSTATIC_GITHUB_REPO_OWNER / _NAME.");
   }
-
-  // The branch the panel writes content to. Defaults to the branch this
-  // deployment was built from (Vercel sets VERCEL_GIT_COMMIT_REF), so a
-  // Preview deployment publishes onto its own branch — never main by accident.
+  // Panel writes content to the branch this deployment was built from
+  // (Vercel sets VERCEL_GIT_COMMIT_REF), so a Preview publishes onto its own
+  // branch — never main by accident. Override with PANEL_CONTENT_BRANCH.
   const branch =
-    process.env.PANEL_CONTENT_BRANCH ||
-    process.env.VERCEL_GIT_COMMIT_REF ||
-    "main";
-
+    process.env.PANEL_CONTENT_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || "main";
   return new GitHubStorage({ owner, repo, branch, token });
 }

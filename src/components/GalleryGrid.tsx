@@ -54,7 +54,23 @@ function GalleryCardFrame() {
 const cardButtonClass =
   "group relative flex flex-col border border-border-gold/40 transition-opacity duration-300 hover:opacity-90 focus-visible:outline-offset-4 lg:border-0 lg:bg-gradient-to-b lg:from-gold/[0.06] lg:to-transparent lg:transition-transform lg:duration-[280ms] lg:ease-out lg:hover:z-10 lg:hover:scale-[1.04] lg:hover:opacity-100 lg:hover:shadow-[0_10px_30px_rgba(212,175,55,0.22)] lg:focus-visible:z-10";
 
-export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale }) {
+export function GalleryGrid({
+  dict,
+  locale,
+  publishedIds,
+}: {
+  dict: Dictionary;
+  locale: Locale;
+  /**
+   * Ids present in the published snapshot. When given, a card renders only if
+   * its project is published — so an unpublished / removed gallery work
+   * disappears from the site while its media stays on disk. Undefined = show
+   * every static card (backwards-compatible).
+   */
+  publishedIds?: string[];
+}) {
+  const visible = publishedIds ? new Set(publishedIds) : null;
+  const showAlbums = visible ? galleryAlbums.filter((a) => visible.has(a.id)) : galleryAlbums;
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
   // The exact card element that opened the current modal, captured on click.
   // Same pattern as ServicesGrid's `lastTriggerRef` — a single stable ref
@@ -107,7 +123,7 @@ export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale
         </div>
 
         <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {galleryAlbums.map((album) => {
+          {showAlbums.map((album) => {
             const albumMeta = dict.gallery.albums[album.titleKey];
             return (
               <button
@@ -153,6 +169,7 @@ export function GalleryGrid({ dict, locale }: { dict: Dictionary; locale: Locale
 
           {galleryImages.map((image, index) => {
             const id = `showcase-${String(index + 1).padStart(2, "0")}`;
+            if (visible && !visible.has(id)) return null;
             const mobileAspect = image.width === image.height ? "aspect-square" : "aspect-[4/5]";
             return (
               <button

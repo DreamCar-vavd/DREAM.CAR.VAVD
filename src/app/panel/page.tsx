@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, describeFailure, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError, type DeployStatus } from "@/lib/content/store";
-import { getPanelData, type CarPanelRow, type PanelData } from "@/lib/content/panelStore";
+import { getPanelData, type PanelData, type PanelGroup, type PanelRow } from "@/lib/content/panelStore";
 import { PanelButton, RefreshButton } from "./PanelActions";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ function DeployBanner({ deploy, mode }: { deploy: DeployStatus; mode: "local" | 
     none: { text: "Деплой для поточного знімка не знайдено.", cls: "text-neutral-500" },
     pending: { text: "⏳ Збірка виконується — зміни ще не в ефірі.", cls: "text-amber-700" },
     ready: { text: "✅ Поточний знімок в ефірі.", cls: "text-green-700 dark:text-green-400" },
-    error: { text: "⚠️ Збірка не вдалася — в ефірі лишається попередня версія.", cls: "text-red-600" },
+    error: { text: "⚠️ Збірка не вдалася — в ефірі попередня версія.", cls: "text-red-600" },
   };
   const s = map[deploy.state];
   return (
@@ -43,7 +43,7 @@ function DeployBanner({ deploy, mode }: { deploy: DeployStatus; mode: "local" | 
   );
 }
 
-function PublicState({ row }: { row: CarPanelRow }) {
+function PublicState({ row }: { row: PanelRow }) {
   if (!row.publishedExists) {
     return <span className="text-neutral-500">Не опубліковане (нова чернетка)</span>;
   }
@@ -52,9 +52,7 @@ function PublicState({ row }: { row: CarPanelRow }) {
       {row.publiclyVisible ? (
         <span className="text-green-700 dark:text-green-400">● На сайті</span>
       ) : (
-        <span className="text-neutral-500">
-          ○ Опубліковане, приховане (статус «{row.car.saleStatus}»)
-        </span>
+        <span className="text-neutral-500">○ Опубліковане, приховане</span>
       )}
       {row.publishState === "modified" && (
         <span className="ml-2 rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-900">
@@ -65,17 +63,15 @@ function PublicState({ row }: { row: CarPanelRow }) {
   );
 }
 
-function CarRow({ row, versions }: { row: CarPanelRow; versions: PanelData["versions"] }) {
+function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: PanelData["versions"] }) {
   return (
     <section className="rounded-lg border border-neutral-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <span className="font-semibold">{row.car.uk.title || row.car.id}</span>{" "}
-          <span className="text-xs text-neutral-500">
-            {row.car.id} · {row.car.price} · порядок {row.car.order}
-          </span>
+          <span className="font-semibold">{row.title}</span>{" "}
+          <span className="text-xs text-neutral-500">{row.subtitle}</span>
         </div>
-        <a className="text-xs underline" href={`/keystatic/collection/cars/item/${row.car.id}`}>
+        <a className="text-xs underline" href={row.editHref}>
           Редагувати в Keystatic →
         </a>
       </div>
@@ -96,7 +92,7 @@ function CarRow({ row, versions }: { row: CarPanelRow; versions: PanelData["vers
               </span>
               {status === "needs-review" && (
                 <PanelButton
-                  payload={{ action: "confirm-locale", carId: row.car.id, locale }}
+                  payload={{ action: "confirm-locale", kind, id: row.id, locale }}
                   versions={versions}
                 >
                   Позначити перевіреним
@@ -117,7 +113,7 @@ function CarRow({ row, versions }: { row: CarPanelRow; versions: PanelData["vers
 
       <div className="mt-3 flex flex-wrap gap-2">
         <PanelButton
-          payload={{ action: "publish", carId: row.car.id }}
+          payload={{ action: "publish", kind, id: row.id }}
           versions={versions}
           variant="primary"
           disabled={row.blockers.length > 0 || row.publishState === "in-sync"}
@@ -126,16 +122,32 @@ function CarRow({ row, versions }: { row: CarPanelRow; versions: PanelData["vers
         </PanelButton>
         {row.publishedExists && (
           <PanelButton
-            payload={{ action: "unpublish", carId: row.car.id }}
+            payload={{ action: "unpublish", kind, id: row.id }}
             versions={versions}
             variant="danger"
-            confirmText={`Прибрати «${row.car.id}» з сайту? Робоча картка лишиться в панелі.`}
+            confirmText={`Прибрати «${row.id}» з сайту? Робоча картка лишиться в панелі.`}
           >
             Прибрати з сайту
           </PanelButton>
         )}
       </div>
     </section>
+  );
+}
+
+function Group({ group, versions }: { group: PanelGroup; versions: PanelData["versions"] }) {
+  return (
+    <div>
+      <h2 className="mt-8 text-lg font-bold">{group.label}</h2>
+      <div className="mt-3 space-y-4">
+        {group.rows.length === 0 && (
+          <p className="text-sm text-neutral-500">Порожньо.</p>
+        )}
+        {group.rows.map((row) => (
+          <Row key={row.id} row={row} kind={group.kind} versions={versions} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -149,7 +161,7 @@ export default async function PanelPage() {
     if (err instanceof NotConnectedError) {
       return (
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-xl font-bold">Публікація автомобілів</h1>
+          <h1 className="text-xl font-bold">Панель публікації</h1>
           <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
             {err.message}
           </p>
@@ -165,11 +177,11 @@ export default async function PanelPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-xl font-bold">Публікація автомобілів</h1>
+      <h1 className="text-xl font-bold">Панель публікації</h1>
       <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         Редагування — у{" "}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- separate app tree */}
-        <a className="underline" href="/keystatic/collection/cars">
+        <a className="underline" href="/keystatic">
           Keystatic
         </a>
         . Зміни там <strong>не потрапляють на сайт</strong>, поки ви не опублікуєте їх тут.
@@ -186,12 +198,9 @@ export default async function PanelPage() {
         </p>
       )}
 
-      <div className="mt-6 space-y-6">
-        {data.rows.length === 0 && <p className="text-sm text-neutral-500">Жодного авто в панелі.</p>}
-        {data.rows.map((row) => (
-          <CarRow key={row.car.id} row={row} versions={data.versions} />
-        ))}
-      </div>
+      {data.groups.map((group) => (
+        <Group key={group.kind} group={group} versions={data.versions} />
+      ))}
     </main>
   );
 }

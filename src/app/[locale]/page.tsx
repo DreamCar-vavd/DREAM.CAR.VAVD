@@ -1,6 +1,7 @@
 import { Phone, Mail, MessageCircle } from "lucide-react";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getPublishedGalleryIds } from "@/lib/content/publishedGallery";
 import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/HeroSection";
 import { ServicesGrid } from "@/components/ServicesGrid";
@@ -24,6 +25,7 @@ export default async function LocaleHomePage({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
+  const publishedGalleryIds = [...(await getPublishedGalleryIds())];
 
   return (
     <>
@@ -32,7 +34,7 @@ export default async function LocaleHomePage({
       <CarsForSaleSection dict={dict} locale={locale} />
       <ProcessTimeline dict={dict} />
       <BenefitsSection dict={dict} />
-      <GalleryGrid dict={dict} locale={locale} />
+      <GalleryGrid dict={dict} locale={locale} publishedIds={publishedGalleryIds} />
       <AboutSection dict={dict} />
       <FaqAccordion dict={dict} />
 

@@ -190,5 +190,335 @@
         "viewGalleryLabel": "Посмотреть 11 фото и 1 видео"
       }
     }
+  ],
+  "gallery": [
+    {
+      "id": "maserati-levante",
+      "order": 1,
+      "kind": "album",
+      "year": "2022",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Мазераті Леванте",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Автопідбір під ключ",
+        "clientRequest": "Вибрати надійний, технічно справний, гарний автомобіль відповідно до побажань і бюджету клієнта.",
+        "completedItems": [
+          "Кузов і лакофарбове покриття. Комп'ютерна діагностика. Помилок не виявлено."
+        ],
+        "result": "Рекомендовано до купівлі"
+      },
+      "en": {
+        "title": "Maserati Levante",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Turnkey car sourcing",
+        "clientRequest": "Select a reliable, technically sound, attractive car matching the client's preferences and budget.",
+        "completedItems": [
+          "Bodywork and paintwork. Computer diagnostics. No faults found."
+        ],
+        "result": "Recommended for purchase"
+      },
+      "ru": {
+        "title": "Мазерати Леванте",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Подбор автомобиля под ключ",
+        "clientRequest": "Выбрать надёжный, технически исправный, красивый автомобиль в соответствии с пожеланиями и бюджетом клиента.",
+        "completedItems": [
+          "Кузов и лакокрасочное покрытие. Компьютерная диагностика. Ошибок не выявлено."
+        ],
+        "result": "Рекомендовано к покупке"
+      }
+    },
+    {
+      "id": "volvo-xc60-d5",
+      "order": 2,
+      "kind": "album",
+      "year": "2018",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Volvo XC60 D5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Автопідбір під ключ",
+        "clientRequest": "Знайти надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
+        "completedItems": [
+          "Проведено комплексну перевірку автомобіля: комп'ютерну діагностику всіх систем і вузлів, огляд кузова, лакофарбового покриття та зазорів, перевірку рівня й стану мастил і технічних рідин, а також тест-драйв. Помилок, слідів повторного фарбування та суттєвих дефектів не виявлено."
+        ],
+        "result": "Рекомендовано до купівлі"
+      },
+      "en": {
+        "title": "Volvo XC60 D5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Volvo XC60 D5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-01",
+      "order": 10,
+      "kind": "showcase",
+      "year": "",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 1",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 1",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 1",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-02",
+      "order": 11,
+      "kind": "showcase",
+      "year": "",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 2",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 2",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 2",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-03",
+      "order": 12,
+      "kind": "showcase",
+      "year": "",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 3",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 3",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 3",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-04",
+      "order": 13,
+      "kind": "showcase",
+      "year": "",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 4",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 4",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 4",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-05",
+      "order": 14,
+      "kind": "showcase",
+      "year": "",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-06",
+      "order": 15,
+      "kind": "showcase",
+      "year": "",
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 6",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 6",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 6",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    }
   ]
 }

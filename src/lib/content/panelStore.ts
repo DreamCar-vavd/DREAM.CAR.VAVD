@@ -1,226 +1,320 @@
 import { createHash } from "node:crypto";
 import {
   LOCALES,
-  confirmedText,
-  getLangStatus,
-  getPublishBlockers,
-  isRenderable,
-  type CmsCar,
   type ContentLocale,
   type GateFailure,
   type LangReviewStatus,
   type ReviewState,
 } from "./carsGate";
+import { KINDS, type ContentKind, type KindKey } from "./kinds";
 import {
   ConflictError,
   type DeployStatus,
   type PanelStorage,
-  type Snapshot,
 } from "./store/adapter";
 
 export const sha256 = (input: string) => createHash("sha256").update(input).digest("hex");
 
-// ---------------------------------------------------------------------------
-// dashboard model
-// ---------------------------------------------------------------------------
+const PUBLISHED = "src/content/cms/published.json" as const;
+const REVIEW = "src/content/cms/review-state.json" as const;
 
-export type CarPublishState = "not-published" | "in-sync" | "modified";
-
-export interface CarPanelRow {
-  car: CmsCar;
-  langStatus: Record<ContentLocale, LangReviewStatus>;
-  blockers: GateFailure[];
-  publishState: CarPublishState;
-  publiclyVisible: boolean;
-  publishedExists: boolean;
-}
-
-export interface PanelData {
-  rows: CarPanelRow[];
-  publishedAt: string;
-  deploy: DeployStatus;
-  mode: "local" | "github";
-  /** opaque version tokens the client echoes back with each action */
-  versions: { working: string; review: string; published: string };
-}
-
-/** Deep, key-sorted JSON — so "modified" detection sees nested text edits. */
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+// deep, key-sorted JSON so "modified" detection sees nested text edits
+function stable(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
   if (value && typeof value === "object") {
-    const keys = Object.keys(value as Record<string, unknown>).sort();
-    return `{${keys
-      .map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`)
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stable((value as Record<string, unknown>)[k])}`)
       .join(",")}}`;
   }
   return JSON.stringify(value ?? null);
 }
 
+// ---------------------------------------------------------------------------
+// snapshot / review parsing
+// ---------------------------------------------------------------------------
+
+export interface Snapshot {
+  publishedAt: string;
+  cars: unknown[];
+  gallery: unknown[];
+}
+function parseSnapshot(text: string | null): Snapshot {
+  const o = (text ? JSON.parse(text) : {}) as Partial<Snapshot>;
+  return {
+    publishedAt: String(o.publishedAt ?? ""),
+    cars: Array.isArray(o.cars) ? o.cars : [],
+    gallery: Array.isArray(o.gallery) ? o.gallery : [],
+  };
+}
+function parseReview(text: string | null): ReviewState {
+  return text ? (JSON.parse(text) as ReviewState) : {};
+}
+
+function coerceList<W extends { id: string; order: number }>(
+  kind: ContentKind<W>,
+  entries: { name: string; text: string }[],
+): W[] {
+  return entries
+    .map((e) => kind.coerce(e.name.replace(/\.json$/, ""), JSON.parse(e.text || "{}")))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+function coerceSnapshotList<W extends { id: string; order: number }>(
+  kind: ContentKind<W>,
+  raw: unknown[],
+): W[] {
+  return raw
+    .map((r) => kind.coerce(String((r as { id?: unknown }).id ?? ""), r as Record<string, unknown>))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+// ---------------------------------------------------------------------------
+// dashboard model
+// ---------------------------------------------------------------------------
+
+export type ItemPublishState = "not-published" | "in-sync" | "modified";
+
+export interface PanelRow {
+  id: string;
+  title: string;
+  subtitle: string;
+  editHref: string;
+  langStatus: Record<ContentLocale, LangReviewStatus>;
+  blockers: GateFailure[];
+  publishState: ItemPublishState;
+  publiclyVisible: boolean;
+  publishedExists: boolean;
+}
+export interface PanelGroup {
+  kind: KindKey;
+  label: string;
+  rows: PanelRow[];
+}
+export interface PanelData {
+  groups: PanelGroup[];
+  publishedAt: string;
+  deploy: DeployStatus;
+  mode: "local" | "github";
+  versions: { car: string; gallery: string; review: string; published: string };
+}
+
+function subtitleFor(kind: KindKey, item: { id: string; order: number } & Record<string, unknown>) {
+  return kind === "car"
+    ? `${item.id} · ${item.price ?? ""} · порядок ${item.order}`
+    : `${item.id} · порядок ${item.order}`;
+}
+function editHrefFor(kind: KindKey, id: string) {
+  return kind === "car"
+    ? `/keystatic/collection/cars/item/${id}`
+    : `/keystatic/collection/galleryProjects/item/${id}`;
+}
+
 export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
-  const [working, review, published, deploy] = await Promise.all([
-    storage.readWorkingCars(),
-    storage.readReview(),
-    storage.readPublished(),
+  const [carsDir, galleryDir, publishedF, reviewF, deploy] = await Promise.all([
+    storage.readDir(KINDS.car.dir),
+    storage.readDir(KINDS.gallery.dir),
+    storage.readFile(PUBLISHED),
+    storage.readFile(REVIEW),
     storage.deployStatus(),
   ]);
-  const publishedById = new Map(published.data.cars.map((c) => [c.id, c]));
-  const ctx = { review: review.data, sha256 };
+  const snapshot = parseSnapshot(publishedF.data);
+  const review = parseReview(reviewF.data);
+  const ctx = { review, sha256 };
 
-  const rows = working.data.map((car): CarPanelRow => {
-    const pub = publishedById.get(car.id);
-    const langStatus = Object.fromEntries(
-      LOCALES.map((l) => [l, getLangStatus(car, l, ctx)]),
-    ) as Record<ContentLocale, LangReviewStatus>;
+  const groups: PanelGroup[] = ([KINDS.car, KINDS.gallery] as ContentKind<{ id: string; order: number }>[]).map(
+    (kind) => {
+      const working = coerceList(kind, (kind.key === "car" ? carsDir : galleryDir).data);
+      const publishedById = new Map(
+        coerceSnapshotList(kind, kind.key === "car" ? snapshot.cars : snapshot.gallery).map((p) => [
+          p.id,
+          p,
+        ]),
+      );
 
-    let publishState: CarPublishState = "not-published";
-    if (pub) {
-      publishState = stableStringify(pub) === stableStringify(car) ? "in-sync" : "modified";
-    }
-    return {
-      car,
-      langStatus,
-      blockers: getPublishBlockers(car, ctx),
-      publishState,
-      publiclyVisible: Boolean(pub) && isRenderable(pub as CmsCar),
-      publishedExists: Boolean(pub),
-    };
-  });
+      const rows = working.map((item): PanelRow => {
+        const pub = publishedById.get(item.id);
+        const langStatus = Object.fromEntries(
+          LOCALES.map((l) => [l, kind.langStatus(item, l, ctx)]),
+        ) as Record<ContentLocale, LangReviewStatus>;
+        let publishState: ItemPublishState = "not-published";
+        if (pub) publishState = stable(pub) === stable(item) ? "in-sync" : "modified";
+        return {
+          id: item.id,
+          title: kind.displayTitle(item),
+          subtitle: subtitleFor(kind.key, item as never),
+          editHref: editHrefFor(kind.key, item.id),
+          langStatus,
+          blockers: kind.publishBlockers(item, ctx),
+          publishState,
+          publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
+          publishedExists: Boolean(pub),
+        };
+      });
+      return { kind: kind.key, label: kind.label, rows };
+    },
+  );
 
   return {
-    rows,
-    publishedAt: published.data.publishedAt,
+    groups,
+    publishedAt: snapshot.publishedAt,
     deploy,
     mode: storage.mode,
-    versions: { working: working.version, review: review.version, published: published.version },
+    versions: {
+      car: carsDir.version,
+      gallery: galleryDir.version,
+      review: reviewF.version,
+      published: publishedF.version,
+    },
   };
 }
 
 // ---------------------------------------------------------------------------
-// actions — the server always re-reads the material and re-runs the gate;
-// the browser only supplies { carId, locale } and the version tokens it saw.
+// actions — server re-reads + re-gates every time; the browser supplies only
+// { kind, id, locale } and the version tokens it last saw.
 // ---------------------------------------------------------------------------
 
 export type ActionResult =
   | { ok: true; message: string }
   | { ok: false; message: string; blockers?: GateFailure[]; conflict?: boolean };
 
-function conflict(err: unknown): ActionResult | null {
-  return err instanceof ConflictError ? { ok: false, message: err.message, conflict: true } : null;
+const asConflict = (err: unknown): ActionResult | null =>
+  err instanceof ConflictError ? { ok: false, message: err.message, conflict: true } : null;
+
+async function loadKind<W extends { id: string; order: number }>(
+  storage: PanelStorage,
+  kindKey: KindKey,
+) {
+  const kind = KINDS[kindKey] as ContentKind<W>;
+  const [dir, reviewF] = await Promise.all([storage.readDir(kind.dir), storage.readFile(REVIEW)]);
+  return {
+    kind,
+    working: coerceList(kind, dir.data),
+    workingVersion: dir.version,
+    review: parseReview(reviewF.data),
+    reviewVersion: reviewF.version,
+  };
 }
 
 export async function confirmLocale(
   storage: PanelStorage,
-  carId: string,
+  kindKey: KindKey,
+  id: string,
   locale: ContentLocale,
-  expected: { review: string; working: string },
+  expected: { working: string; review: string },
 ): Promise<ActionResult> {
-  const [working, review] = await Promise.all([storage.readWorkingCars(), storage.readReview()]);
-  if (working.version !== expected.working) {
-    return {
-      ok: false,
-      conflict: true,
-      message: new ConflictError("робочі картки авто").message,
-    };
+  const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
+  if (workingVersion !== expected.working || reviewVersion !== expected.review) {
+    return { ok: false, conflict: true, message: new ConflictError("робочі картки").message };
   }
-  const car = working.data.find((c) => c.id === carId);
-  if (!car) return { ok: false, message: `Авто «${carId}» не знайдено.` };
-
-  const status = getLangStatus(car, locale, { review: review.data, sha256 });
-  if (status === "empty") {
-    return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть назву й характеристики.` };
+  const item = working.find((w) => w.id === id);
+  if (!item) return { ok: false, message: `«${id}» не знайдено.` };
+  if (kind.langStatus(item, locale, { review, sha256 }) === "empty") {
+    return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
   }
-
   const next: ReviewState = {
-    ...review.data,
-    [carId]: {
-      ...review.data[carId],
-      [locale]: { hash: sha256(confirmedText(car[locale])), at: new Date().toISOString() },
+    ...review,
+    [id]: {
+      ...review[id],
+      [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
     },
   };
   try {
-    await storage.writeReview(next, expected.review);
+    await storage.writeFile(REVIEW, `${JSON.stringify(next, null, 2)}\n`, expected.review);
   } catch (err) {
-    return conflict(err) ?? { ok: false, message: `Не вдалося зберегти: ${(err as Error).message}` };
+    return asConflict(err) ?? { ok: false, message: `Не збережено: ${(err as Error).message}` };
   }
-  return { ok: true, message: `${locale.toUpperCase()}: переклад позначено перевіреним.` };
+  return { ok: true, message: `${locale.toUpperCase()}: позначено перевіреним.` };
 }
 
-export async function publishCar(
+export async function publishItem(
   storage: PanelStorage,
-  carId: string,
-  expected: { working: string; published: string; review: string },
+  kindKey: KindKey,
+  id: string,
+  expected: { working: string; review: string; published: string },
 ): Promise<ActionResult> {
-  const [working, review, published] = await Promise.all([
-    storage.readWorkingCars(),
-    storage.readReview(),
-    storage.readPublished(),
-  ]);
-
-  // §3: the material must not have changed between viewing and publishing.
-  if (working.version !== expected.working || review.version !== expected.review) {
-    return {
-      ok: false,
-      conflict: true,
-      message: new ConflictError("контент авто").message,
-    };
+  const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
+  const publishedF = await storage.readFile(PUBLISHED);
+  if (workingVersion !== expected.working || reviewVersion !== expected.review) {
+    return { ok: false, conflict: true, message: new ConflictError("контент").message };
   }
+  const item = working.find((w) => w.id === id);
+  if (!item) return { ok: false, message: `«${id}» не знайдено.` };
 
-  const car = working.data.find((c) => c.id === carId);
-  if (!car) return { ok: false, message: `Авто «${carId}» не знайдено.` };
-
-  // The server builds the snapshot from verified data — never trusts a
-  // published.json or flags supplied by the browser.
-  const blockers = getPublishBlockers(car, { review: review.data, sha256 });
+  const blockers = kind.publishBlockers(item, { review, sha256 });
   if (blockers.length > 0) {
     return { ok: false, message: "Не можна опублікувати — є невирішені пункти.", blockers };
   }
 
-  const alreadyInSync =
-    published.data.cars.some((c) => c.id === carId) &&
-    stableStringify(published.data.cars.find((c) => c.id === carId)) === stableStringify(car);
-  if (alreadyInSync) {
-    return { ok: true, message: `Авто «${carId}» вже опубліковане в цій версії.` };
+  const snapshot = parseSnapshot(publishedF.data);
+  const listRaw = kind.snapshotKey === "cars" ? snapshot.cars : snapshot.gallery;
+  const current = coerceSnapshotList(kind, listRaw);
+  const existing = current.find((p) => p.id === id);
+  if (existing && stable(existing) === stable(item)) {
+    return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
   }
 
-  const cars = published.data.cars.filter((c) => c.id !== carId);
-  cars.push(car);
-  cars.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-  const nextSnapshot: Snapshot = { publishedAt: new Date().toISOString(), cars };
-
+  const nextList = [...current.filter((p) => p.id !== id), item].sort(
+    (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+  );
+  const nextSnapshot: Snapshot = {
+    publishedAt: new Date().toISOString(),
+    cars: kind.snapshotKey === "cars" ? nextList : coerceSnapshotList(KINDS.car, snapshot.cars),
+    gallery:
+      kind.snapshotKey === "gallery"
+        ? nextList
+        : coerceSnapshotList(KINDS.gallery, snapshot.gallery),
+  };
   try {
-    await storage.writePublished(nextSnapshot, expected.published);
+    await storage.writeFile(
+      PUBLISHED,
+      `${JSON.stringify(nextSnapshot, null, 2)}\n`,
+      expected.published,
+    );
   } catch (err) {
-    return conflict(err) ?? { ok: false, message: `Публікація не вдалася: ${(err as Error).message}` };
+    return asConflict(err) ?? { ok: false, message: `Публікація не вдалася: ${(err as Error).message}` };
   }
-
   return {
     ok: true,
-    message: isRenderable(car)
-      ? `Опубліковано. ${storage.mode === "github" ? "Очікуйте завершення збірки (1–3 хв)." : "Зміни на сайті."}`
-      : `Опубліковано. Авто «${carId}» приховане публічно (статус «${car.saleStatus}»), картка збережена.`,
+    message: kind.isRenderable(item)
+      ? `Опубліковано.${storage.mode === "github" ? " Очікуйте завершення збірки (1–3 хв)." : " Зміни на сайті."}`
+      : `Опубліковано. «${id}» приховане публічно, картка збережена.`,
   };
 }
 
-export async function unpublishCar(
+export async function unpublishItem(
   storage: PanelStorage,
-  carId: string,
-  expectedPublished: string,
+  kindKey: KindKey,
+  id: string,
+  expected: { published: string },
 ): Promise<ActionResult> {
-  const published = await storage.readPublished();
-  if (published.version !== expectedPublished) {
-    return { ok: false, conflict: true, message: new ConflictError("опублікований знімок").message };
+  const kind = KINDS[kindKey];
+  const publishedF = await storage.readFile(PUBLISHED);
+  if (publishedF.version !== expected.published) {
+    return { ok: false, conflict: true, message: new ConflictError("знімок").message };
   }
-  if (!published.data.cars.some((c) => c.id === carId)) {
-    return { ok: false, message: `Авто «${carId}» і так не опубліковане.` };
+  const snapshot = parseSnapshot(publishedF.data);
+  const listRaw = kind.snapshotKey === "cars" ? snapshot.cars : snapshot.gallery;
+  const current = coerceSnapshotList(kind, listRaw);
+  if (!current.some((p) => p.id === id)) {
+    return { ok: false, message: `«${id}» і так не опубліковане.` };
   }
+  const nextList = current.filter((p) => p.id !== id);
   const nextSnapshot: Snapshot = {
     publishedAt: new Date().toISOString(),
-    cars: published.data.cars.filter((c) => c.id !== carId),
+    cars: kind.snapshotKey === "cars" ? nextList : coerceSnapshotList(KINDS.car, snapshot.cars),
+    gallery:
+      kind.snapshotKey === "gallery"
+        ? nextList
+        : coerceSnapshotList(KINDS.gallery, snapshot.gallery),
   };
   try {
-    await storage.writePublished(nextSnapshot, expectedPublished);
+    await storage.writeFile(
+      PUBLISHED,
+      `${JSON.stringify(nextSnapshot, null, 2)}\n`,
+      expected.published,
+    );
   } catch (err) {
-    return conflict(err) ?? { ok: false, message: `Не вдалося: ${(err as Error).message}` };
+    return asConflict(err) ?? { ok: false, message: `Не вдалося: ${(err as Error).message}` };
   }
-  return { ok: true, message: `Авто «${carId}» прибрано з сайту. Робоча картка збережена.` };
+  return { ok: true, message: `«${id}» прибрано з сайту. Робоча картка збережена.` };
 }

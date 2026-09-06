@@ -4,15 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 export interface PanelVersions {
-  working: string;
+  car: string;
+  gallery: string;
   review: string;
   published: string;
 }
 
 type ActionPayload =
-  | { action: "confirm-locale"; carId: string; locale: string }
-  | { action: "publish"; carId: string }
-  | { action: "unpublish"; carId: string };
+  | { action: "confirm-locale"; kind: string; id: string; locale: string }
+  | { action: "publish"; kind: string; id: string }
+  | { action: "unpublish"; kind: string; id: string };
 
 export function PanelButton({
   payload,

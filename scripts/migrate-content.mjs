@@ -102,6 +102,63 @@ function confirmedText(lang) {
 }
 const hash = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
+const GALLERY_DIR = path.join(ROOT, "src/content/cms/gallery");
+
+/** Gallery TEXT captured verbatim on 2026-09-06 from:
+ *   maserati-levante  <- src/content/gallery-project-overrides.json (real, ×3)
+ *   volvo-xc60-d5     <- dictionaries/*.ts gallery.projects (uk real; en/ru placeholder — as shipped)
+ *   showcase-01..06   <- dictionaries/*.ts (placeholder, kept per owner)
+ */
+const G = (title, service, clientRequest, completedItems, result) => ({
+  title,
+  shortDescription: "",
+  longDescription: "",
+  service,
+  clientRequest,
+  completedItems,
+  result,
+});
+const PLACEHOLDER = {
+  uk: G("Автомобіль", "Послуга уточнюється", "Інформація уточнюється.", ["Інформація уточнюється"], "Інформація уточнюється."),
+  en: G("Vehicle", "Service to be confirmed", "Information to be confirmed.", ["Information to be confirmed"], "Information to be confirmed."),
+  ru: G("Автомобиль", "Услуга уточняется", "Информация уточняется.", ["Информация уточняется"], "Информация уточняется."),
+};
+const GALLERY = [
+  {
+    id: "maserati-levante", order: 1, kind: "album", year: "2022",
+    uk: G("Мазераті Леванте", "Автопідбір під ключ", "Вибрати надійний, технічно справний, гарний автомобіль відповідно до побажань і бюджету клієнта.", ["Кузов і лакофарбове покриття. Комп'ютерна діагностика. Помилок не виявлено."], "Рекомендовано до купівлі"),
+    en: G("Maserati Levante", "Turnkey car sourcing", "Select a reliable, technically sound, attractive car matching the client's preferences and budget.", ["Bodywork and paintwork. Computer diagnostics. No faults found."], "Recommended for purchase"),
+    ru: G("Мазерати Леванте", "Подбор автомобиля под ключ", "Выбрать надёжный, технически исправный, красивый автомобиль в соответствии с пожеланиями и бюджетом клиента.", ["Кузов и лакокрасочное покрытие. Компьютерная диагностика. Ошибок не выявлено."], "Рекомендовано к покупке"),
+  },
+  {
+    id: "volvo-xc60-d5", order: 2, kind: "album", year: "2018",
+    uk: G("Volvo XC60 D5", "Автопідбір під ключ", "Знайти надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.", ["Проведено комплексну перевірку автомобіля: комп'ютерну діагностику всіх систем і вузлів, огляд кузова, лакофарбового покриття та зазорів, перевірку рівня й стану мастил і технічних рідин, а також тест-драйв. Помилок, слідів повторного фарбування та суттєвих дефектів не виявлено."], "Рекомендовано до купівлі"),
+    en: G("Volvo XC60 D5", "Service to be confirmed", "Information to be confirmed.", ["Information to be confirmed"], "Information to be confirmed."),
+    ru: G("Volvo XC60 D5", "Услуга уточняется", "Информация уточняется.", ["Информация уточняется"], "Информация уточняется."),
+  },
+  ...Array.from({ length: 6 }, (_, i) => ({
+    id: `showcase-${String(i + 1).padStart(2, "0")}`,
+    order: 10 + i,
+    kind: "showcase",
+    year: "",
+    uk: { ...PLACEHOLDER.uk, title: `Автомобіль — фото ${i + 1}` },
+    en: { ...PLACEHOLDER.en, title: `Vehicle — photo ${i + 1}` },
+    ru: { ...PLACEHOLDER.ru, title: `Автомобиль — фото ${i + 1}` },
+  })),
+];
+
+function galleryConfirmedText(l) {
+  return JSON.stringify({
+    title: (l.title ?? "").trim(),
+    shortDescription: (l.shortDescription ?? "").trim(),
+    longDescription: (l.longDescription ?? "").trim(),
+    service: (l.service ?? "").trim(),
+    clientRequest: (l.clientRequest ?? "").trim(),
+    completedItems: (l.completedItems ?? []).map((s) => s.trim()).filter(Boolean),
+    result: (l.result ?? "").trim(),
+  });
+}
+
 /**
  * Move a media file to `to`, looking for it wherever a previous run of this
  * script, the pre-panel layout, or a Keystatic save may have left it.
@@ -207,9 +264,43 @@ async function main() {
     console.log(`✓ ${car.id}: ${photoEntries.length} photos${car.video ? " + video" : ""}`);
   }
 
+  // ---- Gallery (text only; photos still resolved from the static media map) ----
+  await fs.mkdir(GALLERY_DIR, { recursive: true });
+  const publishedGallery = [];
+  const at = "2026-09-06T00:00:00.000Z";
+  for (const g of GALLERY) {
+    const record = {
+      id: g.id,
+      order: g.order,
+      kind: g.kind,
+      year: g.year,
+      videoUrl: "",
+      showContactCta: true,
+      uk: g.uk,
+      en: g.en,
+      ru: g.ru,
+    };
+    await fs.writeFile(
+      path.join(GALLERY_DIR, `${g.id}.json`),
+      `${JSON.stringify(record, null, 2)}\n`,
+      "utf8",
+    );
+    publishedGallery.push(record);
+    review[g.id] = {
+      uk: { hash: hash(galleryConfirmedText(g.uk)), at },
+      en: { hash: hash(galleryConfirmedText(g.en)), at },
+      ru: { hash: hash(galleryConfirmedText(g.ru)), at },
+    };
+    console.log(`✓ gallery ${g.id}`);
+  }
+
   await fs.writeFile(
     path.join(ROOT, "src/content/cms/published.json"),
-    `${JSON.stringify({ publishedAt: "2026-09-06T00:00:00.000Z", cars: publishedCars }, null, 2)}\n`,
+    `${JSON.stringify(
+      { publishedAt: at, cars: publishedCars, gallery: publishedGallery },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
   await fs.writeFile(

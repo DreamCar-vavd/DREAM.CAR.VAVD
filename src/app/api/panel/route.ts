@@ -2,16 +2,18 @@ import { NextResponse } from "next/server";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
-import { confirmLocale, publishCar, unpublishCar } from "@/lib/content/panelStore";
+import { confirmLocale, publishItem, unpublishItem } from "@/lib/content/panelStore";
+import { KINDS, type KindKey } from "@/lib/content/kinds";
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 interface Body {
   action?: string;
-  carId?: string;
+  kind?: string;
+  id?: string;
   locale?: string;
-  versions?: { working?: string; review?: string; published?: string };
+  versions?: { car?: string; gallery?: string; review?: string; published?: string };
 }
 
 export async function POST(request: Request) {
@@ -32,37 +34,35 @@ export async function POST(request: Request) {
     return json({ ok: false, message: "Некоректний запит." }, 400);
   }
 
-  const { action, carId } = body;
-  const v = body.versions ?? {};
-  const versions = {
-    working: String(v.working ?? ""),
-    review: String(v.review ?? ""),
-    published: String(v.published ?? ""),
-  };
-  if (!carId || typeof carId !== "string") {
-    return json({ ok: false, message: "Не вказано авто." }, 400);
+  const kind = body.kind as KindKey;
+  if (!kind || !(kind in KINDS)) return json({ ok: false, message: "Не вказано розділ." }, 400);
+  if (!body.id || typeof body.id !== "string") {
+    return json({ ok: false, message: "Не вказано елемент." }, 400);
   }
+  const v = body.versions ?? {};
+  const workingVersion = kind === "car" ? String(v.car ?? "") : String(v.gallery ?? "");
+  const review = String(v.review ?? "");
+  const published = String(v.published ?? "");
 
-  switch (action) {
-    case "confirm-locale": {
+  let r;
+  switch (body.action) {
+    case "confirm-locale":
       if (!body.locale || !LOCALES.includes(body.locale as ContentLocale)) {
         return json({ ok: false, message: "Не вказано мову." }, 400);
       }
-      const r = await confirmLocale(storage, carId, body.locale as ContentLocale, {
-        review: versions.review,
-        working: versions.working,
+      r = await confirmLocale(storage, kind, body.id, body.locale as ContentLocale, {
+        working: workingVersion,
+        review,
       });
-      return json(r, r.ok ? 200 : "conflict" in r && r.conflict ? 409 : 400);
-    }
-    case "publish": {
-      const r = await publishCar(storage, carId, versions);
-      return json(r, r.ok ? 200 : "conflict" in r && r.conflict ? 409 : 400);
-    }
-    case "unpublish": {
-      const r = await unpublishCar(storage, carId, versions.published);
-      return json(r, r.ok ? 200 : "conflict" in r && r.conflict ? 409 : 400);
-    }
+      break;
+    case "publish":
+      r = await publishItem(storage, kind, body.id, { working: workingVersion, review, published });
+      break;
+    case "unpublish":
+      r = await unpublishItem(storage, kind, body.id, { published });
+      break;
     default:
-      return json({ ok: false, message: `Невідома дія «${action}».` }, 400);
+      return json({ ok: false, message: `Невідома дія «${body.action}».` }, 400);
   }
+  return json(r, r.ok ? 200 : "conflict" in r && r.conflict ? 409 : 400);
 }

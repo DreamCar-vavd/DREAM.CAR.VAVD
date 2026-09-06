@@ -1,20 +1,22 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import type { CmsCar, ReviewState } from "../carsGate";
-import { CARS_WORKING_DIR, PUBLISHED_FILE, REVIEW_FILE } from "../paths";
-import { coerceCar, coerceSnapshot } from "./coerce";
 import {
   ConflictError,
+  assertAllowedDir,
+  assertAllowedFile,
+  type AllowedDir,
+  type AllowedFile,
   type DeployStatus,
+  type DirEntry,
   type PanelStorage,
-  type Snapshot,
   type Versioned,
 } from "./adapter";
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
+const abs = (rel: string) => path.join(process.cwd(), rel);
 
-async function readFileOr(file: string, fallback: string): Promise<string> {
+async function readOr(file: string, fallback: string | null): Promise<string | null> {
   try {
     return await fs.readFile(file, "utf8");
   } catch {
@@ -22,74 +24,53 @@ async function readFileOr(file: string, fallback: string): Promise<string> {
   }
 }
 
-/** Atomic write: temp file + rename, so a crash never leaves half a file. */
-async function writeAtomic(file: string, text: string): Promise<void> {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}-${Date.now()}`;
-  await fs.writeFile(tmp, text, "utf8");
-  await fs.rename(tmp, file);
-}
-
 export class LocalFsStorage implements PanelStorage {
   readonly mode = "local" as const;
 
-  async readWorkingCars(): Promise<Versioned<CmsCar[]>> {
-    let files: string[] = [];
+  async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
+    assertAllowedDir(dir);
+    let names: string[] = [];
     try {
-      files = (await fs.readdir(CARS_WORKING_DIR))
+      names = (await fs.readdir(abs(dir)))
         .filter((f) => f.endsWith(".json") && !f.startsWith("."))
         .sort();
     } catch {
       return { data: [], version: "" };
     }
-    const cars: CmsCar[] = [];
-    const parts: string[] = [];
-    for (const file of files) {
-      const text = await readFileOr(path.join(CARS_WORKING_DIR, file), "{}");
-      parts.push(`${file}:${text}`);
-      cars.push(coerceCar(file.replace(/\.json$/, ""), JSON.parse(text || "{}")));
+    const entries: DirEntry[] = [];
+    for (const name of names) {
+      entries.push({ name, text: (await readOr(path.join(abs(dir), name), "{}")) ?? "{}" });
     }
-    cars.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-    return { data: cars, version: files.length ? hash(parts.join("\n")) : "" };
-  }
-
-  async readReview(): Promise<Versioned<ReviewState>> {
-    const text = await readFileOr(REVIEW_FILE, "");
-    return { data: text ? (JSON.parse(text) as ReviewState) : {}, version: text ? hash(text) : "" };
-  }
-
-  async readPublished(): Promise<Versioned<Snapshot>> {
-    const text = await readFileOr(PUBLISHED_FILE, "");
     return {
-      data: coerceSnapshot(text ? JSON.parse(text) : {}),
-      version: text ? hash(text) : "",
+      data: entries,
+      version: names.length ? hash(entries.map((e) => `${e.name}:${e.text}`).join("\n")) : "",
     };
   }
 
-  private async writeGuarded<T>(
-    file: string,
-    what: string,
-    data: T,
-    expectedVersion: string,
-  ): Promise<Versioned<T>> {
-    const current = await readFileOr(file, "");
-    const currentVersion = current ? hash(current) : "";
-    if (currentVersion !== expectedVersion) throw new ConflictError(what);
-    const text = `${JSON.stringify(data, null, 2)}\n`;
-    await writeAtomic(file, text);
-    return { data, version: hash(text) };
+  async readFile(file: AllowedFile): Promise<Versioned<string | null>> {
+    assertAllowedFile(file);
+    const text = await readOr(abs(file), null);
+    return { data: text, version: text ? hash(text) : "" };
   }
 
-  writeReview(data: ReviewState, expectedVersion: string) {
-    return this.writeGuarded(REVIEW_FILE, "перевірки перекладів", data, expectedVersion);
-  }
-  writePublished(data: Snapshot, expectedVersion: string) {
-    return this.writeGuarded(PUBLISHED_FILE, "опублікований знімок", data, expectedVersion);
+  async writeFile(
+    file: AllowedFile,
+    text: string,
+    expectedVersion: string,
+  ): Promise<Versioned<string>> {
+    assertAllowedFile(file);
+    const current = await readOr(abs(file), null);
+    if ((current ? hash(current) : "") !== expectedVersion) {
+      throw new ConflictError(file.endsWith("review-state.json") ? "перевірки перекладів" : "знімок");
+    }
+    await fs.mkdir(path.dirname(abs(file)), { recursive: true });
+    const tmp = `${abs(file)}.tmp-${process.pid}-${Date.now()}`;
+    await fs.writeFile(tmp, text, "utf8");
+    await fs.rename(tmp, abs(file)); // atomic
+    return { data: text, version: hash(text) };
   }
 
   async deployStatus(): Promise<DeployStatus> {
-    // Local mode writes files directly; `next dev` HMR reflects them at once —
-    // there is no build/deploy step to wait for.
     return { state: "n/a" };
   }
 }

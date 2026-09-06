@@ -6,7 +6,6 @@ import { ConflictError } from "./adapter";
 const CFG = { owner: "DreamCar-vavd", repo: "DREAM.CAR.VAVD", branch: "codex/test", token: "tok_abc" };
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
 
-/** Minimal fake of the GitHub REST endpoints the adapter uses. */
 function fakeGitHub(routes: Record<string, (init?: RequestInit) => { status: number; body: unknown }>) {
   const calls: { url: string; method: string; body: unknown }[] = [];
   const impl: typeof fetch = async (input, init) => {
@@ -23,7 +22,7 @@ function fakeGitHub(routes: Record<string, (init?: RequestInit) => { status: num
   return { impl, calls };
 }
 
-test("reads a JSON file from the configured repo+branch and returns its blob sha as version", async () => {
+test("readFile uses the configured repo+branch and returns the blob sha as version", async () => {
   const { impl, calls } = fakeGitHub({
     "/contents/src/content/cms/review-state.json": () => ({
       status: 200,
@@ -31,29 +30,36 @@ test("reads a JSON file from the configured repo+branch and returns its blob sha
     }),
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
-  const r = await gh.readReview();
-  assert.deepEqual(r.data, { x: 1 });
+  const r = await gh.readFile("src/content/cms/review-state.json");
+  assert.equal(r.data, '{"x":1}');
   assert.equal(r.version, "blobsha1");
   assert.match(calls[0].url, /repos\/DreamCar-vavd\/DREAM\.CAR\.VAVD\/contents\/src\/content\/cms\/review-state\.json\?ref=codex%2Ftest/);
 });
 
-test("a missing file reads as empty with version ''", async () => {
-  const { impl } = fakeGitHub({});
-  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
-  const r = await gh.readPublished();
-  assert.deepEqual(r.data, { publishedAt: "", cars: [] });
+test("a path outside the allowlist is rejected by the adapter", async () => {
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: fakeGitHub({}).impl });
+  // @ts-expect-error deliberately passing a disallowed path
+  await assert.rejects(() => gh.readFile("src/proxy.ts"), /allowlist/);
+  // @ts-expect-error deliberately passing a disallowed path
+  await assert.rejects(() => gh.writeFile("package.json", "{}", ""), /allowlist/);
+});
+
+test("a missing file reads as null with version ''", async () => {
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: fakeGitHub({}).impl });
+  const r = await gh.readFile("src/content/cms/published.json");
+  assert.equal(r.data, null);
   assert.equal(r.version, "");
 });
 
-test("writePublished PUTs with the expected blob sha (optimistic lock) and returns the new sha", async () => {
+test("writeFile PUTs with the expected blob sha (optimistic lock) on the configured branch", async () => {
   const { impl, calls } = fakeGitHub({
-    "/contents/src/content/cms/published.json": (init) => {
-      if (init?.method === "PUT") return { status: 200, body: { content: { sha: "newsha" }, commit: { sha: "c1" } } };
-      return { status: 404, body: null };
-    },
+    "/contents/src/content/cms/published.json": (init) =>
+      init?.method === "PUT"
+        ? { status: 200, body: { content: { sha: "newsha" } } }
+        : { status: 404, body: null },
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
-  const out = await gh.writePublished({ publishedAt: "t", cars: [] }, "oldsha");
+  const out = await gh.writeFile("src/content/cms/published.json", "{}\n", "oldsha");
   assert.equal(out.version, "newsha");
   const put = calls.find((c) => c.method === "PUT")!;
   assert.equal((put.body as { sha: string }).sha, "oldsha");
@@ -65,20 +71,22 @@ test("creating a new file omits sha (no expectedVersion)", async () => {
     "/contents/src/content/cms/review-state.json": () => ({ status: 201, body: { content: { sha: "s" } } }),
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
-  await gh.writeReview({}, "");
-  const put = calls.find((c) => c.method === "PUT")!;
-  assert.equal("sha" in (put.body as object), false);
+  await gh.writeFile("src/content/cms/review-state.json", "{}\n", "");
+  assert.equal("sha" in (calls.find((c) => c.method === "PUT")!.body as object), false);
 });
 
 test("a 409 from GitHub becomes ConflictError, not a silent overwrite", async () => {
   const { impl } = fakeGitHub({
-    "/contents/src/content/cms/published.json": () => ({ status: 409, body: { message: "does not match" } }),
+    "/contents/src/content/cms/published.json": () => ({ status: 409, body: { message: "no match" } }),
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
-  await assert.rejects(() => gh.writePublished({ publishedAt: "t", cars: [] }, "stale"), ConflictError);
+  await assert.rejects(
+    () => gh.writeFile("src/content/cms/published.json", "{}\n", "stale"),
+    ConflictError,
+  );
 });
 
-test("readWorkingCars lists the fixed dir then fetches each car file", async () => {
+test("readDir lists the fixed dir, fetches each file, version = tree of blob shas", async () => {
   const { impl, calls } = fakeGitHub({
     "/contents/src/content/cms/cars?ref=": () => ({
       status: 200,
@@ -90,16 +98,16 @@ test("readWorkingCars lists the fixed dir then fetches each car file", async () 
     }),
     "/contents/src/content/cms/cars/a.json": () => ({
       status: 200,
-      body: { content: b64('{"order":1,"uk":{"title":"A"}}'), sha: "sa", encoding: "base64" },
+      body: { content: b64('{"id":"a"}'), sha: "sa", encoding: "base64" },
     }),
     "/contents/src/content/cms/cars/b.json": () => ({
       status: 200,
-      body: { content: b64('{"order":2,"uk":{"title":"B"}}'), sha: "sb", encoding: "base64" },
+      body: { content: b64('{"id":"b"}'), sha: "sb", encoding: "base64" },
     }),
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
-  const r = await gh.readWorkingCars();
-  assert.deepEqual(r.data.map((c) => c.id), ["a", "b"]);
+  const r = await gh.readDir("src/content/cms/cars");
+  assert.deepEqual(r.data.map((e) => e.name), ["a.json", "b.json"]);
   assert.equal(r.version, "a.json:sa|b.json:sb");
   assert.equal(calls.filter((c) => c.url.includes("/cars/") && c.url.includes(".json")).length, 2);
 });
