@@ -3,19 +3,27 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-type Action =
+export interface PanelVersions {
+  working: string;
+  review: string;
+  published: string;
+}
+
+type ActionPayload =
   | { action: "confirm-locale"; carId: string; locale: string }
   | { action: "publish"; carId: string }
   | { action: "unpublish"; carId: string };
 
 export function PanelButton({
   payload,
+  versions,
   children,
   disabled,
   variant = "default",
   confirmText,
 }: {
-  payload: Action;
+  payload: ActionPayload;
+  versions: PanelVersions;
   children: React.ReactNode;
   disabled?: boolean;
   variant?: "default" | "primary" | "danger";
@@ -24,7 +32,7 @@ export function PanelButton({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "conflict"; text: string } | null>(null);
 
   async function run() {
     if (confirmText && !window.confirm(confirmText)) return;
@@ -34,18 +42,22 @@ export function PanelButton({
       const res = await fetch("/api/panel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, versions }),
       });
       const data = (await res.json()) as {
         ok: boolean;
         message: string;
+        conflict?: boolean;
         blockers?: { kind: string }[];
       };
       const extra = data.blockers?.length ? ` (${data.blockers.length} пункт(и))` : "";
-      setMsg({ ok: data.ok, text: data.message + extra });
+      setMsg({
+        kind: data.ok ? "ok" : data.conflict ? "conflict" : "err",
+        text: data.message + extra,
+      });
       if (data.ok) startTransition(() => router.refresh());
     } catch {
-      setMsg({ ok: false, text: "Помилка мережі. Спробуйте ще раз." });
+      setMsg({ kind: "err", text: "Помилка мережі. Дані могли не зберегтися — оновіть сторінку." });
     } finally {
       setBusy(false);
     }
@@ -70,10 +82,42 @@ export function PanelButton({
         {busy || pending ? "…" : children}
       </button>
       {msg && (
-        <span className={`text-xs ${msg.ok ? "text-green-700 dark:text-green-400" : "text-red-600"}`}>
+        <span
+          className={`text-xs ${
+            msg.kind === "ok"
+              ? "text-green-700 dark:text-green-400"
+              : msg.kind === "conflict"
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-red-600"
+          }`}
+        >
           {msg.text}
+          {msg.kind === "conflict" && (
+            <button
+              type="button"
+              className="ml-2 underline"
+              onClick={() => startTransition(() => router.refresh())}
+            >
+              Оновити
+            </button>
+          )}
         </span>
       )}
     </span>
+  );
+}
+
+export function RefreshButton() {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      onClick={() => startTransition(() => router.refresh())}
+      disabled={pending}
+      className="rounded border border-neutral-400 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
+    >
+      {pending ? "…" : "Оновити стан"}
+    </button>
   );
 }
