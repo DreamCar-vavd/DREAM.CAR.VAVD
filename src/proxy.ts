@@ -9,6 +9,9 @@ export function proxy(request: NextRequest) {
 
   if (pathname === "/") return NextResponse.next();
   if (pathname.startsWith("/api")) return NextResponse.next();
+  if (pathname === "/keystatic" || pathname.startsWith("/keystatic/")) {
+    return NextResponse.next();
+  }
   if (pathname.startsWith("/_next")) return NextResponse.next();
   if (pathname === "/favicon.ico") return NextResponse.next();
   if (pathname === "/robots.txt") return NextResponse.next();
