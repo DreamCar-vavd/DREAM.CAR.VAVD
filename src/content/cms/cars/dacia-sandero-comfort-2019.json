@@ -1,0 +1,80 @@
+{
+  "order": 3,
+  "publishState": "published",
+  "saleStatus": "for-sale",
+  "year": "2019",
+  "price": "£3,300",
+  "mileageValue": 42488,
+  "photos": [
+    {
+      "image": "dacia-sandero-comfort-2019--01-front.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--02-front-right.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--03-right-side.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--04-rear-right.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--05-rear.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--06-rear-left.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--07-left-side.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--08-driver-door.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--09-rear-door.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--10-front-interior.jpeg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-comfort-2019--11-service-book.jpeg",
+      "caption": ""
+    }
+  ],
+  "video": {
+    "mode": "legacy-file",
+    "src": "/images/cms/cars/dacia-sandero-comfort-2019--12-walkaround.mp4",
+    "posterSrc": "/images/cms/cars/dacia-sandero-comfort-2019--01-front.jpeg"
+  },
+  "uk": {
+    "title": "Dacia Sandero Comfort",
+    "specLine": "1.0 Turbo • Бензин • Механічна • Сірий",
+    "description": "",
+    "viewGalleryLabel": "Переглянути 11 фото і 1 відео",
+    "reviewState": "confirmed"
+  },
+  "en": {
+    "title": "Dacia Sandero Comfort",
+    "specLine": "1.0 Turbo • Petrol • Manual • Grey",
+    "description": "",
+    "viewGalleryLabel": "View 11 photos and 1 video",
+    "reviewState": "confirmed"
+  },
+  "ru": {
+    "title": "Dacia Sandero Comfort",
+    "specLine": "1.0 Turbo • Бензин • Механическая • Серый",
+    "description": "",
+    "viewGalleryLabel": "Посмотреть 11 фото и 1 видео",
+    "reviewState": "confirmed"
+  }
+}

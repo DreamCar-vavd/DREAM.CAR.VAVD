@@ -1,0 +1,76 @@
+{
+  "order": 1,
+  "publishState": "published",
+  "saleStatus": "for-sale",
+  "year": "2020",
+  "price": "£9,500",
+  "mileageValue": 47170,
+  "photos": [
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-front.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-left.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-right.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-rear.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-boot.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-interior-front.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-interior-rear.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-sunroof-interior.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-sunroof-wide.jpg",
+      "caption": ""
+    },
+    {
+      "image": "suzuki-sx4-s-cross--suzuki-dashboard.jpg",
+      "caption": ""
+    }
+  ],
+  "video": {
+    "mode": "none",
+    "src": "",
+    "posterSrc": ""
+  },
+  "uk": {
+    "title": "Suzuki SX4 S-Cross",
+    "specLine": "1.4 Turbo • Бензин • Автомат",
+    "description": "",
+    "viewGalleryLabel": "Переглянути 10 фото",
+    "reviewState": "confirmed"
+  },
+  "en": {
+    "title": "Suzuki SX4 S-Cross",
+    "specLine": "1.4 Turbo • Petrol • Automatic",
+    "description": "",
+    "viewGalleryLabel": "View 10 photos",
+    "reviewState": "confirmed"
+  },
+  "ru": {
+    "title": "Suzuki SX4 S-Cross",
+    "specLine": "1.4 Turbo • Бензин • Автомат",
+    "description": "",
+    "viewGalleryLabel": "Посмотреть 10 фото",
+    "reviewState": "confirmed"
+  }
+}

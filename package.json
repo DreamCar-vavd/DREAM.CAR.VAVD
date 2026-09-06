@@ -9,7 +9,10 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test 'src/**/*.test.ts'"
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "content:check": "node --import tsx scripts/content-check.ts",
+    "content:confirm": "node scripts/content-confirm.mjs",
+    "cars:migrate": "node scripts/migrate-cars.mjs"
   },
   "dependencies": {
     "@keystatic/core": "^0.6.9",

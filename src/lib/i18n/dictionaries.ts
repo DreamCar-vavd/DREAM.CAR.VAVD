@@ -2,6 +2,7 @@ import "server-only";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "./config";
 import { readGalleryProjectOverrides } from "@/lib/galleryProjectOverrides";
+import { getCarListingCopy } from "@/lib/content/cars";
 
 const dictionaries: Record<Locale, () => Promise<Dictionary>> = {
   uk: () => import("@/content/dictionaries/uk").then((m) => m.default),
@@ -12,6 +13,7 @@ const dictionaries: Record<Locale, () => Promise<Dictionary>> = {
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
   const base = await dictionaries[locale]();
   const overrides = await readGalleryProjectOverrides();
+  const carListingCopy = await getCarListingCopy(locale);
 
   const overriddenProjects = { ...base.gallery.projects };
   for (const [id, byLocale] of Object.entries(overrides)) {
@@ -23,6 +25,7 @@ export async function getDictionary(locale: Locale): Promise<Dictionary> {
 
   return {
     ...base,
+    carsForSale: { ...base.carsForSale, listings: carListingCopy },
     gallery: { ...base.gallery, projects: overriddenProjects },
   };
 }

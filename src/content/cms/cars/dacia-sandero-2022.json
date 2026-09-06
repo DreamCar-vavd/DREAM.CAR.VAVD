@@ -1,0 +1,72 @@
+{
+  "order": 2,
+  "publishState": "published",
+  "saleStatus": "for-sale",
+  "year": "2022",
+  "price": "£9,400",
+  "mileageValue": 6150,
+  "photos": [
+    {
+      "image": "dacia-sandero-2022--dacia-front.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-left.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-right.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-rear.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-interior-front.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-interior-front-right.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-interior-rear.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-interior-rear-right.jpg",
+      "caption": ""
+    },
+    {
+      "image": "dacia-sandero-2022--dacia-dashboard.jpg",
+      "caption": ""
+    }
+  ],
+  "video": {
+    "mode": "legacy-file",
+    "src": "/images/cms/cars/dacia-sandero-2022--dacia-walkaround.mp4",
+    "posterSrc": "/images/cms/cars/dacia-sandero-2022--dacia-front.jpg"
+  },
+  "uk": {
+    "title": "Dacia Sandero",
+    "specLine": "1.0 Turbo • Бензин • Автомат",
+    "description": "",
+    "viewGalleryLabel": "Переглянути 9 фото і 1 відео",
+    "reviewState": "confirmed"
+  },
+  "en": {
+    "title": "Dacia Sandero",
+    "specLine": "1.0 Turbo • Petrol • Automatic",
+    "description": "",
+    "viewGalleryLabel": "View 9 photos and 1 video",
+    "reviewState": "confirmed"
+  },
+  "ru": {
+    "title": "Dacia Sandero",
+    "specLine": "1.0 Turbo • Бензин • Автомат",
+    "description": "",
+    "viewGalleryLabel": "Посмотреть 9 фото и 1 видео",
+    "reviewState": "confirmed"
+  }
+}

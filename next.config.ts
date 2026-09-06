@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
-const cspHeader = `
+/**
+ * Public site CSP — unchanged from before the panel. Strict: no external
+ * origins at all.
+ */
+const publicCsp = `
   default-src 'self';
   base-uri 'self';
   object-src 'none';
@@ -19,6 +23,53 @@ const cspHeader = `
   .replace(/\s{2,}/g, " ")
   .trim();
 
+/**
+ * CSP for the management panel routes only (`/keystatic`, `/api/keystatic`).
+ * Never sent for a public page.
+ *
+ * Deltas vs the public CSP, each tied to an observed need on `next build` +
+ * `next start` (see report/33 §5):
+ *  - style-src / font-src add Google Fonts — Keystatic's admin UI loads the
+ *    Inter webfont from fonts.googleapis.com. Blocked -> UI renders in a
+ *    fallback font (still usable), so this is cosmetic; added to remove the
+ *    console error.
+ *  - connect-src / img-src / form-action add api.github.com + github.com +
+ *    avatars.githubusercontent.com — required only in GitHub storage mode
+ *    (hosted panel): the API calls that read/write content and the sign-in
+ *    redirect. Harmless in local mode.
+ * `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
+ * `script-src` (NO unsafe-eval — React needs it only in `next dev`) are kept
+ * exactly as strict as the public site.
+ */
+const panelCsp = `
+  default-src 'self';
+  base-uri 'self';
+  object-src 'none';
+  frame-ancestors 'none';
+  form-action 'self' https://github.com;
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  img-src 'self' data: blob: https://avatars.githubusercontent.com;
+  font-src 'self' data: https://fonts.gstatic.com;
+  media-src 'self' blob:;
+  connect-src 'self' https://api.github.com https://github.com;
+  frame-src 'none';
+  worker-src 'none';
+  manifest-src 'self';
+`
+  .replace(/\s{2,}/g, " ")
+  .trim();
+
+const sharedHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "DENY" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+  },
+];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
@@ -30,29 +81,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/:path*",
-        headers: [
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
-          },
-          {
-            key: "Content-Security-Policy",
-            value: cspHeader,
-          },
-        ],
+        // Every route EXCEPT the panel — keeps the strict public CSP.
+        source: "/((?!keystatic|api/keystatic).*)",
+        headers: [...sharedHeaders, { key: "Content-Security-Policy", value: publicCsp }],
+      },
+      {
+        source: "/keystatic/:path*",
+        headers: [...sharedHeaders, { key: "Content-Security-Policy", value: panelCsp }],
+      },
+      {
+        source: "/api/keystatic/:path*",
+        headers: [...sharedHeaders, { key: "Content-Security-Policy", value: panelCsp }],
       },
     ];
   },

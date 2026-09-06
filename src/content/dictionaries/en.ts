@@ -175,32 +175,8 @@ const dictionary: Dictionary = {
     contactCta: "Contact us",
     photoAlt: "Photo",
     videoAlt: "Vehicle walkaround video",
-    listings: {
-      "suzuki-sx4-s-cross": {
-        title: "Suzuki SX4 S-Cross",
-        year: "2020",
-        specLine: "1.4 Turbo • Petrol • Automatic",
-        mileage: "47,170 miles",
-        price: "£9,500",
-        viewGallery: "View 10 photos",
-      },
-      "dacia-sandero-2022": {
-        title: "Dacia Sandero",
-        year: "2022",
-        specLine: "1.0 Turbo • Petrol • Automatic",
-        mileage: "6,150 miles",
-        price: "£9,400",
-        viewGallery: "View 9 photos and 1 video",
-      },
-      "dacia-sandero-comfort-2019": {
-        title: "Dacia Sandero Comfort",
-        year: "2019",
-        specLine: "1.0 Turbo • Petrol • Manual • Grey",
-        mileage: "42,488 miles",
-        price: "£3,300",
-        viewGallery: "View 11 photos and 1 video",
-      },
-    },
+    // Populated at build time by getDictionary() from the panel content.
+    listings: {},
   },
   process: {
     heading: "How We Work",
