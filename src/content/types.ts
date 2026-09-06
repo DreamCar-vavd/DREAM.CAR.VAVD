@@ -52,6 +52,12 @@ export interface ProcessStep {
   description: string;
 }
 
+/**
+ * Legacy known car ids. Since the management panel, the catalogue is
+ * data-driven (src/content/cms/cars/*) and a car id is just a string; this
+ * union is kept only for the pre-panel fixtures/tests that still reference
+ * these three by name.
+ */
 export type CarListingId =
   | "suzuki-sx4-s-cross"
   | "dacia-sandero-2022"
@@ -145,7 +151,13 @@ export interface Dictionary {
     contactCta: string;
     photoAlt: string;
     videoAlt: string;
-    listings: Record<CarListingId, CarListingCopy>;
+    /**
+     * Per-car copy for the current locale. Populated at build time by
+     * getDictionary() from the management panel content
+     * (src/content/cms/cars/*), not from the static dictionary files.
+     * Key = car id. Only cars that pass the publish gate appear here.
+     */
+    listings: Record<string, CarListingCopy>;
   };
   process: {
     heading: string;
@@ -178,7 +190,7 @@ export interface Dictionary {
       checkedLabel: string;
       resultLabel: string;
     };
-    projects: Record<GalleryProjectId, GalleryProjectCopy>;
+    projects: Record<string, GalleryProjectCopy>;
   };
   about: {
     heading: string;

@@ -1,0 +1,47 @@
+{
+  "id": "showcase-05",
+  "order": 14,
+  "kind": "showcase",
+  "year": "",
+  "photos": [
+    {
+      "image": "/images/cms/gallery/showcase-05/photos/0/image.jpg",
+      "caption": ""
+    }
+  ],
+  "videoUrl": "",
+  "showContactCta": true,
+  "uk": {
+    "title": "Автомобіль — фото 5",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Послуга уточнюється",
+    "clientRequest": "Інформація уточнюється.",
+    "completedItems": [
+      "Інформація уточнюється"
+    ],
+    "result": "Інформація уточнюється."
+  },
+  "en": {
+    "title": "Vehicle — photo 5",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Service to be confirmed",
+    "clientRequest": "Information to be confirmed.",
+    "completedItems": [
+      "Information to be confirmed"
+    ],
+    "result": "Information to be confirmed."
+  },
+  "ru": {
+    "title": "Автомобиль — фото 5",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Услуга уточняется",
+    "clientRequest": "Информация уточняется.",
+    "completedItems": [
+      "Информация уточняется"
+    ],
+    "result": "Информация уточняется."
+  }
+}

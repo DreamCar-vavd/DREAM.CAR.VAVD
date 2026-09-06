@@ -1,0 +1,75 @@
+{
+  "id": "maserati-levante",
+  "order": 1,
+  "kind": "album",
+  "year": "2022",
+  "photos": [
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/0/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/1/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/2/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/3/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/4/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/5/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/6/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/maserati-levante/photos/7/image.jpg",
+      "caption": ""
+    }
+  ],
+  "videoUrl": "",
+  "showContactCta": true,
+  "uk": {
+    "title": "Мазераті Леванте",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Автопідбір під ключ",
+    "clientRequest": "Вибрати надійний, технічно справний, гарний автомобіль відповідно до побажань і бюджету клієнта.",
+    "completedItems": [
+      "Кузов і лакофарбове покриття. Комп'ютерна діагностика. Помилок не виявлено."
+    ],
+    "result": "Рекомендовано до купівлі"
+  },
+  "en": {
+    "title": "Maserati Levante",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Turnkey car sourcing",
+    "clientRequest": "Select a reliable, technically sound, attractive car matching the client's preferences and budget.",
+    "completedItems": [
+      "Bodywork and paintwork. Computer diagnostics. No faults found."
+    ],
+    "result": "Recommended for purchase"
+  },
+  "ru": {
+    "title": "Мазерати Леванте",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Подбор автомобиля под ключ",
+    "clientRequest": "Выбрать надёжный, технически исправный, красивый автомобиль в соответствии с пожеланиями и бюджетом клиента.",
+    "completedItems": [
+      "Кузов и лакокрасочное покрытие. Компьютерная диагностика. Ошибок не выявлено."
+    ],
+    "result": "Рекомендовано к покупке"
+  }
+}

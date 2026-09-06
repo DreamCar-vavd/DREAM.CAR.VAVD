@@ -1,0 +1,63 @@
+{
+  "id": "volvo-xc60-d5",
+  "order": 2,
+  "kind": "album",
+  "year": "2018",
+  "photos": [
+    {
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/1/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/2/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/3/image.jpg",
+      "caption": ""
+    },
+    {
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/4/image.jpg",
+      "caption": ""
+    }
+  ],
+  "videoUrl": "",
+  "showContactCta": true,
+  "uk": {
+    "title": "Volvo XC60 D5",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Автопідбір під ключ",
+    "clientRequest": "Знайти надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
+    "completedItems": [
+      "Проведено комплексну перевірку автомобіля: комп'ютерну діагностику всіх систем і вузлів, огляд кузова, лакофарбового покриття та зазорів, перевірку рівня й стану мастил і технічних рідин, а також тест-драйв. Помилок, слідів повторного фарбування та суттєвих дефектів не виявлено."
+    ],
+    "result": "Рекомендовано до купівлі"
+  },
+  "en": {
+    "title": "Volvo XC60 D5",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Service to be confirmed",
+    "clientRequest": "Information to be confirmed.",
+    "completedItems": [
+      "Information to be confirmed"
+    ],
+    "result": "Information to be confirmed."
+  },
+  "ru": {
+    "title": "Volvo XC60 D5",
+    "shortDescription": "",
+    "longDescription": "",
+    "service": "Услуга уточняется",
+    "clientRequest": "Информация уточняется.",
+    "completedItems": [
+      "Информация уточняется"
+    ],
+    "result": "Информация уточняется."
+  }
+}

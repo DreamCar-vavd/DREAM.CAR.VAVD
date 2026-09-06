@@ -1,0 +1,66 @@
+{
+  "id": "dacia-sandero-comfort-2019",
+  "order": 3,
+  "saleStatus": "for-sale",
+  "year": "2019",
+  "price": "£3,300",
+  "mileageValue": 42488,
+  "photos": [
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/1/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/2/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/3/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/4/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/5/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/6/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/7/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/8/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/9/image.jpeg"
+    },
+    {
+      "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/10/image.jpeg"
+    }
+  ],
+  "video": {
+    "mode": "legacy-file",
+    "src": "/images/cms/cars/dacia-sandero-comfort-2019/video/12-walkaround.mp4",
+    "posterSrc": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
+  },
+  "uk": {
+    "title": "Dacia Sandero Comfort",
+    "specLine": "1.0 Turbo • Бензин • Механічна • Сірий",
+    "description": "",
+    "viewGalleryLabel": "Переглянути 11 фото і 1 відео"
+  },
+  "en": {
+    "title": "Dacia Sandero Comfort",
+    "specLine": "1.0 Turbo • Petrol • Manual • Grey",
+    "description": "",
+    "viewGalleryLabel": "View 11 photos and 1 video"
+  },
+  "ru": {
+    "title": "Dacia Sandero Comfort",
+    "specLine": "1.0 Turbo • Бензин • Механическая • Серый",
+    "description": "",
+    "viewGalleryLabel": "Посмотреть 11 фото и 1 видео"
+  }
+}

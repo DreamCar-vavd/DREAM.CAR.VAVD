@@ -176,32 +176,8 @@ const dictionary: Dictionary = {
     contactCta: "Зв’язатися з нами",
     photoAlt: "Фото",
     videoAlt: "Відео огляду автомобіля",
-    listings: {
-      "suzuki-sx4-s-cross": {
-        title: "Suzuki SX4 S-Cross",
-        year: "2020",
-        specLine: "1.4 Turbo • Бензин • Автомат",
-        mileage: "47 170 миль",
-        price: "£9,500",
-        viewGallery: "Переглянути 10 фото",
-      },
-      "dacia-sandero-2022": {
-        title: "Dacia Sandero",
-        year: "2022",
-        specLine: "1.0 Turbo • Бензин • Автомат",
-        mileage: "6 150 миль",
-        price: "£9,400",
-        viewGallery: "Переглянути 9 фото і 1 відео",
-      },
-      "dacia-sandero-comfort-2019": {
-        title: "Dacia Sandero Comfort",
-        year: "2019",
-        specLine: "1.0 Turbo • Бензин • Механічна • Сірий",
-        mileage: "42 488 миль",
-        price: "£3,300",
-        viewGallery: "Переглянути 11 фото і 1 відео",
-      },
-    },
+    // Populated at build time by getDictionary() from the panel content.
+    listings: {},
   },
   process: {
     heading: "Як ми працюємо",

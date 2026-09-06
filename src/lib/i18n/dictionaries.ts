@@ -1,7 +1,8 @@
 import "server-only";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "./config";
-import { readGalleryProjectOverrides } from "@/lib/galleryProjectOverrides";
+import { getCarListingCopy } from "@/lib/content/publishedCars";
+import { getGalleryProjectCopy } from "@/lib/content/publishedGallery";
 
 const dictionaries: Record<Locale, () => Promise<Dictionary>> = {
   uk: () => import("@/content/dictionaries/uk").then((m) => m.default),
@@ -10,19 +11,28 @@ const dictionaries: Record<Locale, () => Promise<Dictionary>> = {
 };
 
 export async function getDictionary(locale: Locale): Promise<Dictionary> {
-  const base = await dictionaries[locale]();
-  const overrides = await readGalleryProjectOverrides();
+  const [base, carListings, galleryProjects] = await Promise.all([
+    dictionaries[locale](),
+    getCarListingCopy(locale),
+    getGalleryProjectCopy(locale),
+  ]);
 
-  const overriddenProjects = { ...base.gallery.projects };
-  for (const [id, byLocale] of Object.entries(overrides)) {
-    const override = byLocale[locale];
-    if (override && id in overriddenProjects) {
-      overriddenProjects[id as keyof typeof overriddenProjects] = override;
-    }
-  }
+  // Gallery album titles follow their project's title for the current locale.
+  const albums = { ...base.gallery.albums };
+  const maserati = galleryProjects["maserati-levante"];
+  const volvo = galleryProjects["volvo-xc60-d5"];
+  if (maserati?.title) albums.maseratiLevante = { ...albums.maseratiLevante, title: maserati.title };
+  if (volvo?.title) albums.volvoXc60D5 = { ...albums.volvoXc60D5, title: volvo.title };
 
   return {
     ...base,
-    gallery: { ...base.gallery, projects: overriddenProjects },
+    carsForSale: { ...base.carsForSale, listings: carListings },
+    gallery: {
+      ...base.gallery,
+      albums,
+      // Only published projects; the grid renders a card only when the
+      // project id is present here (empty object -> falls back per project).
+      projects: { ...base.gallery.projects, ...galleryProjects },
+    },
   };
 }

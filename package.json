@@ -9,9 +9,14 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test 'src/**/*.test.ts'"
+    "test": "node --import tsx --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
+    "content:check": "node scripts/content-check.mjs",
+    "content:guard": "node --import tsx scripts/content-guard.ts",
+    "content:migrate": "node scripts/migrate-content.mjs"
   },
   "dependencies": {
+    "@keystatic/core": "^0.6.9",
+    "@keystatic/next": "^5.0.5",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "lucide-react": "^1.28.0",

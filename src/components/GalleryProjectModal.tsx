@@ -1,26 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Car, Check, ClipboardCheck, Pencil, Plus, ShieldCheck, Trash2, User, X } from "lucide-react";
-import type { Dictionary, GalleryProjectCopy } from "@/content/types";
+import { Car, Check, ClipboardCheck, ShieldCheck, User, X } from "lucide-react";
+import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
-import { locales } from "@/lib/i18n/config";
-import type { GalleryProjectEntry } from "@/content/galleryProjects";
 import { DreamLogo } from "./DreamLogo";
-import { GoldLink, GoldButton } from "./GoldButton";
+import { GoldLink } from "./GoldButton";
 import { WhatsAppIcon } from "./icons/SocialIcons";
 import { whatsappUrl } from "@/lib/social";
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 import { isModifiedClick } from "@/lib/isModifiedClick";
 import { focusContactsHeading } from "@/lib/focusContactsHeading";
 
-const EDITABLE_PROJECT_IDS = new Set(["maserati-levante", "volvo-xc60-d5"]);
-
-type EditState = Record<Locale, GalleryProjectCopy>;
-
-const EDIT_LOCALE_LABEL: Record<Locale, string> = { uk: "UA", ru: "RU", en: "EN" };
+/**
+ * Read-only gallery-project modal. Content is now edited in the management
+ * panel (/keystatic + /panel); the former in-modal dev editor and its
+ * /api/gallery-projects backend were removed with the panel work.
+ */
+export interface GalleryModalProject {
+  id: string;
+  images: { src: string; width: number; height: number }[];
+}
 
 export function GalleryProjectModal({
   dict,
@@ -31,25 +32,16 @@ export function GalleryProjectModal({
 }: {
   dict: Dictionary;
   locale: Locale;
-  project: GalleryProjectEntry;
+  project: GalleryModalProject;
   onClose: () => void;
   onNavigate: () => void;
 }) {
-  const router = useRouter();
   const copy = dict.gallery.projects[project.id];
   const [activeIndex, setActiveIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const activeImage = project.images[activeIndex];
-
-  const canEdit = process.env.NODE_ENV === "development" && EDITABLE_PROJECT_IDS.has(project.id);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isLoadingEdit, setIsLoadingEdit] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editData, setEditData] = useState<EditState | null>(null);
-  const [editLocale, setEditLocale] = useState<Locale>(locale);
 
   useDialogFocusTrap(dialogRef, true, onClose);
 
@@ -59,103 +51,13 @@ export function GalleryProjectModal({
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  async function startEditing() {
-    setEditError(null);
-    setIsLoadingEdit(true);
-    try {
-      const response = await fetch(`/api/gallery-projects/${project.id}`);
-      if (!response.ok) throw new Error("load-failed");
-      const body = (await response.json()) as { locales: EditState };
-      setEditData(body.locales);
-      setEditLocale(locale);
-      setIsEditing(true);
-    } catch {
-      setEditError("Не вдалося завантажити дані для редагування.");
-    } finally {
-      setIsLoadingEdit(false);
-    }
-  }
-
-  function cancelEditing() {
-    setIsEditing(false);
-    setEditData(null);
-    setEditError(null);
-  }
-
-  function updateField<K extends keyof GalleryProjectCopy>(field: K, value: GalleryProjectCopy[K]) {
-    setEditData((state) => {
-      if (!state) return state;
-      return { ...state, [editLocale]: { ...state[editLocale], [field]: value } };
-    });
-  }
-
-  function updateCompletedItem(index: number, value: string) {
-    setEditData((state) => {
-      if (!state) return state;
-      const items = [...state[editLocale].completedItems];
-      items[index] = value;
-      return { ...state, [editLocale]: { ...state[editLocale], completedItems: items } };
-    });
-  }
-
-  function addCompletedItem() {
-    setEditData((state) => {
-      if (!state) return state;
-      const items = [...state[editLocale].completedItems, ""];
-      return { ...state, [editLocale]: { ...state[editLocale], completedItems: items } };
-    });
-  }
-
-  function removeCompletedItem(index: number) {
-    setEditData((state) => {
-      if (!state) return state;
-      const items = state[editLocale].completedItems.filter((_, i) => i !== index);
-      return { ...state, [editLocale]: { ...state[editLocale], completedItems: items } };
-    });
-  }
-
-  async function saveEditing() {
-    if (!editData) return;
-    for (const loc of locales) {
-      if (!editData[loc].title.trim()) {
-        setEditLocale(loc);
-        setEditError(`Назва автомобіля не може бути порожньою (${EDIT_LOCALE_LABEL[loc]}).`);
-        return;
-      }
-    }
-    setIsSaving(true);
-    setEditError(null);
-    try {
-      const response = await fetch(`/api/gallery-projects/${project.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locales: editData }),
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "save-failed");
-      }
-      setIsEditing(false);
-      setEditData(null);
-      router.refresh();
-    } catch (error) {
-      setEditError(error instanceof Error ? error.message : "Не вдалося зберегти зміни.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  const editCopy = editData?.[editLocale];
-
   // Closes the modal (via `onNavigate`, not `onClose` — see its comment on
   // the `GalleryGrid` call site for why) and moves focus onto the contacts
-  // heading. Without this, the link's default navigation still ran (the
-  // URL hash did change to `#contacts`), but nothing ever told this modal
-  // to stop rendering: its full-screen overlay kept covering the page,
-  // making the CTA look like it did nothing at all — confirmed by
-  // reproducing the reported bug before writing this fix. Deliberately
-  // does not pass any project data into the form — only navigation and
-  // focus, matching what was actually requested.
+  // heading. Without this, the link's default navigation still ran (the URL
+  // hash did change to `#contacts`), but nothing ever told this modal to stop
+  // rendering: its full-screen overlay kept covering the page, making the CTA
+  // look like it did nothing at all — confirmed by reproducing the reported
+  // bug before writing this fix.
   function handleContactClick(event: MouseEvent<HTMLAnchorElement>) {
     if (isModifiedClick(event)) return;
     onNavigate();
@@ -235,203 +137,68 @@ export function GalleryProjectModal({
             )}
           </div>
 
-          {!isEditing ? (
-            <div className="flex flex-col">
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="font-heading text-2xl font-bold text-gold sm:text-3xl">
-                  {copy.title}
-                  {copy.year ? `, ${copy.year}` : ""}
-                </h2>
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={startEditing}
-                    disabled={isLoadingEdit}
-                    className="flex shrink-0 items-center gap-1.5 rounded-sm border border-border-gold/60 px-3 py-1.5 text-xs font-semibold text-gold transition-colors duration-300 hover:bg-gold/10 disabled:opacity-50"
-                  >
-                    <Pencil size={14} aria-hidden="true" />
-                    {isLoadingEdit ? "Завантаження…" : "Редагувати інформацію"}
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-text">{copy.service}</p>
-
-              <div className="mt-4 border-t border-border-gold/40 pt-4">
-                <h3 className="flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-gold">
-                  <User size={18} aria-hidden="true" />
-                  {dict.gallery.modal.clientRequestLabel}
-                </h3>
-                <p className="mt-2 text-sm text-muted">{copy.clientRequest}</p>
-              </div>
-
-              <div className="mt-4 border-t border-border-gold/40 pt-4">
-                <h3 className="flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-gold">
-                  <ClipboardCheck size={18} aria-hidden="true" />
-                  {dict.gallery.modal.checkedLabel}
-                </h3>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {copy.completedItems.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-sm text-muted">
-                      <Check size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="mt-4 border-t border-border-gold/40 pt-4">
-                <h3 className="flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-gold">
-                  <ShieldCheck size={18} aria-hidden="true" />
-                  {dict.gallery.modal.resultLabel}
-                </h3>
-                <p className="mt-2 text-sm text-muted">{copy.result}</p>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <GoldLink
-                  href={`/${locale}#contacts`}
-                  onClick={handleContactClick}
-                  variant="solid"
-                  className="w-full whitespace-nowrap sm:w-auto"
-                >
-                  <Car size={16} aria-hidden="true" />
-                  {dict.common.consultationCta}
-                </GoldLink>
-                <GoldLink
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="outline"
-                  className="whatsapp-cta w-full whitespace-nowrap sm:w-auto"
-                >
-                  <WhatsAppIcon className="h-4 w-4" />
-                  {dict.common.whatsappCta}
-                </GoldLink>
-              </div>
+          <div className="flex flex-col">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-heading text-2xl font-bold text-gold sm:text-3xl">
+                {copy.title}
+                {copy.year ? `, ${copy.year}` : ""}
+              </h2>
             </div>
-          ) : (
-            editCopy && (
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-heading text-lg font-bold text-gold">Редагування інформації</h2>
-                  <div className="flex gap-1 rounded-sm border border-border-gold/50 p-0.5">
-                    {locales.map((loc) => (
-                      <button
-                        key={loc}
-                        type="button"
-                        onClick={() => setEditLocale(loc)}
-                        className={`rounded-sm px-2.5 py-1 text-xs font-semibold transition-colors duration-300 ${
-                          loc === editLocale ? "bg-gold text-[#0a0a0a]" : "text-gold hover:bg-gold/10"
-                        }`}
-                      >
-                        {EDIT_LOCALE_LABEL[loc]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <p className="mt-1 text-text">{copy.service}</p>
 
-                <label className="mt-4 flex flex-col gap-1 text-xs font-semibold tracking-wide text-gold">
-                  Назва автомобіля
-                  <input
-                    type="text"
-                    value={editCopy.title}
-                    onChange={(event) => updateField("title", event.target.value)}
-                    className="rounded-sm border border-border-gold/50 bg-surface px-3 py-2 text-sm font-normal text-text focus-visible:border-gold focus-visible:outline-none"
-                  />
-                </label>
+            <div className="mt-4 border-t border-border-gold/40 pt-4">
+              <h3 className="flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-gold">
+                <User size={18} aria-hidden="true" />
+                {dict.gallery.modal.clientRequestLabel}
+              </h3>
+              <p className="mt-2 text-sm text-muted">{copy.clientRequest}</p>
+            </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-1 text-xs font-semibold tracking-wide text-gold">
-                    Рік
-                    <input
-                      type="text"
-                      value={editCopy.year}
-                      onChange={(event) => updateField("year", event.target.value)}
-                      className="rounded-sm border border-border-gold/50 bg-surface px-3 py-2 text-sm font-normal text-text focus-visible:border-gold focus-visible:outline-none"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs font-semibold tracking-wide text-gold">
-                    Послуга
-                    <input
-                      type="text"
-                      value={editCopy.service}
-                      onChange={(event) => updateField("service", event.target.value)}
-                      className="rounded-sm border border-border-gold/50 bg-surface px-3 py-2 text-sm font-normal text-text focus-visible:border-gold focus-visible:outline-none"
-                    />
-                  </label>
-                </div>
+            <div className="mt-4 border-t border-border-gold/40 pt-4">
+              <h3 className="flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-gold">
+                <ClipboardCheck size={18} aria-hidden="true" />
+                {dict.gallery.modal.checkedLabel}
+              </h3>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {copy.completedItems.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-muted">
+                    <Check size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-                <label className="mt-3 flex flex-col gap-1 text-xs font-semibold tracking-wide text-gold">
-                  Запит клієнта
-                  <textarea
-                    value={editCopy.clientRequest}
-                    onChange={(event) => updateField("clientRequest", event.target.value)}
-                    rows={2}
-                    className="rounded-sm border border-border-gold/50 bg-surface px-3 py-2 text-sm font-normal text-text focus-visible:border-gold focus-visible:outline-none"
-                  />
-                </label>
+            <div className="mt-4 border-t border-border-gold/40 pt-4">
+              <h3 className="flex items-center gap-2 font-heading text-sm font-semibold tracking-wide text-gold">
+                <ShieldCheck size={18} aria-hidden="true" />
+                {dict.gallery.modal.resultLabel}
+              </h3>
+              <p className="mt-2 text-sm text-muted">{copy.result}</p>
+            </div>
 
-                <div className="mt-3 flex flex-col gap-1 text-xs font-semibold tracking-wide text-gold">
-                  Що перевірили
-                  <div className="flex flex-col gap-1.5">
-                    {editCopy.completedItems.map((item, index) => (
-                      <div key={index} className="flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          value={item}
-                          onChange={(event) => updateCompletedItem(index, event.target.value)}
-                          className="flex-1 rounded-sm border border-border-gold/50 bg-surface px-3 py-1.5 text-sm font-normal text-text focus-visible:border-gold focus-visible:outline-none"
-                        />
-                        <button
-                          type="button"
-                          aria-label="Видалити пункт"
-                          onClick={() => removeCompletedItem(index)}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-border-gold/50 text-gold hover:bg-gold/10"
-                        >
-                          <Trash2 size={14} aria-hidden="true" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addCompletedItem}
-                    className="mt-1 flex w-fit items-center gap-1 text-xs font-semibold text-gold hover:text-gold-light"
-                  >
-                    <Plus size={14} aria-hidden="true" />
-                    Додати пункт
-                  </button>
-                </div>
-
-                <label className="mt-3 flex flex-col gap-1 text-xs font-semibold tracking-wide text-gold">
-                  Результат
-                  <textarea
-                    value={editCopy.result}
-                    onChange={(event) => updateField("result", event.target.value)}
-                    rows={2}
-                    className="rounded-sm border border-border-gold/50 bg-surface px-3 py-2 text-sm font-normal text-text focus-visible:border-gold focus-visible:outline-none"
-                  />
-                </label>
-
-                {editError && <p className="mt-3 text-sm text-gold-light">{editError}</p>}
-
-                <div className="mt-4 flex gap-3">
-                  <GoldButton
-                    type="button"
-                    variant="solid"
-                    onClick={saveEditing}
-                    disabled={isSaving}
-                    className="disabled:opacity-50"
-                  >
-                    {isSaving ? "Збереження…" : "Зберегти"}
-                  </GoldButton>
-                  <GoldButton type="button" variant="outline" onClick={cancelEditing} disabled={isSaving}>
-                    Скасувати
-                  </GoldButton>
-                </div>
-              </div>
-            )
-          )}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <GoldLink
+                href={`/${locale}#contacts`}
+                onClick={handleContactClick}
+                variant="solid"
+                className="w-full whitespace-nowrap sm:w-auto"
+              >
+                <Car size={16} aria-hidden="true" />
+                {dict.common.consultationCta}
+              </GoldLink>
+              <GoldLink
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="outline"
+                className="whatsapp-cta w-full whitespace-nowrap sm:w-auto"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
+                {dict.common.whatsappCta}
+              </GoldLink>
+            </div>
+          </div>
         </div>
       </div>
     </div>

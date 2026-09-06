@@ -1,0 +1,616 @@
+{
+  "publishedAt": "2026-09-06T00:00:00.000Z",
+  "cars": [
+    {
+      "id": "suzuki-sx4-s-cross",
+      "order": 1,
+      "saleStatus": "for-sale",
+      "year": "2020",
+      "price": "£9,500",
+      "mileageValue": 47170,
+      "photos": [
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/0/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/1/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/2/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/3/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/4/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/5/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/6/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/7/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/8/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/9/image.jpg"
+        }
+      ],
+      "video": {
+        "mode": "none",
+        "src": "",
+        "posterSrc": ""
+      },
+      "uk": {
+        "title": "Suzuki SX4 S-Cross",
+        "specLine": "1.4 Turbo • Бензин • Автомат",
+        "description": "",
+        "viewGalleryLabel": "Переглянути 10 фото"
+      },
+      "en": {
+        "title": "Suzuki SX4 S-Cross",
+        "specLine": "1.4 Turbo • Petrol • Automatic",
+        "description": "",
+        "viewGalleryLabel": "View 10 photos"
+      },
+      "ru": {
+        "title": "Suzuki SX4 S-Cross",
+        "specLine": "1.4 Turbo • Бензин • Автомат",
+        "description": "",
+        "viewGalleryLabel": "Посмотреть 10 фото"
+      }
+    },
+    {
+      "id": "dacia-sandero-2022",
+      "order": 2,
+      "saleStatus": "for-sale",
+      "year": "2022",
+      "price": "£9,400",
+      "mileageValue": 6150,
+      "photos": [
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/0/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/1/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/2/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/3/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/4/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/5/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/6/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/7/image.jpg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/8/image.jpg"
+        }
+      ],
+      "video": {
+        "mode": "legacy-file",
+        "src": "/images/cms/cars/dacia-sandero-2022/video/dacia-walkaround.mp4",
+        "posterSrc": "/images/cms/cars/dacia-sandero-2022/photos/0/image.jpg"
+      },
+      "uk": {
+        "title": "Dacia Sandero",
+        "specLine": "1.0 Turbo • Бензин • Автомат",
+        "description": "",
+        "viewGalleryLabel": "Переглянути 9 фото і 1 відео"
+      },
+      "en": {
+        "title": "Dacia Sandero",
+        "specLine": "1.0 Turbo • Petrol • Automatic",
+        "description": "",
+        "viewGalleryLabel": "View 9 photos and 1 video"
+      },
+      "ru": {
+        "title": "Dacia Sandero",
+        "specLine": "1.0 Turbo • Бензин • Автомат",
+        "description": "",
+        "viewGalleryLabel": "Посмотреть 9 фото и 1 видео"
+      }
+    },
+    {
+      "id": "dacia-sandero-comfort-2019",
+      "order": 3,
+      "saleStatus": "for-sale",
+      "year": "2019",
+      "price": "£3,300",
+      "mileageValue": 42488,
+      "photos": [
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/1/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/2/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/3/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/4/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/5/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/6/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/7/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/8/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/9/image.jpeg"
+        },
+        {
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/10/image.jpeg"
+        }
+      ],
+      "video": {
+        "mode": "legacy-file",
+        "src": "/images/cms/cars/dacia-sandero-comfort-2019/video/12-walkaround.mp4",
+        "posterSrc": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
+      },
+      "uk": {
+        "title": "Dacia Sandero Comfort",
+        "specLine": "1.0 Turbo • Бензин • Механічна • Сірий",
+        "description": "",
+        "viewGalleryLabel": "Переглянути 11 фото і 1 відео"
+      },
+      "en": {
+        "title": "Dacia Sandero Comfort",
+        "specLine": "1.0 Turbo • Petrol • Manual • Grey",
+        "description": "",
+        "viewGalleryLabel": "View 11 photos and 1 video"
+      },
+      "ru": {
+        "title": "Dacia Sandero Comfort",
+        "specLine": "1.0 Turbo • Бензин • Механическая • Серый",
+        "description": "",
+        "viewGalleryLabel": "Посмотреть 11 фото и 1 видео"
+      }
+    }
+  ],
+  "gallery": [
+    {
+      "id": "maserati-levante",
+      "order": 1,
+      "kind": "album",
+      "year": "2022",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/0/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/1/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/2/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/3/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/4/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/5/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/6/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/maserati-levante/photos/7/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Мазераті Леванте",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Автопідбір під ключ",
+        "clientRequest": "Вибрати надійний, технічно справний, гарний автомобіль відповідно до побажань і бюджету клієнта.",
+        "completedItems": [
+          "Кузов і лакофарбове покриття. Комп'ютерна діагностика. Помилок не виявлено."
+        ],
+        "result": "Рекомендовано до купівлі"
+      },
+      "en": {
+        "title": "Maserati Levante",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Turnkey car sourcing",
+        "clientRequest": "Select a reliable, technically sound, attractive car matching the client's preferences and budget.",
+        "completedItems": [
+          "Bodywork and paintwork. Computer diagnostics. No faults found."
+        ],
+        "result": "Recommended for purchase"
+      },
+      "ru": {
+        "title": "Мазерати Леванте",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Подбор автомобиля под ключ",
+        "clientRequest": "Выбрать надёжный, технически исправный, красивый автомобиль в соответствии с пожеланиями и бюджетом клиента.",
+        "completedItems": [
+          "Кузов и лакокрасочное покрытие. Компьютерная диагностика. Ошибок не выявлено."
+        ],
+        "result": "Рекомендовано к покупке"
+      }
+    },
+    {
+      "id": "volvo-xc60-d5",
+      "order": 2,
+      "kind": "album",
+      "year": "2018",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/1/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/2/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/3/image.jpg",
+          "caption": ""
+        },
+        {
+          "image": "/images/cms/gallery/volvo-xc60-d5/photos/4/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Volvo XC60 D5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Автопідбір під ключ",
+        "clientRequest": "Знайти надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
+        "completedItems": [
+          "Проведено комплексну перевірку автомобіля: комп'ютерну діагностику всіх систем і вузлів, огляд кузова, лакофарбового покриття та зазорів, перевірку рівня й стану мастил і технічних рідин, а також тест-драйв. Помилок, слідів повторного фарбування та суттєвих дефектів не виявлено."
+        ],
+        "result": "Рекомендовано до купівлі"
+      },
+      "en": {
+        "title": "Volvo XC60 D5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Volvo XC60 D5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-01",
+      "order": 10,
+      "kind": "showcase",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-01/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 1",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 1",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 1",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-02",
+      "order": 11,
+      "kind": "showcase",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-02/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 2",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 2",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 2",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-03",
+      "order": 12,
+      "kind": "showcase",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-03/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 3",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 3",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 3",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-04",
+      "order": 13,
+      "kind": "showcase",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-04/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 4",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 4",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 4",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-05",
+      "order": 14,
+      "kind": "showcase",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-05/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 5",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "showcase-06",
+      "order": 15,
+      "kind": "showcase",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/showcase-06/photos/0/image.jpg",
+          "caption": ""
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "Автомобіль — фото 6",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Послуга уточнюється",
+        "clientRequest": "Інформація уточнюється.",
+        "completedItems": [
+          "Інформація уточнюється"
+        ],
+        "result": "Інформація уточнюється."
+      },
+      "en": {
+        "title": "Vehicle — photo 6",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Service to be confirmed",
+        "clientRequest": "Information to be confirmed.",
+        "completedItems": [
+          "Information to be confirmed"
+        ],
+        "result": "Information to be confirmed."
+      },
+      "ru": {
+        "title": "Автомобиль — фото 6",
+        "shortDescription": "",
+        "longDescription": "",
+        "service": "Услуга уточняется",
+        "clientRequest": "Информация уточняется.",
+        "completedItems": [
+          "Информация уточняется"
+        ],
+        "result": "Информация уточняется."
+      }
+    }
+  ]
+}
