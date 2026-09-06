@@ -1,0 +1,87 @@
+# PROPOSED — owner applies this by moving it to .github/workflows/content-guard.yml
+# (kept here because this session's token has no `workflow` scope).
+#
+# What it does (report/37 §2–4):
+#   On a push to the content branch, it
+#     1. checks the branch changed NOTHING outside the content allowlist
+#        { src/content/cms/published.json, src/content/cms/review-state.json,
+#          public/images/cms/** };
+#     2. runs `npm run content:guard` (validates the snapshot structure,
+#        language readiness, review-hash correspondence, media paths/types,
+#        rejects traversal/symlink/executables);
+#     3. if both pass, fast-forwards ONLY those files into `main`.
+#   Code changes on the content branch -> step 1 fails -> no merge.
+#   The content branch's code is NEVER executed with the merge token: only
+#   this workflow file (from `main`) runs, and it only runs `npm ci` + the
+#   guard script from `main`'s checkout.
+
+name: content-guard
+
+on:
+  push:
+    branches: ["panel/content"] # the PANEL_CONTENT_BRANCH
+
+permissions:
+  contents: write
+
+concurrency:
+  group: content-guard
+  cancel-in-progress: false
+
+jobs:
+  guard-and-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Check out MAIN (trusted) — the guard code and workflow come from here,
+      # never from the pushed content branch.
+      - name: Checkout main (trusted)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install (from main)
+        run: npm ci
+
+      - name: Fetch the pushed content commit
+        run: git fetch origin "${{ github.sha }}"
+
+      - name: Reject any change outside the content allowlist
+        run: |
+          base="$(git merge-base main "${{ github.sha }}")"
+          changed="$(git diff --name-only "$base" "${{ github.sha }}")"
+          echo "Changed files:"; echo "$changed"
+          bad="$(echo "$changed" | grep -vE '^(src/content/cms/(published|review-state)\.json|public/images/cms/.*)$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::Content branch touched non-content files:"; echo "$bad"; exit 1
+          fi
+
+      - name: Validate the snapshot + media (content:guard, from main)
+        run: |
+          git show "${{ github.sha }}:src/content/cms/published.json" > /tmp/published.json
+          git show "${{ github.sha }}:src/content/cms/review-state.json" > /tmp/review.json || echo '{}' > /tmp/review.json
+          rm -rf /tmp/media && mkdir -p /tmp/media
+          git archive "${{ github.sha }}" -- public/images/cms | tar -x -C /tmp/media || true
+          npm run content:guard -- \
+            --published /tmp/published.json --review /tmp/review.json \
+            --media-root /tmp/media --manifest-out /tmp/manifest.txt
+
+      - name: Merge ONLY the manifest files into main
+        run: |
+          git config user.name "content-guard"
+          git config user.email "content-guard@users.noreply.github.com"
+          git checkout main
+          # check out exactly the files the guard approved — never a directory
+          xargs -a /tmp/manifest.txt git checkout "${{ github.sha }}" --
+          git add -A
+          git diff --cached --quiet && { echo "nothing to publish"; exit 0; }
+          git commit -m "content: publish $(date -u +%FT%TZ) (guarded ${{ github.sha }})"
+          git push origin main
