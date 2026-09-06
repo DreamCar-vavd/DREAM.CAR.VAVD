@@ -13,6 +13,7 @@ import { getSocialLinks } from "@/lib/social";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { DraftPreviewBanner } from "@/components/DraftPreviewBanner";
+import { readSiteContent } from "@/lib/content/siteContent";
 import "../globals.css";
 
 const heading = Playfair_Display({
@@ -85,7 +86,8 @@ export default async function LocaleLayout({
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
   const social = getSocialLinks();
-  const isDraftPreview = (await draftMode()).isEnabled;
+  const inDraftMode = (await draftMode()).isEnabled;
+  const site = inDraftMode ? await readSiteContent() : null;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -113,7 +115,13 @@ export default async function LocaleLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {isDraftPreview && <DraftPreviewBanner />}
+        {inDraftMode && (
+          <DraftPreviewBanner
+            active={site?.isDraftPreview ?? false}
+            version={site?.draftVersion}
+            error={site?.draftError}
+          />
+        )}
         <SiteHeader dict={dict} locale={locale} />
         <main className="flex-1">{children}</main>
         <SiteFooter dict={dict} locale={locale} />
