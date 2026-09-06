@@ -101,15 +101,26 @@ function confirmedText(lang) {
 }
 const hash = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
-async function moveIfPresent(from, to) {
-  try {
-    await fs.access(from);
-  } catch {
-    return false;
+/**
+ * Move a media file to `to`, looking for it wherever a previous run of this
+ * script, the pre-panel layout, or a Keystatic save may have left it.
+ * Idempotent. `extraCandidates` are extra source paths to try.
+ */
+async function placeMedia(to, ...extraCandidates) {
+  const candidates = [to, ...extraCandidates];
+  for (const from of candidates) {
+    try {
+      await fs.access(from);
+    } catch {
+      continue;
+    }
+    if (path.resolve(from) === path.resolve(to)) return true;
+    await fs.mkdir(path.dirname(to), { recursive: true });
+    await fs.rename(from, to);
+    return true;
   }
-  await fs.mkdir(path.dirname(to), { recursive: true });
-  await fs.rename(from, to);
-  return true;
+  console.warn(`  ! media not found for: ${path.relative(ROOT, to)}`);
+  return false;
 }
 
 async function main() {
@@ -119,30 +130,53 @@ async function main() {
   const locks = {};
 
   for (const car of CARS) {
-    const prefix = `${car.id}--`;
+    const carDir = path.join(NEW_DIR, car.id);
     const photoEntries = [];
-    for (const name of car.photos) {
-      const target = `${prefix}${name}`;
-      await moveIfPresent(path.join(OLD_DIR, car.oldFolder, name), path.join(NEW_DIR, target));
-      photoEntries.push({ image: target, caption: "" });
+    for (let i = 0; i < car.photos.length; i++) {
+      const name = car.photos[i];
+      const ext = name.split(".").pop();
+      // Match exactly the layout Keystatic writes for an array of image
+      // fields: <directory>/<slug>/<field>/<index>/image.<ext>. The stored
+      // value is the full public path (getSrcPrefix appends the slug). Any
+      // save from the panel normalises to this, so migrating straight to it
+      // keeps the first edit's diff clean.
+      const rel = `photos/${i}/image.${ext}`;
+      await placeMedia(
+        path.join(carDir, rel),
+        path.join(carDir, name),
+        path.join(NEW_DIR, `${car.id}--${name}`),
+        path.join(OLD_DIR, car.oldFolder, name),
+      );
+      photoEntries.push({ image: `/images/cms/cars/${car.id}/${rel}` });
     }
 
     let video = { mode: "none", src: "", posterSrc: "" };
     if (car.video) {
-      const vTarget = `${prefix}${car.video.file}`;
-      await moveIfPresent(
+      // video.src is a plain text field (not fields.image) — keep it at a
+      // stable path next to the poster it reuses.
+      await placeMedia(
+        path.join(carDir, "video", car.video.file),
+        path.join(carDir, car.video.file),
+        path.join(NEW_DIR, `${car.id}--${car.video.file}`),
         path.join(OLD_DIR, car.oldFolder, car.video.file),
-        path.join(NEW_DIR, vTarget),
       );
+      const posterIdx = car.photos.indexOf(car.video.poster);
+      const posterExt = car.video.poster.split(".").pop();
       video = {
         mode: car.video.mode,
-        src: `/images/cms/cars/${vTarget}`,
-        posterSrc: `/images/cms/cars/${prefix}${car.video.poster}`,
+        src: `/images/cms/cars/${car.id}/video/${car.video.file}`,
+        posterSrc:
+          posterIdx >= 0
+            ? `/images/cms/cars/${car.id}/photos/${posterIdx}/image.${posterExt}`
+            : `/images/cms/cars/${car.id}/video/${car.video.poster}`,
       };
     }
 
     const withReview = (lang) => ({ ...lang, reviewState: "confirmed" });
     const record = {
+      // fields.slug stores its "name" here; the filename is the slug. Keep
+      // them identical so the stable id is unambiguous.
+      id: car.id,
       order: car.order,
       publishState: car.publishState,
       saleStatus: car.saleStatus,
@@ -175,9 +209,22 @@ async function main() {
     "utf8",
   );
 
-  // Drop the now-empty old folders (files were moved out).
-  for (const car of CARS) {
-    await fs.rm(path.join(OLD_DIR, car.oldFolder), { recursive: true, force: true });
+  // Drop pre-panel / flat / intermediate leftovers.
+  await fs.rm(OLD_DIR, { recursive: true, force: true });
+  for (const f of await fs.readdir(NEW_DIR)) {
+    const full = path.join(NEW_DIR, f);
+    if (f.includes("--")) {
+      await fs.rm(full, { force: true });
+      continue;
+    }
+    // Inside each car folder keep only photos/ and video/.
+    if ((await fs.stat(full)).isDirectory()) {
+      for (const inner of await fs.readdir(full)) {
+        if (inner !== "photos" && inner !== "video") {
+          await fs.rm(path.join(full, inner), { recursive: true, force: true });
+        }
+      }
+    }
   }
   console.log("\nMigration complete. Review: git status");
 }

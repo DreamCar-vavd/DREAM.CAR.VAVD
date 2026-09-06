@@ -136,8 +136,11 @@ export default config({
           fields.object({
             image: fields.image({
               label: "Фото",
+              // Keystatic stores car images per entry:
+              // public/images/cms/cars/<id>/<file>. The stored value is the
+              // full public path (getSrcPrefix appends the slug).
               directory: "public/images/cms/cars",
-              publicPath: "/images/cms/cars/",
+              publicPath: "/images/cms/cars",
               validation: { isRequired: true },
             }),
             caption: fields.text({ label: "Підпис / alt (необов'язково)" }),

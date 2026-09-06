@@ -37,17 +37,20 @@ const publicCsp = `
  *    avatars.githubusercontent.com — required only in GitHub storage mode
  *    (hosted panel): the API calls that read/write content and the sign-in
  *    redirect. Harmless in local mode.
- * `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
- * `script-src` (NO unsafe-eval — React needs it only in `next dev`) are kept
- * exactly as strict as the public site.
+ * `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` are kept
+ * exactly as strict as the public site. `'unsafe-eval'` is added to
+ * `script-src` ONLY in development (`next dev`) — React's dev build needs it
+ * and Keystatic's editor overlay is otherwise unusable locally; `next build`
+ * output does not need it (verified) so production `script-src` stays strict.
  */
+const devUnsafeEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
 const panelCsp = `
   default-src 'self';
   base-uri 'self';
   object-src 'none';
   frame-ancestors 'none';
   form-action 'self' https://github.com;
-  script-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline'${devUnsafeEval};
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   img-src 'self' data: blob: https://avatars.githubusercontent.com;
   font-src 'self' data: https://fonts.gstatic.com;
