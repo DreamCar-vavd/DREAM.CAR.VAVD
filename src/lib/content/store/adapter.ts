@@ -72,9 +72,17 @@ export interface PanelStorage {
   deployStatus(): Promise<DeployStatus>;
 }
 
+export interface DeployMeta {
+  url?: string;
+  /** GitHub deployment `environment` (e.g. "Production", "Preview"). */
+  environment?: string;
+  /** true when the target is NOT the production site (a test branch). */
+  isTest?: boolean;
+}
 export type DeployStatus =
   | { state: "n/a" }
   | { state: "none" }
-  | { state: "pending"; url?: string }
-  | { state: "ready"; url?: string }
-  | { state: "error"; url?: string };
+  | ({ state: "unknown"; reason: string } & DeployMeta)
+  | ({ state: "pending" } & DeployMeta)
+  | ({ state: "ready" } & DeployMeta)
+  | ({ state: "error" } & DeployMeta);

@@ -116,21 +116,39 @@ export class GitHubStorage implements PanelStorage {
   }
 
   async deployStatus(): Promise<DeployStatus> {
+    const isTest = this.cfg.branch !== "main";
     const sha = await this.branchHeadSha();
-    if (!sha) return { state: "none" };
-    const list = await this.gh(this.repoUrl(`/deployments?sha=${sha}&per_page=1`));
+    if (!sha) return { state: "unknown", reason: "не вдалося визначити останній коміт гілки", isTest };
+
+    // Newest deployment for this exact commit (there can be several).
+    const list = await this.gh(this.repoUrl(`/deployments?sha=${sha}&per_page=10`));
+    if (list.status === 403) {
+      return {
+        state: "unknown",
+        reason: "немає доступу до стану deployment (потрібен дозвіл App «Deployments: Read») або обмеження GitHub API",
+        isTest,
+      };
+    }
     if (list.status !== 200 || !Array.isArray(list.body) || list.body.length === 0) {
       return { state: "none" };
     }
-    const id = (list.body[0] as { id: number }).id;
-    const statuses = await this.gh(this.repoUrl(`/deployments/${id}/statuses?per_page=1`));
+    const deployments = (list.body as { id: number; environment?: string; created_at: string }[])
+      .slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const d = deployments[0];
+    const environment = d.environment;
+
+    const statuses = await this.gh(this.repoUrl(`/deployments/${d.id}/statuses?per_page=1`));
+    if (statuses.status === 403) {
+      return { state: "unknown", reason: "немає доступу до статусів deployment", environment, isTest };
+    }
     if (statuses.status !== 200 || !Array.isArray(statuses.body) || statuses.body.length === 0) {
-      return { state: "pending" };
+      return { state: "pending", environment, isTest };
     }
     const s = statuses.body[0] as { state: string; environment_url?: string; target_url?: string };
     const url = s.environment_url || s.target_url;
-    if (s.state === "success") return { state: "ready", url };
-    if (s.state === "error" || s.state === "failure") return { state: "error", url };
-    return { state: "pending", url };
+    if (s.state === "success") return { state: "ready", url, environment, isTest };
+    if (s.state === "error" || s.state === "failure") return { state: "error", url, environment, isTest };
+    return { state: "pending", url, environment, isTest };
   }
 }

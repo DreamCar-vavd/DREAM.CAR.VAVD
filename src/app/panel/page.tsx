@@ -22,17 +22,32 @@ function DeployBanner({ deploy, mode }: { deploy: DeployStatus; mode: "local" | 
       </p>
     );
   }
+  const isTest = "isTest" in deploy && deploy.isTest;
+  const where = isTest ? "на тестовому сайті" : "в ефірі";
   const map: Record<DeployStatus["state"], { text: string; cls: string }> = {
     "n/a": { text: "", cls: "" },
     none: { text: "Деплой для поточного знімка не знайдено.", cls: "text-neutral-500" },
-    pending: { text: "⏳ Збірка виконується — зміни ще не в ефірі.", cls: "text-amber-700" },
-    ready: { text: "✅ Поточний знімок в ефірі.", cls: "text-green-700 dark:text-green-400" },
-    error: { text: "⚠️ Збірка не вдалася — в ефірі попередня версія.", cls: "text-red-600" },
+    unknown: {
+      text: `ℹ Стан збірки невідомий: ${"reason" in deploy ? deploy.reason : ""}`,
+      cls: "text-neutral-500",
+    },
+    pending: { text: `⏳ Збірка виконується — зміни ще не ${where}.`, cls: "text-amber-700" },
+    ready: {
+      text: `✅ Поточний знімок ${where}.`,
+      cls: "text-green-700 dark:text-green-400",
+    },
+    error: {
+      text: `⚠️ Збірка не вдалася — ${isTest ? "на тестовому сайті" : "в ефірі"} лишається попередня версія.`,
+      cls: "text-red-600",
+    },
   };
   const s = map[deploy.state];
   return (
-    <p className={`mt-2 flex items-center gap-2 text-xs ${s.cls}`}>
+    <p className={`mt-2 flex flex-wrap items-center gap-2 text-xs ${s.cls}`}>
       <span>{s.text}</span>
+      {"environment" in deploy && deploy.environment && (
+        <span className="text-neutral-400">({deploy.environment})</span>
+      )}
       {"url" in deploy && deploy.url && (
         <a className="underline" href={deploy.url} target="_blank" rel="noreferrer">
           відкрити

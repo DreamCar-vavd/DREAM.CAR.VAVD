@@ -157,6 +157,25 @@ test("publishItem is blocked by the gate and never writes", async () => {
   assert.equal(s.files.has("src/content/cms/published.json"), false);
 });
 
+test("publishItem re-checks working+review right before the write (TOCTOU) and aborts if they moved", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const v = await versions(s);
+  // Wrap readDir so the SECOND read (the pre-write re-check) sees a changed set.
+  const realReadDir = s.readDir.bind(s);
+  let calls = 0;
+  s.readDir = async (dir) => {
+    calls += 1;
+    if (calls > 1 && dir === "src/content/cms/cars") {
+      s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ price: "£777" }) }]);
+    }
+    return realReadDir(dir);
+  };
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal((r as { conflict?: boolean }).conflict, true);
+  assert.equal(s.files.has("src/content/cms/published.json"), false);
+});
+
 test("publishItem conflicts (no write) when the snapshot moved between view and publish", async () => {
   const s = baseStore();
   s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));

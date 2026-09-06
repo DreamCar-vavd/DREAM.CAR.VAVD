@@ -112,11 +112,14 @@ test("readDir lists the fixed dir, fetches each file, version = tree of blob sha
   assert.equal(calls.filter((c) => c.url.includes("/cars/") && c.url.includes(".json")).length, 2);
 });
 
-test("deployStatus maps GitHub deployment status to panel states", async () => {
+test("deployStatus maps GitHub deployment status to panel states + flags a test branch", async () => {
   const make = (state: string) =>
     fakeGitHub({
       "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "head1" } }),
-      "/deployments?sha=head1": () => ({ status: 200, body: [{ id: 7 }] }),
+      "/deployments?sha=head1": () => ({
+        status: 200,
+        body: [{ id: 7, environment: "Preview", created_at: "2026-09-06T00:00:00Z" }],
+      }),
       "/deployments/7/statuses": () => ({
         status: 200,
         body: [{ state, environment_url: "https://preview.example" }],
@@ -131,6 +134,37 @@ test("deployStatus maps GitHub deployment status to panel states", async () => {
     ["error", "error"],
   ] as const) {
     const s = new GitHubStorage({ ...CFG, fetchImpl: make(gh) });
-    assert.equal((await s.deployStatus()).state, want, `${gh} -> ${want}`);
+    const d = await s.deployStatus();
+    assert.equal(d.state, want, `${gh} -> ${want}`);
+    assert.equal("isTest" in d && d.isTest, true); // branch codex/test != main
+    assert.equal("environment" in d && d.environment, "Preview");
   }
+});
+
+test("deployStatus reports 'unknown' (not a false 'ready') when it lacks Deployments:Read", async () => {
+  const { impl } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "head1" } }),
+    "/deployments?sha=head1": () => ({ status: 403, body: { message: "Resource not accessible" } }),
+  });
+  const s = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const d = await s.deployStatus();
+  assert.equal(d.state, "unknown");
+  assert.match("reason" in d ? d.reason : "", /Deployments: Read|обмеження/);
+});
+
+test("deployStatus picks the newest deployment when several exist for one SHA", async () => {
+  const { impl } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "head1" } }),
+    "/deployments?sha=head1": () => ({
+      status: 200,
+      body: [
+        { id: 1, environment: "Preview", created_at: "2026-09-06T10:00:00Z" },
+        { id: 2, environment: "Preview", created_at: "2026-09-06T12:00:00Z" },
+      ],
+    }),
+    "/deployments/2/statuses": () => ({ status: 200, body: [{ state: "success" }] }),
+    "/deployments/1/statuses": () => ({ status: 200, body: [{ state: "error" }] }),
+  });
+  const s = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  assert.equal((await s.deployStatus()).state, "ready");
 });

@@ -264,6 +264,18 @@ export async function publishItem(
         ? nextList
         : coerceSnapshotList(KINDS.gallery, snapshot.gallery),
   };
+
+  // Close the read→verify→write TOCTOU window: re-read the working set and
+  // review right before committing and abort if either moved (a parallel
+  // Keystatic save / another panel confirm). The blob-SHA guard on
+  // published.json covers a parallel publish; this covers the source data
+  // the snapshot was built from. Whole-group atomicity across files would
+  // need a single file or a lock — see report/36 §7.
+  const recheck = await loadKind(storage, kindKey);
+  if (recheck.workingVersion !== expected.working || recheck.reviewVersion !== expected.review) {
+    return { ok: false, conflict: true, message: new ConflictError("контент").message };
+  }
+
   try {
     await storage.writeFile(
       PUBLISHED,
@@ -273,10 +285,14 @@ export async function publishItem(
   } catch (err) {
     return asConflict(err) ?? { ok: false, message: `Публікація не вдалася: ${(err as Error).message}` };
   }
+  const tail =
+    storage.mode === "github"
+      ? " Очікуйте завершення збірки (1–3 хв), стан — угорі сторінки."
+      : " Зміни на сайті.";
   return {
     ok: true,
     message: kind.isRenderable(item)
-      ? `Опубліковано.${storage.mode === "github" ? " Очікуйте завершення збірки (1–3 хв)." : " Зміни на сайті."}`
+      ? `Опубліковано.${tail}`
       : `Опубліковано. «${id}» приховане публічно, картка збережена.`,
   };
 }
