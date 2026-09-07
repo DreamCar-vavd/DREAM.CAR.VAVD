@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getLeadsStore, LeadsNotConfiguredError } from "./store";
+import { getLeadsStore } from "./store";
 
 test("with no LEADS_DATABASE_URL, the store is the demo store and every row is flagged demo", async () => {
   delete process.env.LEADS_DATABASE_URL;
@@ -52,13 +52,13 @@ test("get() returns one demo row by id, null for anything else", async () => {
   assert.equal(await store.get("../secrets"), null);
 });
 
-test("a set LEADS_DATABASE_URL does NOT silently fall back to demo data", async () => {
-  process.env.LEADS_DATABASE_URL = "postgres://example/db";
+test("a set LEADS_DATABASE_URL selects the Postgres store, never demo data", async () => {
+  process.env.LEADS_DATABASE_URL = "postgres://user:pass@127.0.0.1:1/nonexistent";
   try {
     const store = await getLeadsStore();
     assert.equal(store.kind, "database");
-    // adapter not implemented -> reading throws, it does NOT return demo rows
-    await assert.rejects(() => store.list({ limit: 5 }), LeadsNotConfiguredError);
+    // An unreachable DB throws a connection error — it does NOT return demo rows.
+    await assert.rejects(() => store.list({ limit: 5 }));
   } finally {
     delete process.env.LEADS_DATABASE_URL;
   }

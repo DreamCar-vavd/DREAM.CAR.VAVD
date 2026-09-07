@@ -13,7 +13,8 @@
     "content:check": "node scripts/content-check.mjs",
     "content:guard": "node --import tsx scripts/content-guard.ts",
     "content:migrate": "node scripts/migrate-content.mjs",
-    "content:export": "node scripts/content-export.mjs"
+    "content:export": "node scripts/content-export.mjs",
+    "leads:migrate": "node scripts/leads-migrate.mjs"
   },
   "dependencies": {
     "@keystatic/core": "^0.6.9",
@@ -22,6 +23,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "lucide-react": "^1.28.0",
     "next": "16.3.0",
+    "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1"
@@ -29,6 +31,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

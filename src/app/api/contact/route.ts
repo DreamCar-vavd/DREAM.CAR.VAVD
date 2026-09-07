@@ -68,20 +68,11 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: false, code: "INVALID_PAYLOAD" }, 400);
   }
 
-  const endpoint = resolveAllowedEndpoint(process.env.CONTACT_FORM_ENDPOINT);
-  if (!endpoint) {
-    return jsonResponse({ ok: false, code: "NOT_CONFIGURED" }, 503);
-  }
-
   // Durable record (panel database) — an INDEPENDENT sink, tried BEFORE email
-  // so a captured lead survives an email outage. `null` when no database is
-  // configured -> this whole block is a no-op and the email path is unchanged.
-  // Never throws out of here, never logs personal data.
-  // Durable record (panel database) — an INDEPENDENT sink, tried BEFORE email
-  // so a captured lead survives an email outage. `null` when no database is
-  // configured -> no-op, the email path is unchanged. Never throws out of
-  // here, never logs personal data.
-  const leadsStore = getWritableLeadsStore();
+  // so a captured lead survives an email outage or a missing email endpoint.
+  // `null` when no database is configured -> no-op, the email path is exactly
+  // as before. Never throws out of here, never logs personal data.
+  const leadsStore = await getWritableLeadsStore();
   let savedToDb = false;
   if (leadsStore) {
     try {
@@ -91,6 +82,15 @@ export async function POST(request: Request) {
     } catch {
       console.warn("[contact] lead DB write failed; continuing with email only");
     }
+  }
+
+  const endpoint = resolveAllowedEndpoint(process.env.CONTACT_FORM_ENDPOINT);
+  if (!endpoint) {
+    // Email not set up. If the lead was still saved, report success with a
+    // code; otherwise keep the original 503.
+    return savedToDb
+      ? jsonResponse({ ok: true, code: "SAVED_EMAIL_FAILED" }, 200)
+      : jsonResponse({ ok: false, code: "NOT_CONFIGURED" }, 503);
   }
 
   const controller = new AbortController();

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
-import { getLeadsStore, LeadsNotConfiguredError, type Lead } from "@/lib/leads/store";
+import { getLeadsStore, type Lead } from "@/lib/leads/store";
 
 export const dynamic = "force-dynamic";
 
@@ -80,23 +80,7 @@ export default async function LeadsPage({
   }
 
   const { cursor } = await searchParams;
-
-  let store;
-  try {
-    store = await getLeadsStore();
-  } catch (err) {
-    if (err instanceof LeadsNotConfiguredError) {
-      return (
-        <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-xl font-bold">Заявки</h1>
-          <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300">
-            {err.message} Перевірте змінну середовища <code>LEADS_DATABASE_URL</code>.
-          </p>
-        </main>
-      );
-    }
-    throw err;
-  }
+  const store = await getLeadsStore();
 
   let page;
   let loadError: string | null = null;
