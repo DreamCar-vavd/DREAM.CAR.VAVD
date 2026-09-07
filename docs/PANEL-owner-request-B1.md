@@ -43,41 +43,69 @@
 ## Діагностика першої спроби (2026-09-07)
 
 Перша спроба власника впала: GitHub показав **«We didn't find an App Manifest
-for your request.»**, а в консолі — попередження React про `value` без
-`onChange` на службовому `input[name="manifest"]`.
+for your request.»**. На фото власника видно, що **він уже був залогінений**, а
+екран був **«Confirm access»** (GitHub sudo-режим — повторне підтвердження
+особи перед створенням App). У консолі також було попередження React про
+`value` без `onChange` на `input[name="manifest"]`.
 
-**Перевірено (не припущення):**
+**Що доведено:**
 
 - **Попередження React — НЕ причина.** У браузері `new FormData(form).get("manifest")`
   повертає повний валідний JSON (409 символів), `input.readOnly === false`,
   `input.disabled === false`, форма — `POST` `application/x-www-form-urlencoded`
   на `https://github.com/settings/apps/new`. Read-only поле все одно
-  відправляється. Попередження походить із зібраного `keystatic-core-ui.js`
-  (вендорний код) — косметичне, `node_modules` не патчимо, перевірки не
-  вимикаємо.
-- **Маніфест доходить до GitHub і приймається.** Відтворення тим самим тілом
-  (`curl -X POST … --data-urlencode "manifest=<json>"`) → GitHub відповідає
-  `302 → https://github.com/settings/apps/manifest` і ставить cookie
-  `app_manifest_token=…` з **терміном життя ~5 хвилин** (`expires` через 5 хв,
-  `HttpOnly; SameSite=Lax`). Помилкової сторінки немає — маніфест прийнято.
-- **Сторінка підтвердження вимагає входу.** `GET /settings/apps/manifest` без
-  активної сесії GitHub → `302 → /login?return_to=/settings/apps/manifest`.
+  відправляється. Попередження — із зібраного `keystatic-core-ui.js` (вендор),
+  косметичне; `node_modules` не патчимо, перевірки не вимикаємо.
+- **Маніфест доходить до GitHub і приймається.** `curl -X POST …
+  --data-urlencode "manifest=<той самий json>"` → GitHub відповідає
+  `302 → /settings/apps/manifest` і ставить cookie `app_manifest_token=…`.
+  Помилкової сторінки немає — тіло маніфесту прийняте.
 
-**Підтверджена причина:** GitHub тримає надісланий маніфест на своєму боці за
-короткоживучим cookie `app_manifest_token` (~5 хв). Якщо власник **не був
-залогінений** у GitHub у тому самому браузері, ланцюг «POST → редірект на
-логін → пароль → 2FA/SSO/passkey → назад» перевищує 5 хвилин, cookie згасає, і
-`/settings/apps/manifest` каже «We didn't find an App Manifest for your
-request». (Окремий 1-годинний ліміт із доків GitHub — це вже `code` на кроці
-`redirect_url` → `/app-manifests/{code}/conversions`, інша річ.)
+**Що виміряно, але НЕ доведено як причину саме цього збою:**
 
-**Мінімальне усунення:** увійти в GitHub у цьому браузері **до** відкриття
-setup-сторінки й пройти екран GitHub швидко (значно менше 5 хв). Тоді
-POST одразу відкриває заповнену сторінку без гаку на логін. Провалена спроба
-**нічого не створює** — можна просто перезавантажити setup і клікнути ще раз
-(новий маніфест, новий 5-хв cookie), дублікатів не буде.
-Якщо не спрацює й із входом наперед — детермінований запасний шлях без
-manifest-flow: §«Запасний шлях» нижче.
+- Cookie `app_manifest_token` у моєму експерименті мав `expires` через **~5 хв**
+  (`HttpOnly; SameSite=Lax`). GitHub тримає надісланий маніфест за цим cookie на
+  `/settings/apps/manifest`.
+- Що цей cookie згас **саме під час спроби власника** — **не підтверджено**.
+  Власник був залогінений, тож моя попередня версія «ланцюг логіна > 5 хв» не
+  застосовна.
+
+**Робоча гіпотеза (не факт):** проміжний екран **«Confirm access»** (sudo) між
+POST маніфесту й сторінкою `/settings/apps/manifest` додає навігаційні переходи
+й час; за цей проміжок або згасає ~5-хв cookie `app_manifest_token`, або
+sudo-редірект його не доносить — і GitHub каже «We didn't find an App Manifest
+for your request». (Окремий 1-годинний ліміт із доків GitHub — це вже `code` на
+кроці `redirect_url` → `/app-manifests/{code}/conversions`, інша річ.)
+
+**Практичне усунення (не залежить від того, яка з причин точна):**
+1. Спершу **зняти sudo наперед**: відкрити `https://github.com/settings/apps` —
+   якщо GitHub показує «Confirm access», пройти його там.
+2. **Одразу** (у ті самі 1–2 хв) відкрити локальний setup і натиснути «Create
+   GitHub App», не роблячи пауз на пересилання фото між кроками.
+3. Якщо все одно «We didn't find an App Manifest» — **не повторювати нескінченно**:
+   перейти на §«Запасний шлях» (ручне створення, без manifest-flow і без
+   5-хв вікна).
+
+Провалена спроба доходить лише до сторінки-підтвердження **до** кнопки «Create
+GitHub App» — тобто App при цій помилці **не створюється**. Але це не гарантія:
+перед новою спробою власник має звірити список (нижче).
+
+## Перед новою спробою — звірити, що App ще не створено
+
+Асистент перевірив доступним способом: публічного App зі слагом
+`dreamcar-vavd-keystatic` **не існує** (`GET /apps/dreamcar-vavd-keystatic` і
+`github.com/apps/dreamcar-vavd-keystatic` → 404). Оскільки помилка виникає **до**
+кнопки створення, найімовірніше нічого не створено. **Точну перевірку робить
+власник:**
+
+- Створені App: **`https://github.com/settings/apps`** — списку не має містити
+  «DreamCar-vavd Keystatic».
+- Встановлені на репозиторій: **`https://github.com/DreamCar-vavd/DREAM.CAR.VAVD/settings/installations`**
+  — не має бути Keystatic-App.
+
+Якщо App там уже є — **не створювати другий**: повідомити, і далі працюємо з
+наявним (додати Deployments: Read, звірити callback, за потреби перегенерувати
+client secret).
 
 ## Права: потрібне зараз vs майбутнє
 
@@ -112,34 +140,47 @@ Vercel, `main`, сервер власника на `:3000` не чіпали.
 `http://127.0.0.1:3010/keystatic/setup`
 (працює лише на цьому Mac, поки запущений підготовлений сервер).
 
-**Що власник побачить:**
-Екран **«Keystatic Setup»** з двома полями — «Deployed App URL» і «GitHub
-organization (if any)» — і синьою кнопкою **«Create GitHub App»**. Обидва поля
-**лишити порожніми** (акаунт `DreamCar-vavd` особистий, не організація; Deployed
-App URL додається в App пізніше). У консолі буде косметичне попередження React
-про `manifest` — його **ігнорувати** (див. «Діагностика» вище).
+**Що власник побачить:** екран **«Keystatic Setup»** з двома полями («Deployed
+App URL», «GitHub organization») — **лишити порожніми** — і кнопкою **«Create
+GitHub App»**. Косметичне попередження React у консолі — ігнорувати.
 
-**Що натиснути:**
-0. **Спершу відкрити `https://github.com` у ЦЬОМУ ж браузері й переконатися, що
-   вхід виконано** (видно свій аватар). Це головне — інакше 5-хвилинний cookie
-   маніфесту згасне на екрані логіна.
-1. Тоді відкрити `http://127.0.0.1:3010/keystatic/setup` → **«Create GitHub App»**
-   → відкриється сторінка GitHub «Register new GitHub App» із заповненими назвою
-   `DreamCar-vavd Keystatic`, callback і правами `contents: write`,
-   `metadata: read`, `pull_requests: read`. **Пройти її швидко** (< 5 хв).
-   Якщо натомість «We didn't find an App Manifest…» — повернутись на
-   `http://127.0.0.1:3010/keystatic/setup`, перезавантажити, клікнути ще раз
-   (нічого не створилось, дубля не буде). Двічі поспіль не вийшло → «Запасний
-   шлях» нижче.
-2. На GitHub — кнопка **«Create GitHub App»**. GitHub поверне на
-   `http://127.0.0.1:3010/api/keystatic/github/created-app`, і Keystatic
-   **сам** допише 3 значення у файл
-   `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`.
-3. GitHub → Settings → Developer settings → GitHub Apps → новий App →
-   **Permissions & events**: додати **Deployments → Read-only** → Save.
-4. Той самий App → **General**: переконатися, що **Webhook → Active** знято.
-5. Той самий App → **Install App** → акаунт `DreamCar-vavd` → **Only select
-   repositories** → вибрати **`DREAM.CAR.VAVD`** → **Install**.
+**Одна інструкція на весь процес (робити підряд, без пауз на фото):**
+
+1. **Звірити акаунт.** Відкрити `https://github.com/settings/apps` — має бути
+   акаунт **`DreamCar-vavd`** (праворуч угорі — його аватар; URL без
+   `/organizations/…`). У списку **немає** «DreamCar-vavd Keystatic» (якщо є —
+   стоп, повідомити, не створювати другий).
+2. **Зняти «Confirm access» наперед.** Якщо на кроці 1 GitHub попросив «Confirm
+   access» (sudo) — пройти його там (пароль / passkey / 2FA). Тепер вікно
+   sudo-режиму відкрите.
+3. **Відразу** відкрити `http://127.0.0.1:3010/keystatic/setup` → **«Create
+   GitHub App»**. Відкриється сторінка GitHub **«Register new GitHub App»** уже
+   заповнена.
+4. **Звірити на цій сторінці GitHub** (нічого не міняти):
+   - Name: **`DreamCar-vavd Keystatic`**
+   - Callback URL: **`http://127.0.0.1:3010/api/keystatic/github/oauth/callback`**
+   - «Request user authorization (OAuth) during installation» — **увімкнено**
+   - Repository permissions: **Contents: Read and write**, **Metadata: Read**,
+     **Pull requests: Read** (Webhook — вимкнено або без URL)
+   Якщо замість форми знову «We didn't find an App Manifest» — перезавантажити
+   `http://127.0.0.1:3010/keystatic/setup` і клікнути ще раз **один** раз.
+   Якщо і вдруге те саме — **зупинитись** і перейти на «Запасний шлях» нижче
+   (не повторювати далі).
+5. Внизу натиснути **«Create GitHub App»**. GitHub поверне на
+   `http://127.0.0.1:3010/api/keystatic/github/created-app`; Keystatic сам
+   допише 3 значення у `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`
+   і відкриє `/keystatic`.
+6. GitHub → Settings → Developer settings → GitHub Apps → **DreamCar-vavd
+   Keystatic** → **Permissions & events** → додати **Deployments → Read-only**
+   → **Save changes**. (Якщо GitHub попросить — власник підтверджує оновлення
+   дозволів для встановлення.)
+7. Той самий App → **Install App** → **`DreamCar-vavd`** → **Only select
+   repositories** → **`DREAM.CAR.VAVD`** → **Install** (або **Configure** →
+   зберегти нові дозволи, якщо вже було встановлено на кроці «OAuth during
+   installation»).
+8. Написати асистенту один рядок: **«App створено; встановлено на DREAM.CAR.VAVD;
+   у `.env` є 3 імені `KEYSTATIC_*`»** — і асистент доперевірить решту локально
+   й проведе тестовий вхід.
 
 **Які права погоджуються:**
 Repository permissions **лише** для `DreamCar-vavd/DREAM.CAR.VAVD`:
@@ -175,39 +216,41 @@ Repository permissions **лише** для `DreamCar-vavd/DREAM.CAR.VAVD`:
   приватні репозиторії; джерела — `docs/PANEL-hosting-and-approvals.md` §2).
 
 **Що повідомити після виконання:**
-Одним рядком: «App створено в акаунті DreamCar-vavd, встановлено лише на
-DREAM.CAR.VAVD, права Contents RW / Metadata R / Deployments R / Pull requests R,
-Webhook off, у `.env` є 3 імені `KEYSTATIC_*`». **Значень не надсилати.**
-Якщо повернення на `http://127.0.0.1:3010/...` не спрацювало — спершу перевірити
-GitHub → Developer settings → GitHub Apps, чи App уже створено (щоб не робити
-дубль), і повідомити стан.
+Одним рядком: «App створено, встановлено лише на DREAM.CAR.VAVD, у `.env` є 3
+імені `KEYSTATIC_*`». **Значень не надсилати.** Далі асистент локально звірить
+дозволи/callback і проведе тестовий вхід.
 
 ---
 
 ## Запасний шлях: створити App вручну (без manifest-flow)
 
-Якщо manifest-flow падає навіть із входом наперед (агресивне блокування cookie
-тощо). Тут немає 5-хвилинного вікна.
+Якщо manifest-flow падає і вдруге. Тут немає 5-хвилинного вікна й екрана-«гаку».
+Поля звірені з установленою `@keystatic/core@0.6.9` / `@keystatic/next@5.0.5`.
 
-1. GitHub (залогінений) → Settings → Developer settings → GitHub Apps →
-   **New GitHub App**. Заповнити:
-   - **GitHub App name:** `DreamCar-vavd Keystatic` (якщо зайнято — додати
-     суфікс, напр. `DreamCar-vavd Keystatic Panel`; тоді те саме ім'я
-     використати далі).
-   - **Homepage URL:** `http://127.0.0.1:3010/keystatic` (будь-який валідний
-     годиться).
-   - **Callback URL:** `http://127.0.0.1:3010/api/keystatic/github/oauth/callback`
-   - **Request user authorization (OAuth) during installation:** ✅ увімкнути.
-   - **Webhook → Active:** ✖ **вимкнути** (URL не потрібен).
-   - **Repository permissions:** Contents = **Read and write**;
-     Metadata = **Read-only** (стане автоматично); Pull requests = **Read-only**;
-     Deployments = **Read-only**. Більше нічого.
-   - **Where can this GitHub App be installed?** → **Only on this account**.
-   - **Create GitHub App**.
-2. На сторінці App: скопіювати **Client ID**; натиснути **Generate a new client
-   secret** → скопіювати секрет (показується один раз).
-3. У терміналі згенерувати `KEYSTATIC_SECRET`:
-   `openssl rand -hex 32`
+1. GitHub (залогінений, `DreamCar-vavd`) → Settings → Developer settings →
+   GitHub Apps → **New GitHub App**. Якщо GitHub попросить «Confirm access» —
+   пройти. Заповнити рівно так:
+
+   | Поле | Значення |
+   |---|---|
+   | **GitHub App name** | `DreamCar-vavd Keystatic` (якщо зайнято → `DreamCar-vavd Keystatic Panel`) |
+   | **Homepage URL** | `http://127.0.0.1:3010/keystatic` |
+   | **Callback URL** | `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` |
+   | **Request user authorization (OAuth) during installation** | ✅ увімкнути |
+   | **Expire user authorization tokens** | лишити як є (типово ✅) |
+   | **Webhook → Active** | ✖ вимкнути (Webhook URL не потрібен) |
+   | **Repository permissions → Contents** | **Read and write** |
+   | **Repository permissions → Metadata** | **Read-only** (виставиться саме) |
+   | **Repository permissions → Pull requests** | **Read-only** |
+   | **Repository permissions → Deployments** | **Read-only** |
+   | *решта permissions* | **No access** |
+   | **Where can this GitHub App be installed?** | **Only on this account** |
+
+   → **Create GitHub App**.
+2. На сторінці App: скопіювати **Client ID** (вигляд `Iv23li…` або `Iv1.…`);
+   **Generate a new client secret** → скопіювати (показується один раз).
+3. У терміналі згенерувати `KEYSTATIC_SECRET` (Keystatic-сумісна довжина — 80 hex):
+   `openssl rand -hex 40`
 4. Створити файл `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`
    (git-ignored, **не** комітити) з трьома рядками — значення вставити **у файл**,
    не в чат:
@@ -217,12 +260,90 @@ GitHub → Developer settings → GitHub Apps, чи App уже створено 
    KEYSTATIC_SECRET=<вивід openssl з кроку 3>
    ```
    (`.env.local` із 3 несекретними рядками вже є — його не чіпати.)
-5. App → **Install App** → акаунт `DreamCar-vavd` → **Only select repositories**
-   → `DREAM.CAR.VAVD` → **Install**.
-6. Перезапустити підготовлений сервер, щоб він підхопив `.env`
-   (`kill <pid>` конкретного `next dev`, тоді знову
-   `npx next dev --webpack -H 127.0.0.1 -p 3010` з тієї копії). Успішний
-   результат — той самий, що вище.
+4. Створити файл `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`
+   (git-ignored, **не** комітити; `.env.local` не чіпати) з трьома рядками —
+   значення вставити **у файл**:
+   ```
+   KEYSTATIC_GITHUB_CLIENT_ID=<Client ID>
+   KEYSTATIC_GITHUB_CLIENT_SECRET=<client secret>
+   KEYSTATIC_SECRET=<вивід openssl>
+   ```
+5. App → **Install App** → `DreamCar-vavd` → **Only select repositories** →
+   `DREAM.CAR.VAVD` → **Install**.
+6. Написати асистенту: «App створено вручну; `.env` заповнено; встановлено на
+   DREAM.CAR.VAVD». Асистент перезапустить сервер і проведе перевірку.
+
+---
+
+## Перевірка асистентом після дії власника (значень секретів не виводити)
+
+1. `.env` у setup-копії містить рядки з іменами
+   `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
+   `KEYSTATIC_SECRET` — перевірка `grep -oE '^(KEYSTATIC_GITHUB_CLIENT_ID|KEYSTATIC_GITHUB_CLIENT_SECRET|KEYSTATIC_SECRET)='`
+   (лише імена + «наявна/відсутня»). Наявні env-файли не перезаписувати.
+2. Перезапустити setup-сервер (конкретний `kill <pid>` → перезапуск), відкрити
+   `http://127.0.0.1:3010/keystatic` — має показати **«Sign in with GitHub»**
+   (github-режим активний), а не екран Setup.
+3. Через `gh` (акаунт `DreamCar-vavd`) звірити:
+   `gh api /apps/<slug>` — назва, `owner.login = DreamCar-vavd`,
+   `permissions` = `{contents: write, metadata: read, pull_requests: read, deployments: read}`;
+   встановлення лише на `DREAM.CAR.VAVD`.
+4. Callback у налаштуваннях App = `http://127.0.0.1:3010/api/keystatic/github/oauth/callback`
+   (той самий хост і порт, що й сервер).
+5. **Тестовий вхід (робить власник у своєму браузері, асистент дивиться логи):**
+   `http://127.0.0.1:3010/keystatic` → «Sign in with GitHub» → Authorize →
+   має відкритися редактор колекцій; тоді `http://127.0.0.1:3010/panel` →
+   дашборд із розділами. Це і є критерій завершення Б1 (локальний вхід працює).
+   Тестовий матеріал **не публікувати**.
+
+---
+
+## Наступний крок — ЧЕРНЕТКА запиту (виконувати ТІЛЬКИ після підтвердженого локального входу)
+
+Не діяти за цим, доки крок «Тестовий вхід» вище не дав ✅ (редактор + `/panel`
+відкрились локально). Тоді — оформити й передати:
+
+> **ЗАПИТ ДЛЯ ПЕРЕДАЧІ АСИСТЕНТУ — Vercel Preview для hosted-панелі**
+>
+> **Потрібна дія власника:** додати 6 (+1 опційну) env-змінні у Vercel і
+> зробити redeploy — **лише для Preview гілки `codex/admin-panel-spike`**,
+> Production не чіпати.
+>
+> **Точна гілка:** `codex/admin-panel-spike` (PR #26, draft).
+> **Проєкт Vercel:** `dream.car.vavd` (team `6y7h9wdz4r-7375s-projects`).
+> **Перевірена адреса:** стабільний branch-аліас Preview — **скопіювати** з
+> Vercel → Project → Deployments (поряд із гілкою) або Settings → Domains
+> (вигляд `dreamcarvavd-git-codex-admin-panel-spike-<scope>.vercel.app`;
+> **не вигадувати**). Далі `<ALIAS>`.
+>
+> **Env (Vercel → Settings → Environment Variables; для кожної Environment =
+> Preview → Specific Git Branches → `codex/admin-panel-spike`):**
+> | Змінна | Значення | Секрет |
+> |---|---|---|
+> | `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND` | `github` | ні |
+> | `KEYSTATIC_GITHUB_REPO_OWNER` | `DreamCar-vavd` | ні |
+> | `KEYSTATIC_GITHUB_REPO_NAME` | `DREAM.CAR.VAVD` | ні |
+> | `KEYSTATIC_GITHUB_CLIENT_ID` | з `…-panel-setup-verify/.env` | **так** |
+> | `KEYSTATIC_GITHUB_CLIENT_SECRET` | з `…-panel-setup-verify/.env` | **так** |
+> | `KEYSTATIC_SECRET` | з `…-panel-setup-verify/.env` | **так** |
+> | `PANEL_CONTENT_BRANCH` *(опційно)* | `panel/content` | ні |
+> Секрети вставляти лише у поле Value у Vercel — не в чат / Git.
+>
+> **Callback:** у GitHub App → Callback URLs **додати** (не замінювати
+> локальний) `https://<ALIAS>/api/keystatic/github/oauth/callback`.
+>
+> **Redeploy:** Vercel → Deployments → останній для гілки → ⋯ → Redeploy
+> (env застосовуються лише до нової збірки).
+>
+> **Спосіб перевірки:** `https://<ALIAS>/keystatic` → Sign in with GitHub →
+> Authorize → редактор; `https://<ALIAS>/panel` → дашборд. Далі — повний
+> протокол `docs/PANEL-hosted-verification.md` (вхід двох користувачів, відмова
+> сторонньому, публікація за SHA, конфлікт, відкликання). Захист Preview vs
+> OAuth — `docs/PANEL-hosting-and-approvals.md` §3.5 (оцінювати лише за
+> фактичним збоєм, глобально не вимикати).
+>
+> **Межі:** Production / `main` / DNS / тарифи / видимість репо не чіпати.
+> PR #26 лишається draft.
 
 ---
 

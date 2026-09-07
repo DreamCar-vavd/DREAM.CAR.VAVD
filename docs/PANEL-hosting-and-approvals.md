@@ -88,7 +88,7 @@ GitHub рахує їх окремо: PR може мати всі зелені ch
 
 | Пункт | Значення | Звідки (перевірено з `@keystatic/core@0.6.9`) |
 |---|---|---|
-| **Тип інтеграції** | **GitHub App** (не OAuth App). Keystatic допомагає створити його через App-manifest flow (кнопка «Create GitHub App» у `/keystatic`), або власник створює App вручну: GitHub → Settings → Developer settings → GitHub Apps → New. **Manifest-flow крихкий:** GitHub тримає POST-ний маніфест за cookie `app_manifest_token` ~5 хв; треба бути залогіненим у GitHub наперед і пройти екран швидко, інакше «We didn't find an App Manifest for your request». Ручний шлях цього обмеження не має. | `github/created-app` → `POST api.github.com/app-manifests/{code}/conversions` |
+| **Тип інтеграції** | **GitHub App** (не OAuth App). Keystatic допомагає створити його через App-manifest flow (кнопка «Create GitHub App» у `/keystatic`), або власник створює App вручну: GitHub → Settings → Developer settings → GitHub Apps → New. **Manifest-flow крихкий:** GitHub тримає POST-ний маніфест за cookie `app_manifest_token` (~5 хв виміряно). Перша спроба власника (залогінений, екран «Confirm access») → «We didn't find an App Manifest for your request». Точний тригер не доведено; практично — зняти «Confirm access» наперед на `github.com/settings/apps`, тоді одразу пройти setup без пауз; за повторного збою — ручний шлях (`docs/PANEL-owner-request-B1.md`), який цього обмеження не має. | `github/created-app` → `POST api.github.com/app-manifests/{code}/conversions` |
 | **⚠️ Де запускати «Create GitHub App»** | **Локально (`next dev`), НЕ на Vercel Preview.** Обробник Keystatic після створення App робить `fs.writeFile('.env', …)` — на Vercel файлова система read-only, тож на Preview цей крок падає з 500 і видані значення губляться. Правильний порядок: локально з `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` + `KEYSTATIC_GITHUB_REPO_OWNER/NAME` у `.env.local` → `/keystatic` → «Create GitHub App» → Keystatic **сам** дописує `KEYSTATIC_GITHUB_CLIENT_ID` / `_SECRET` / `KEYSTATIC_SECRET` (80 hex-символів) у локальний `.env` → скопіювати ці 3 значення у **Vercel env**. Або створити App вручну в GitHub UI й згенерувати `KEYSTATIC_SECRET` самому. | `keystatic-core-api-generic.node.react-server.js` рядки 78–90 |
 | **Тестова адреса** | Поточний Preview-домен гілки: `https://dreamcarvavd-<hash>-…vercel.app`. **Стабільний для гілки** — переіменування гілки чи новий піддомен **не потрібні**: Keystatic будує `redirect_uri` як `${reqUrl.origin}/api/keystatic/github/oauth/callback` з поточного запиту, тож працює на будь-якому домені зі списку Callback URLs App. Кожен новий Preview-хеш — це новий домен, тож зручніше додати в App **wildcard** callback або стабільний branch-аліас `…-git-<branch>-<team>.vercel.app`. | `redirect_uri` у коді |
 | **Callback URL(и) App** | `/api/keystatic/github/oauth/callback`. Додати повні URL: `https://<preview>/api/keystatic/github/oauth/callback` (+ стабільний branch-аліас, якщо є) і для локальної розробки `http://127.0.0.1:3000/api/keystatic/github/oauth/callback`. | код |
@@ -147,16 +147,21 @@ Protection** — на цьому кроці **не** чіпаються (пит�
 `http://127.0.0.1:3010`. Власнику достатньо кроків 2–6. Якщо середовище треба
 відтворити з нуля:
 
-> **Передумова (2026-09-07, підтверджено діагностикою).** Спершу увійти в
-> `https://github.com` у тому самому браузері. GitHub тримає надісланий маніфест
-> за cookie `app_manifest_token` з **~5-хв** життям; якщо власник не залогінений,
-> ланцюг «POST → логін → 2FA/SSO → назад» перевищує 5 хв, cookie згасає, і
-> GitHub каже **«We didn't find an App Manifest for your request.»** Провалена
-> спроба нічого не створює — перезавантажити `/keystatic/setup` і клікнути ще
-> раз. Попередження React про `manifest` без `onChange` у консолі —
-> **косметичне, не причина** (форма все одно шле повний маніфест; перевірено).
-> Якщо й із входом наперед не виходить — `docs/PANEL-owner-request-B1.md`
-> §«Запасний шлях» (створення App вручну, без 5-хв вікна).
+> **Передумова (2026-09-07).** Перша спроба власника впала на
+> **«We didn't find an App Manifest for your request.»**; на фото він **був
+> залогінений**, екран — **«Confirm access»** (sudo). Доведено: маніфест
+> доходить до GitHub і приймається; попередження React про `manifest` без
+> `onChange` — косметичне, не причина (форма шле повний маніфест — перевірено).
+> Виміряно: cookie `app_manifest_token`, за яким GitHub тримає маніфест на
+> `/settings/apps/manifest`, живе **~5 хв**. Що він згас саме тоді — **не
+> доведено**; робоча гіпотеза — проміжний sudo-екран додає час/переходи.
+> **Практично:** (1) відкрити `https://github.com/settings/apps`, пройти
+> «Confirm access» там; (2) одразу (1–2 хв) відкрити локальний setup і
+> «Create GitHub App», без пауз; (3) якщо і вдруге помилка — не повторювати,
+> перейти на `docs/PANEL-owner-request-B1.md` §«Запасний шлях» (ручне
+> створення, без manifest-flow). Провалена спроба доходить лише до сторінки
+> **до** кнопки «Create» — App не створюється; перед новою спробою власник
+> звіряє `https://github.com/settings/apps`.
 
 1. У корені ізольованої копії створити **`.env.local`** (у `.gitignore`) з
    умістом `docs/keystatic-app-setup.env`:

@@ -23,10 +23,12 @@
   `.env.local` (3 несекретні рядки) на місці, `next dev` на `http://127.0.0.1:3010`.
   Одна дія власника — `docs/PANEL-owner-request-B1.md`. Секрети після створення App
   запишуться у `…-panel-setup-verify/.env` (git-ignored). Worktree **не видаляти**.
-- **Перша спроба власника впала** («We didn't find an App Manifest») — причина
-  діагностована (5-хв cookie `app_manifest_token` + логін-редірект), не код і не
-  попередження React. Виправлення — процедурне (увійти в GitHub наперед) +
-  запасний ручний шлях. Деталі — журнал П18, `docs/PANEL-owner-request-B1.md`.
+- **Перша спроба власника впала** («We didn't find an App Manifest»; власник
+  БУВ залогінений, екран «Confirm access»/sudo). Доведено: маніфест доходить і
+  приймається; попередження React — не причина. НЕ доведено: що ~5-хв cookie
+  згас саме тоді. Практичне усунення: зняти sudo наперед на
+  `github.com/settings/apps` → одразу пройти setup; повторний збій → ручний
+  шлях. Деталі — журнал П18, `docs/PANEL-owner-request-B1.md`.
 - **Незакомічених змін у гілці немає**
 
 ### Що НЕ перевірено наживо (важливо для приймання)
@@ -44,9 +46,12 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ## Завершені пункти (новіші зверху)
 
 ### П18 — діагностика провалу створення App: «We didn't find an App Manifest»
+> Уточнення (12:54): на фото власник **був залогінений**, екран — **«Confirm
+> access»** (sudo). Версія «ланцюг логіна > 5 хв» **знята**. ~5-хв cookie
+> виміряно, але його сплив саме тоді — **не доведено**.
 - **Симптом власника:** GitHub → «We didn't find an App Manifest for your
-  request.» + консольне попередження React про `value` без `onChange` на
-  `input[name="manifest"]`.
+  request.» на екрані «Confirm access». Плюс консольне попередження React про
+  `value` без `onChange` на `input[name="manifest"]`.
 - **Попередження React — НЕ причина (доведено).** У браузері
   `new FormData(form).get("manifest")` = повний валідний JSON (409 симв.),
   `input.readOnly=false`, `disabled=false`, форма `POST`
@@ -58,17 +63,27 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
   `Set-Cookie app_manifest_token=… expires ~5 хв, HttpOnly, SameSite=Lax`.
   Помилкової сторінки немає.
 - **`/settings/apps/manifest` вимагає входу:** без сесії → `302 /login?return_to=…`.
-- **Підтверджена причина:** GitHub тримає маніфест за короткоживучим (~5 хв)
-  cookie `app_manifest_token`. Якщо власник не залогінений у GitHub наперед,
-  ланцюг логін+2FA/SSO перевищує 5 хв, cookie згасає → цей текст помилки.
-  (1-годинний ліміт із доків GitHub — це інший токен, `code` на кроці
-  `redirect_url`→`/app-manifests/{code}/conversions`.)
-- **Мінімальне усунення:** увійти в GitHub у тому самому браузері **до**
-  відкриття setup, пройти екран GitHub швидко (< 5 хв). Провалена спроба нічого
-  не створює — перезавантажити `/keystatic/setup`, клікнути ще раз (дубля не
-  буде). Запасний детермінований шлях без manifest-flow (ручне створення App +
-  `openssl rand -hex 32` для `KEYSTATIC_SECRET`) — `docs/PANEL-owner-request-B1.md`
-  §«Запасний шлях».
+- **Виміряно, не доведено як тригер цього збою:** cookie `app_manifest_token`
+  живе ~5 хв. Що згас саме під час спроби власника — доказів немає (власник був
+  залогінений). (1-годинний ліміт із доків GitHub — інший токен, `code` на
+  кроці `redirect_url`→`/app-manifests/{code}/conversions`.)
+- **Робоча гіпотеза:** проміжний sudo-екран «Confirm access» між POST маніфесту
+  й `/settings/apps/manifest` додає час/навігацію → або згасає ~5-хв cookie,
+  або sudo-редірект його не доносить.
+- **Практичне усунення (не залежить від точного тригера):** (1) зняти «Confirm
+  access» наперед на `github.com/settings/apps`; (2) одразу (1–2 хв) пройти
+  локальний setup без пауз на фото; (3) повторний збій → не циклити, ручний
+  шлях. Провалена спроба доходить лише до сторінки **до** кнопки «Create» — App
+  не створюється; перед новою спробою власник звіряє `github.com/settings/apps`.
+- **Дубль-перевірка асистентом:** `GET /apps/dreamcar-vavd-keystatic` і
+  `github.com/apps/dreamcar-vavd-keystatic` → 404 (публічного App із цим слагом
+  немає). Точну перевірку робить власник (`github.com/settings/apps`).
+- **Запасний шлях без manifest-flow:** ручне створення App (поля звірені з
+  `@keystatic/core@0.6.9`), `KEYSTATIC_SECRET` = `openssl rand -hex 40` (80 hex,
+  як генератор Keystatic; `keyToEnvVar` = `KEYSTATIC_GITHUB_CLIENT_ID` /
+  `KEYSTATIC_GITHUB_CLIENT_SECRET` / `KEYSTATIC_SECRET`) — `docs/PANEL-owner-request-B1.md`.
+- **Чернетка наступного запиту (Vercel Preview)** підготовлена в тому ж
+  документі — виконувати ТІЛЬКИ після підтвердженого локального входу.
 - **Код не змінювали.** Оновлено `docs/PANEL-owner-request-B1.md` (розділ
   «Діагностика» + крок 0 «увійти в GitHub» + «Запасний шлях») і
   `docs/PANEL-hosting-and-approvals.md` §2, §3.1.
