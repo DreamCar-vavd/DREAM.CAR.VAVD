@@ -2147,16 +2147,20 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
   - `:3010` (loopback) — підготовлений `next dev` з worktree
     `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` для СПРАВЖНЬОГО
     створення GitHub App власником (`docs/PANEL-owner-request-B1.md`).
-    `.env.local` (3 несекретні рядки) на місці; секрети після дії власника
-    підуть у `…-panel-setup-verify/.env` (git-ignored). Worktree й `.env` **не
+    `.env.local` (3 несекретні рядки) + **`.env` підготовлено** (права 600,
+    git-ignored, 4 ключі: `KEYSTATIC_SECRET` згенеровано, `CLIENT_ID/SECRET`
+    порожні для власника, `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` порожній —
+    асистент впише реальний slug після створення). Worktree й `.env` **не
     видаляти** до перенесення у Vercel + hosted-перевірки. Зупиняти сервер —
     конкретним `kill <pid>` (pid у `…-panel-setup-verify/setup-server.log`).
-    **Перша спроба власника впала** («We didn't find an App Manifest»; власник
-    БУВ залогінений, екран «Confirm access»/sudo). Доведено: маніфест доходить,
-    попередження React — не причина. НЕ доведено: що ~5-хв cookie згас тоді.
-    Практика: зняти sudo наперед на `github.com/settings/apps` → одразу пройти
-    setup; повторний збій → ручний шлях (`docs/PANEL-owner-request-B1.md`).
-    Журнал — П18.
+    **Перша спроба власника (manifest-flow) впала** («We didn't find an App
+    Manifest»; власник БУВ залогінений, екран «Confirm access»/sudo). Тепер
+    основний шлях — **ручний** (`docs/PANEL-owner-request-B1.md` §«Ручний шлях»):
+    власник заповнює `github.com/settings/apps/new` (класифікатор блокує це
+    асистенту), копіює Client ID/secret у `.env` через TextEdit, асистент
+    дописує slug + перезапускає сервер. **Callback без креденшлів = 404**
+    (перевірено) — OAuth стає доступним лише після заповненого `.env` +
+    рестарту. Журнал — П18/§«Поточний стан».
 
 ## 2. Що зроблено повністю (код готовий, покрито тестами)
 

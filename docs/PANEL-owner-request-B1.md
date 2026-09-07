@@ -127,10 +127,14 @@ client secret).
 
 ## ЗАПИТ ДЛЯ ПЕРЕДАЧІ АСИСТЕНТУ
 
+> **Рекомендований шлях — «Ручний шлях» нижче** (без 5-хв вікна, без терміналу;
+> `.env` уже підготовлено). Manifest-flow у цьому розділі лишається як варіант,
+> але він крихкий (перша спроба власника впала — див. «Діагностика»).
+
 **Потрібна дія власника:**
-Пройти справжнє створення GitHub App за готовим посиланням і встановити App
-лише на репозиторій `DreamCar-vavd/DREAM.CAR.VAVD`. Три значення, які видасть
-GitHub, залишаться у локальному файлі — нікуди їх не вставляти й не пересилати.
+Пройти справжнє створення GitHub App і встановити App лише на репозиторій
+`DreamCar-vavd/DREAM.CAR.VAVD`. Значення, які видасть GitHub, вставляються лише
+у локальний файл `.env` — нікуди більше.
 
 **Що вже підготовлено:**
 Ізольована копія `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` з
@@ -224,80 +228,109 @@ Repository permissions **лише** для `DreamCar-vavd/DREAM.CAR.VAVD`:
 
 ---
 
-## Запасний шлях: створити App вручну (без manifest-flow)
+## Ручний шлях (рекомендований) — без терміналу, без 5-хв вікна
 
-Якщо manifest-flow падає і вдруге. Тут немає 5-хвилинного вікна й екрана-«гаку».
-Поля звірені з установленою `@keystatic/core@0.6.9` / `@keystatic/next@5.0.5`.
+Поля звірені з установленими `@keystatic/core@0.6.9` / `@keystatic/next@5.0.5`.
+**`.env` у setup-копії вже підготовлено асистентом:** права `600`, git-ignored,
+`KEYSTATIC_SECRET` згенеровано (не показується). Власнику лишається вставити
+**два** значення у файл; `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` асистент впише
+сам після створення App (реальний slug із GitHub, не вгаданий).
 
-1. GitHub (залогінений, `DreamCar-vavd`) → Settings → Developer settings →
-   GitHub Apps → **New GitHub App**. Якщо GitHub попросить «Confirm access» —
-   пройти. Заповнити рівно так:
+### Крок 1 (власник) — створити App
 
-   | Поле | Значення |
-   |---|---|
-   | **GitHub App name** | `DreamCar-vavd Keystatic` (якщо зайнято → `DreamCar-vavd Keystatic Panel`) |
-   | **Homepage URL** | `http://127.0.0.1:3010/keystatic` |
-   | **Callback URL** | `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` |
-   | **Request user authorization (OAuth) during installation** | ✅ увімкнути |
-   | **Expire user authorization tokens** | лишити як є (типово ✅) |
-   | **Webhook → Active** | ✖ вимкнути (Webhook URL не потрібен) |
-   | **Repository permissions → Contents** | **Read and write** |
-   | **Repository permissions → Metadata** | **Read-only** (виставиться саме) |
-   | **Repository permissions → Pull requests** | **Read-only** |
-   | **Repository permissions → Deployments** | **Read-only** |
-   | *решта permissions* | **No access** |
-   | **Where can this GitHub App be installed?** | **Only on this account** |
+GitHub (залогінений, `DreamCar-vavd`) → **`https://github.com/settings/apps/new`**.
+Якщо попросить «Confirm access» — пройти. Заповнити рівно так:
 
-   → **Create GitHub App**.
-2. На сторінці App: скопіювати **Client ID** (вигляд `Iv23li…` або `Iv1.…`);
-   **Generate a new client secret** → скопіювати (показується один раз).
-3. У терміналі згенерувати `KEYSTATIC_SECRET` (Keystatic-сумісна довжина — 80 hex):
-   `openssl rand -hex 40`
-4. Створити файл `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`
-   (git-ignored, **не** комітити) з трьома рядками — значення вставити **у файл**,
-   не в чат:
+| Поле | Значення |
+|---|---|
+| **GitHub App name** | `DreamCar-vavd Keystatic` (якщо зайнято → `DreamCar-vavd Keystatic Panel`; сказати асистенту фактичну назву) |
+| **Homepage URL** | `http://127.0.0.1:3010/keystatic` |
+| **Identifying and authorizing users → Redirect URI** | `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` |
+| **Expire user authorization tokens** | лишити ✅ (типово) |
+| **Request user authorization (OAuth) during installation** | ✅ **увімкнути** |
+| **Enable Device Flow** | лишити вимкненим |
+| **Webhook → Active** | ✖ **вимкнути** |
+| **Repository permissions → Contents** | **Read and write** |
+| **Repository permissions → Pull requests** | **Read-only** |
+| **Repository permissions → Deployments** | **Read-only** |
+| Metadata | стане **Read-only** саме |
+| *решта permissions* | **No access** |
+| **Where can this GitHub App be installed?** | **Only on this account** |
+
+→ **Create GitHub App**. **App поки НЕ встановлювати.**
+
+### Крок 2 (власник) — скопіювати Client ID і Client secret
+
+На сторінці App:
+- **Client ID** — просто на сторінці (вигляд `Iv23li…`);
+- **Client secrets → Generate a new client secret** → скопіювати (показується
+  один раз).
+
+### Крок 3 (власник) — вставити їх у підготовлений файл (без терміналу)
+
+1. Finder → меню **Перехід → Перехід до папки…** (`Cmd+Shift+G`) → вставити
+   `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` → Enter.
+2. Показати приховані файли: `Cmd+Shift+.` (крапка). З'явиться файл **`.env`**.
+3. Відкрити його **у TextEdit**: правою кнопкою на `.env` → **Відкрити у
+   програмі → TextEdit**. Якщо TextEdit перемкнувся у форматований режим —
+   меню **Формат → Зробити звичайним текстом**.
+4. У файлі вже є рядки. Заповнити **тільки** ці два (кожен на своєму рядку,
+   без пробілів навколо `=`):
    ```
-   KEYSTATIC_GITHUB_CLIENT_ID=<Client ID>
-   KEYSTATIC_GITHUB_CLIENT_SECRET=<client secret з кроку 2>
-   KEYSTATIC_SECRET=<вивід openssl з кроку 3>
+   KEYSTATIC_GITHUB_CLIENT_ID=<сюди Client ID>
+   KEYSTATIC_GITHUB_CLIENT_SECRET=<сюди client secret>
    ```
-   (`.env.local` із 3 несекретними рядками вже є — його не чіпати.)
-4. Створити файл `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`
-   (git-ignored, **не** комітити; `.env.local` не чіпати) з трьома рядками —
-   значення вставити **у файл**:
-   ```
-   KEYSTATIC_GITHUB_CLIENT_ID=<Client ID>
-   KEYSTATIC_GITHUB_CLIENT_SECRET=<client secret>
-   KEYSTATIC_SECRET=<вивід openssl>
-   ```
-5. App → **Install App** → `DreamCar-vavd` → **Only select repositories** →
-   `DREAM.CAR.VAVD` → **Install**.
-6. Написати асистенту: **«App створено вручну й встановлено»** (+ назва App).
-   `.env` не звітувати. Асистент перезапустить сервер і проведе перевірку.
+   Рядки `KEYSTATIC_SECRET=…` і `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=`
+   **не чіпати**.
+5. **Зберегти** (`Cmd+S`). Якщо TextEdit пропонує додати `.txt` — відмовитись,
+   ім'я лишити `.env`.
+6. Написати асистенту: **«Client ID і secret вставлено у .env»** (+ фактична
+   назва App, якщо з суфіксом). Вміст файлу **не** пересилати.
+
+### Крок 4 (асистент) — дописати slug, перезапустити сервер, звірити
+
+- Отримати **фактичний slug** App: `gh api /apps/<slug-кандидат>` або зі
+  сторінки `github.com/apps/<slug>` → вписати
+  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=<slug>` у `.env` (лише цей рядок).
+- Звірити **наявність** усіх 4 ключів (імена + «наявний/порожній», без значень).
+- Перезапустити **лише свій** setup-сервер (`kill <pid>` конкретного `next dev`
+  → перезапуск).
+- **Перевірити готовність callback:** `GET /api/keystatic/github/login` має
+  тепер вести на `github.com/login/oauth/...` (а не редіректити на
+  `/keystatic/setup`); `GET /api/keystatic/github/oauth/callback` — вже **не**
+  `404`. `GET /keystatic` — показує **«Sign in with GitHub»**, не екран Setup.
+  Доти OAuth власнику **не** пробувати.
+
+### Крок 5 (власник) — встановити App і авторизуватися
+
+- App → **Install App** → `DreamCar-vavd` → **Only select repositories** →
+  **`DREAM.CAR.VAVD`** → **Install**.
+- `http://127.0.0.1:3010/keystatic` → **Sign in with GitHub** → Authorize
+  (пароль/passkey/коди — власник).
 
 ---
 
 ## Перевірка асистентом після дії власника (значень секретів не виводити)
 
-1. `.env` у setup-копії містить рядки з іменами
-   `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
-   `KEYSTATIC_SECRET` — перевірка `grep -oE '^(KEYSTATIC_GITHUB_CLIENT_ID|KEYSTATIC_GITHUB_CLIENT_SECRET|KEYSTATIC_SECRET)='`
-   (лише імена + «наявна/відсутня»). Наявні env-файли не перезаписувати.
-2. Перезапустити setup-сервер (конкретний `kill <pid>` → перезапуск), відкрити
-   `http://127.0.0.1:3010/keystatic` — має показати **«Sign in with GitHub»**
-   (github-режим активний), а не екран Setup.
+1. `.env` містить **усі 4** ключі — `KEYSTATIC_GITHUB_CLIENT_ID`,
+   `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`,
+   `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` — перевірка `grep -oE '^[A-Z_]+='`
+   (лише імена + «наявний/порожній»). Значень **не** друкувати; наявні
+   `.env`/`.env.local` не перезаписувати (тільки дописати slug-рядок).
+2. Callback готовий (крок 4 вище): `/keystatic` → «Sign in with GitHub»;
+   `/api/keystatic/github/login` ініціює OAuth; `/api/keystatic/github/oauth/callback`
+   не 404.
 3. Через `gh` (акаунт `DreamCar-vavd`) звірити **реєстрацію App**:
    `gh api /apps/<slug>` — назва, `owner.login = DreamCar-vavd`, і що
    `permissions` містить `contents: write`, `metadata: read`,
    `pull_requests: read`, `deployments: read`.
    ⚠️ `GET /apps/<slug>` показує **дефолтні** дозволи й `installations_count` —
    він **НЕ** доказ, що конкретне встановлення обмежене одним репозиторієм.
-4. **Область встановлення — окремо.** Достовірно її видно лише власнику:
-   `https://github.com/settings/installations` → цей App → «Repository access»
-   = **Only select repositories → DREAM.CAR.VAVD** (не «All repositories»).
-   Побічно асистент підтвердить її тестовим входом (крок 6): Keystatic у
-   github-режимі бачить лише `DreamCar-vavd/DREAM.CAR.VAVD`; спроба звернутись
-   до іншого репо через токен встановлення дала б `404`.
+4. **Область встановлення — окремо.** Асистент відкриває
+   `https://github.com/settings/installations` у Chrome власника → цей App →
+   «Repository access» = **Only select repositories → DREAM.CAR.VAVD**
+   (не «All repositories»). Побічно підтверджується тестовим входом: Keystatic
+   у github-режимі бачить лише `DreamCar-vavd/DREAM.CAR.VAVD`.
 5. Callback у налаштуваннях App = `http://127.0.0.1:3010/api/keystatic/github/oauth/callback`
    (той самий хост і порт, що й сервер).
 6. **Тестовий вхід (пароль/passkey/коди вводить власник, асистент дивиться

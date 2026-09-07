@@ -16,17 +16,26 @@
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
 - **Head:** `caa3f17` (docs-коміти поверх `87fe84a`) — PR #26 head звірено 2026-09-07
 - **CI `Verify`:** success · Vercel Preview — success (`gh pr checks 26`)
-- **Б1 статус (2026-09-07, звірено в браузері власника через Claude-in-Chrome):**
-  App ще НЕ створено. `github.com/settings/apps` (акаунт **DreamCar-vavd**,
-  особистий) → **«No GitHub Apps»**; `github.com/settings/installations` →
-  Installed GitHub Apps = лише **Vercel**. Дублікатів немає — створювати з нуля
-  безпечно. Форму `github.com/settings/apps/new` відкрито у вкладці Chrome
-  власника; **заповнення форми створення App класифікатор блокує** (це дія
-  власника — він вводить значення й тисне Create/Confirm access). Далі —
-  «Запасний шлях» у `docs/PANEL-owner-request-B1.md` (ручне створення, поля
-  звірені з Keystatic 0.6.9). Setup-сервер `127.0.0.1:3010` запущений.
-  Перевірку після створення (env, дозволи, область встановлення, тест входу)
-  асистент робить сам.
+- **Б1 статус (2026-09-07):** App ще НЕ створено (звірено в Chrome власника:
+  `settings/apps` → «No GitHub Apps», `settings/installations` → лише Vercel;
+  дублікатів немає). Далі — **ручний шлях** (`docs/PANEL-owner-request-B1.md`
+  §«Ручний шлях»), заповнення форми створення App робить власник (класифікатор
+  блокує це асистенту; + потрібен «Confirm access»).
+- **`.env` у setup-копії підготовлено асистентом:**
+  `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`, права `600`,
+  git-ignored, 4 ключі: `KEYSTATIC_SECRET` згенеровано (80 hex, `randomBytes(40)`,
+  не виводиться); `KEYSTATIC_GITHUB_CLIENT_ID` / `KEYSTATIC_GITHUB_CLIENT_SECRET`
+  порожні (власник вписує через TextEdit, без терміналу);
+  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` порожній (асистент впише реальний slug
+  після створення — `@keystatic/next@5.0.5` читає його для лінка «Install App»;
+  автосетап пише його разом із 3 ключами; відсутність = лише caution-нотатка,
+  не блокер OAuth). `.env.local` (3 несекретні рядки) — не чіпати.
+- **Callback ще не готовий (перевірено):** без `CLIENT_ID/SECRET` у dev-режимі
+  `GET /api/keystatic/github/oauth/callback` → 404, `…/github/login` → 307 на
+  `/keystatic/setup`. OAuth стане доступним лише після вписаних креденшлів +
+  перезапуску сервера. Порядок: власник створює App → копіює Client ID/secret у
+  `.env` → асистент дописує slug + перезапускає сервер + звіряє готовність
+  callback → власник встановлює App на `DREAM.CAR.VAVD` → власник авторизується.
 - **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
