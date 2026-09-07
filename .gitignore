@@ -64,3 +64,6 @@ next-env.d.ts
 
 # panel: uploaded videos live outside Git (external storage in hosted mode)
 /public/uploads/
+
+# panel: content export output (npm run content:export)
+/export/
