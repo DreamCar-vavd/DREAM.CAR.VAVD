@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, describeFailure, type ContentLocale } from "@/lib/content/carsGate";
@@ -292,6 +293,12 @@ export default async function PanelPage() {
         <span className="text-xs text-neutral-500">
           (робоча версія на реальному макеті сайту, ще не опублікована)
         </span>
+      </p>
+      <p className="mt-2 text-sm">
+        <Link className="underline" href="/panel/leads">
+          Заявки з форми →
+        </Link>{" "}
+        <span className="text-xs text-neutral-500">(перегляд; база ще не підключена — демо-дані)</span>
       </p>
 
       <nav className="mt-3 flex flex-wrap gap-2 text-xs">
