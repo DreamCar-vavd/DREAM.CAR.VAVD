@@ -21,7 +21,7 @@ import { config, fields, collection, singleton } from "@keystatic/core";
  * in `github` mode without touching this file.
  */
 const storage =
-  process.env.KEYSTATIC_STORAGE_KIND === "github"
+  process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND === "github"
     ? ({
         kind: "github",
         repo: {

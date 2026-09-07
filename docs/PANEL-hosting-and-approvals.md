@@ -89,19 +89,19 @@ GitHub рахує їх окремо: PR може мати всі зелені ch
 | Пункт | Значення | Звідки (перевірено з `@keystatic/core@0.6.9`) |
 |---|---|---|
 | **Тип інтеграції** | **GitHub App** (не OAuth App). Keystatic допомагає створити його через App-manifest flow (кнопка «Create GitHub App» у `/keystatic`), або власник створює App вручну: GitHub → Settings → Developer settings → GitHub Apps → New. | `github/created-app` → `POST api.github.com/app-manifests/{code}/conversions` |
-| **⚠️ Де запускати «Create GitHub App»** | **Локально (`next dev`), НЕ на Vercel Preview.** Обробник Keystatic після створення App робить `fs.writeFile('.env', …)` — на Vercel файлова система read-only, тож на Preview цей крок падає з 500 і видані значення губляться. Правильний порядок: локально з `KEYSTATIC_STORAGE_KIND=github` + `KEYSTATIC_GITHUB_REPO_OWNER/NAME` у `.env.local` → `/keystatic` → «Create GitHub App» → Keystatic **сам** дописує `KEYSTATIC_GITHUB_CLIENT_ID` / `_SECRET` / `KEYSTATIC_SECRET` (80 hex-символів) у локальний `.env` → скопіювати ці 3 значення у **Vercel env**. Або створити App вручну в GitHub UI й згенерувати `KEYSTATIC_SECRET` самому. | `keystatic-core-api-generic.node.react-server.js` рядки 78–90 |
+| **⚠️ Де запускати «Create GitHub App»** | **Локально (`next dev`), НЕ на Vercel Preview.** Обробник Keystatic після створення App робить `fs.writeFile('.env', …)` — на Vercel файлова система read-only, тож на Preview цей крок падає з 500 і видані значення губляться. Правильний порядок: локально з `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` + `KEYSTATIC_GITHUB_REPO_OWNER/NAME` у `.env.local` → `/keystatic` → «Create GitHub App» → Keystatic **сам** дописує `KEYSTATIC_GITHUB_CLIENT_ID` / `_SECRET` / `KEYSTATIC_SECRET` (80 hex-символів) у локальний `.env` → скопіювати ці 3 значення у **Vercel env**. Або створити App вручну в GitHub UI й згенерувати `KEYSTATIC_SECRET` самому. | `keystatic-core-api-generic.node.react-server.js` рядки 78–90 |
 | **Тестова адреса** | Поточний Preview-домен гілки: `https://dreamcarvavd-<hash>-…vercel.app`. **Стабільний для гілки** — переіменування гілки чи новий піддомен **не потрібні**: Keystatic будує `redirect_uri` як `${reqUrl.origin}/api/keystatic/github/oauth/callback` з поточного запиту, тож працює на будь-якому домені зі списку Callback URLs App. Кожен новий Preview-хеш — це новий домен, тож зручніше додати в App **wildcard** callback або стабільний branch-аліас `…-git-<branch>-<team>.vercel.app`. | `redirect_uri` у коді |
 | **Callback URL(и) App** | `/api/keystatic/github/oauth/callback`. Додати повні URL: `https://<preview>/api/keystatic/github/oauth/callback` (+ стабільний branch-аліас, якщо є) і для локальної розробки `http://127.0.0.1:3000/api/keystatic/github/oauth/callback`. | код |
 | **Homepage URL App** | будь-який робочий, напр. `https://dream-car-vavd.com`. | — |
 | **Дозволи App (repository permissions)** | **Contents: Read and write**, **Pull requests: Read and write**, **Deployments: Read**, **Metadata: Read** (обов'язково). Більше нічого — без Actions, Secrets, Administration, Workflows, Members. | `deployStatus()`; Keystatic PR-режим |
 | **Webhook** | **Вимкнути** (Active — off). Keystatic вебхук не використовує. | — |
 | **Where installed** | **Only select repositories → `DreamCar-vavd/DREAM.CAR.VAVD`**. Не «All repositories», не org-wide. | — |
-| **Env (точні назви, де задавати)** | **Vercel → Project → Settings → Environment Variables**, спершу **Preview**, потім Production: `KEYSTATIC_STORAGE_KIND=github`; `KEYSTATIC_GITHUB_CLIENT_ID`; `KEYSTATIC_GITHUB_CLIENT_SECRET`; `KEYSTATIC_SECRET` — **рядок ≥ 32 символи** (Keystatic кидає помилку, якщо коротший; його власний генератор дає 80 hex — `openssl rand -hex 32` теж годиться); `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`; `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`. Необов'язково `PANEL_CONTENT_BRANCH=panel/content` (без нього — гілка деплою `VERCEL_GIT_COMMIT_REF`, ніколи не `main` на Preview). Скорочені імена (`CLIENT_ID` тощо) код **не** читає. | `keystatic-core-api-generic.js` рядки 74–76, 28; `store/index.ts` |
+| **Env (точні назви, де задавати)** | **Vercel → Project → Settings → Environment Variables**, спершу **Preview**, потім Production: `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`; `KEYSTATIC_GITHUB_CLIENT_ID`; `KEYSTATIC_GITHUB_CLIENT_SECRET`; `KEYSTATIC_SECRET` — **рядок ≥ 32 символи** (Keystatic кидає помилку, якщо коротший; його власний генератор дає 80 hex — `openssl rand -hex 32` теж годиться); `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`; `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`. Необов'язково `PANEL_CONTENT_BRANCH=panel/content` (без нього — гілка деплою `VERCEL_GIT_COMMIT_REF`, ніколи не `main` на Preview). Скорочені імена (`CLIENT_ID` тощо) код **не** читає. | `keystatic-core-api-generic.js` рядки 74–76, 28; `store/index.ts` |
 | **Обмеження Preview env гілкою** | Vercel env для «Preview» застосовується до **всіх** preview-гілок. Щоб тільки ця гілка: у полі змінної Vercel вибрати **Preview → Specific Branches → `codex/admin-panel-spike`**. | Vercel env UI |
 | **Повторний deployment після env** | **Так, обов'язково.** Vercel не застосовує нові env до вже зібраного деплою — після додавання значень зробити Redeploy гілки (Deployments → ⋯ → Redeploy) або новий push. | Vercel |
 | **Повернення після OAuth** | `/api/keystatic/github/oauth/callback` ставить cookie сесії й редіректить назад на сторінку, з якої почався вхід (Keystatic зберігає `from` у підписаному cookie `ks-<state>`). Токен GitHub — у cookie `keystatic-gh-access-token` (не httpOnly, бо його читає і панель). | код callback |
 | **Звідки власник бере кожне значення** | `CLIENT_ID` / `CLIENT_SECRET` / `KEYSTATIC_SECRET` — з локального `.env`, куди їх дописав Keystatic після «Create GitHub App» (крок вище), або: `CLIENT_ID`/`SECRET` з GitHub App settings, `KEYSTATIC_SECRET` — `openssl rand -hex 32`. Owner/Repo — вже відомі. **Значення — лише в Vercel env, не в Git, не в чат, не в звіт.** | — |
-| **Безпека початкового налаштування** | Поки на Preview стоїть `KEYSTATIC_STORAGE_KIND=github` + `KEYSTATIC_SECRET`, але ще немає `CLIENT_ID`, `/keystatic` показує кнопку «Create GitHub App» будь-кому, хто відкриє Preview. Сторонній не отримає доступу до репо (App створиться в **його** акаунті й не буде встановлений на репозиторій; на Vercel крок ще й падає 500), але це зайвий шум. **Рекомендація:** на час налаштування увімкнути Vercel **Deployment Protection → Vercel Authentication** для Preview, або робити «Create GitHub App» **локально** (варіант вище). Після того, як усі env задані й App встановлений, кнопки більше немає. | `keystaticEnabled`, `localModeApiHandler` 404 |
+| **Безпека початкового налаштування** | Поки на Preview стоїть `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` + `KEYSTATIC_SECRET`, але ще немає `CLIENT_ID`, `/keystatic` показує кнопку «Create GitHub App» будь-кому, хто відкриє Preview. Сторонній не отримає доступу до репо (App створиться в **його** акаунті й не буде встановлений на репозиторій; на Vercel крок ще й падає 500), але це зайвий шум. **Рекомендація:** на час налаштування увімкнути Vercel **Deployment Protection → Vercel Authentication** для Preview, або робити «Create GitHub App» **локально** (варіант вище). Після того, як усі env задані й App встановлений, кнопки більше немає. | `keystaticEnabled`, `localModeApiHandler` 404 |
 | **Перевірка входу (2 користувачі)** | **Не обіцяється до фактичного прогону.** Після env + redeploy: власник → `https://<preview>/keystatic` → «Sign in with GitHub» → Authorize → бачить колекції та `/panel`. Потім помічник (окремий GitHub-акаунт, роль **Write** на репо) — те саме у своєму браузері. Протокол повного прогону — `docs/PANEL-hosted-verification.md`. | — |
 | **Відкликання доступу** | Помічнику: GitHub → Repo → Settings → Collaborators → Remove **або** користувач сам: GitHub → Settings → Applications → Authorized GitHub Apps → `<App>` → Revoke. Наступний рендер `/panel` / чернетки одразу недоступний (сесія перевіряється щоразу). Повне вимкнення: видалити App у Developer settings. | `siteContent.ts` re-check |
 | **Платні функції** | **Не потрібні для панелі.** GitHub App + Actions на приватному репо — безкоштовний тариф (Actions 2000 хв/міс private). Vercel: `/keystatic` не потребує Vercel-акаунта помічнику (він входить через GitHub). Окремо: **Vercel Web Analytics API** (джерела трафіку в панелі, §нижче) — потребує **Pro** ($20/міс) + Access Token; сама панель від цього не залежить. |
@@ -132,40 +132,102 @@ GitHub Pages з цього репо немає (не використовуєт�
 ## 3. Покрокова інструкція власнику (hosted-логін для Preview)
 
 Порядок важливий. Production, DNS, гілки, тарифи — не чіпаються.
+**Перевірено локально на цьому Mac** (2026-09-07): сторінка створення App
+відкривається, кнопка працює, форма веде на GitHub. Сам App не створювався.
 
-1. **Локально** створити `.env.local` у корені проєкту:
+### 3.1. Локально створити App (не на Vercel — там FS read-only, крок падає 500)
+
+1. У корені проєкту `…/DREAM.CAR.VAVD-admin-panel-20260906` створити файл
+   **`.env.local`** (він у `.gitignore`, в Git не потрапляє) з таким вмістом:
    ```
-   KEYSTATIC_STORAGE_KIND=github
+   NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github
    KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd
    KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD
    ```
-   Запустити `npm run dev`, відкрити `http://127.0.0.1:3000/keystatic`.
-2. Натиснути **«Create GitHub App»** → GitHub → вибрати акаунт `DreamCar-vavd` →
-   **Create GitHub App**. Keystatic допише в локальний `.env`:
+   (Готовий шаблон: `docs/keystatic-app-setup.env` — скопіювати в `.env.local`.)
+2. `npm run dev` → відкрити **`http://localhost:3000/keystatic/setup`**
+   (саме `localhost`, НЕ `127.0.0.1` — щоб callback у маніфесті збігся з тим,
+   з чого йде вхід; не чергувати ці два хости). Має відкритися екран
+   **«Keystatic Setup»** із полями «Deployed App URL», «GitHub organization»
+   і синьою кнопкою **«Create GitHub App»**.
+3. Поля лишити **порожніми** (акаунт `DreamCar-vavd` — це користувач, не
+   організація; Deployed App URL можна додати в App пізніше) → натиснути
+   **«Create GitHub App»**. Форма робить `POST https://github.com/settings/apps/new`
+   з готовим маніфестом (name `DreamCar-vavd Keystatic`, callback
+   `http://localhost:3000/api/keystatic/github/oauth/callback` +
+   `http://127.0.0.1/api/keystatic/github/oauth/callback`, permissions
+   `contents: write`, `metadata: read`, `pull_requests`).
+4. На GitHub натиснути **Create GitHub App** → GitHub редіректить назад на
+   `/api/keystatic/github/created-app`, і Keystatic **сам дописує** в
+   локальний `.env` (файл `.env`, не `.env.local`) три значення:
    `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
-   `KEYSTATIC_SECRET`. Ці 3 значення — секретні.
-3. У GitHub → Settings → Developer settings → GitHub Apps → `<новий App>`:
-   - **Permissions**: Contents R/W, Pull requests R/W, Deployments Read,
-     Metadata Read; Webhook — **off**;
-   - **Callback URLs**: додати `https://<preview-домен>/api/keystatic/github/oauth/callback`
-     (домен поточного Preview гілки `codex/admin-panel-spike` — див. звіт) і
-     `http://127.0.0.1:3000/api/keystatic/github/oauth/callback`;
-   - **Install App** → **Only select repositories** → `DREAM.CAR.VAVD`.
-4. **Vercel → Project `dream.car.vavd` → Settings → Environment Variables**, для
-   кожної: Environment = **Preview**, Branch = **`codex/admin-panel-spike`**:
-   `KEYSTATIC_STORAGE_KIND=github`, `KEYSTATIC_GITHUB_CLIENT_ID=…`,
-   `KEYSTATIC_GITHUB_CLIENT_SECRET=…`, `KEYSTATIC_SECRET=…` (ті самі, що в
-   локальному `.env`), `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`,
-   `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`.
-5. Vercel → Deployments → останній деплой гілки → ⋯ → **Redeploy**.
-6. Відкрити `https://<preview>/keystatic` → **Sign in with GitHub** → Authorize.
-   Має відкритися список колекцій; `https://<preview>/panel` — дашборд публікації.
-7. Далі — протокол перевірки з `docs/PANEL-hosted-verification.md` (вхід двох
-   користувачів, відмова сторонньому, реальна публікація за SHA, конфлікт,
-   відкликання доступу).
+   `KEYSTATIC_SECRET`. **Це секрети.**
+5. GitHub → Settings → Developer settings → GitHub Apps → `<новий App>` →
+   **Permissions & events**: додати **Deployments: Read** (маніфест Keystatic
+   його не просить, а банер стану збірки в `/panel` його потребує; без нього
+   банер показуватиме «стан невідомий» — не критично). Webhook → **Active off**.
+6. Той самий App → **Install App** → акаунт `DreamCar-vavd` → **Only select
+   repositories** → `DREAM.CAR.VAVD` → Install.
+7. Зупинити `npm run dev`. **Видалити `.env.local`** (інакше локальні
+   `npm run dev` / `npm run build` йтимуть у github-режим без токенів і
+   падатимуть). Секрети з `.env` перенести у Vercel (крок 3.2), потім `.env`
+   теж можна очистити.
 
-**Після підготовки — окреме погодження на конкретне підключення.** Секрети
-вставляються лише в Vercel, не в чат / Git / звіт.
+### 3.2. Vercel env (лише Preview потрібної гілки)
+
+**Vercel → Project `dream.car.vavd` → Settings → Environment Variables.** Для
+кожної: Environment = **Preview**, і в Advanced обрати **Specific Git Branches
+→ `codex/admin-panel-spike`** (щоб не зачепити інші preview-гілки):
+
+| Змінна | Значення | Секрет? |
+|---|---|---|
+| `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND` | `github` | ні |
+| `KEYSTATIC_GITHUB_REPO_OWNER` | `DreamCar-vavd` | ні |
+| `KEYSTATIC_GITHUB_REPO_NAME` | `DREAM.CAR.VAVD` | ні |
+| `KEYSTATIC_GITHUB_CLIENT_ID` | з локального `.env` | **так** |
+| `KEYSTATIC_GITHUB_CLIENT_SECRET` | з локального `.env` | **так** |
+| `KEYSTATIC_SECRET` | з локального `.env` (80 hex) | **так** |
+| `PANEL_CONTENT_BRANCH` *(необов'язково)* | `panel/content` | ні |
+
+Секрети вставляти **лише в поле Value у Vercel**, не в чат / Git / звіт.
+
+### 3.3. Callback після redeploy (проблема адреси, що змінюється)
+
+Кожен деплой має **унікальний** URL `dreamcarvavd-<hash>-…vercel.app`, але у
+Vercel є **стабільний branch-аліас** виду
+`dreamcarvavd-git-codex-admin-panel-spike-<scope>.vercel.app` (точний рядок —
+у Vercel → Project → Deployments, поряд із гілкою, або Settings → Domains;
+**не вигадувати**, скопіювати звідти). Keystatic будує `redirect_uri` як
+`${origin}/api/keystatic/github/oauth/callback`, тож:
+
+- **відкривати `/keystatic` треба саме через branch-аліас**, не через
+  per-deployment хеш-URL — тоді `redirect_uri` завжди той самий і стабільний;
+- у GitHub App → **Callback URLs** додати рівно два рядки:
+  `https://<branch-аліас>/api/keystatic/github/oauth/callback` і
+  `http://localhost:3000/api/keystatic/github/oauth/callback` (для локалі).
+- GitHub App приймає **кілька** Callback URLs і їх можна редагувати будь-коли —
+  переіменування гілки чи новий піддомен **не потрібні**.
+
+**Захист Preview + OAuth:** якщо ввімкнено Vercel Deployment Protection для
+Preview, редірект GitHub назад на `/api/keystatic/github/oauth/callback`
+впирається у challenge Vercel і код авторизації може не дійти. Варіанти:
+(а) на час налаштування й перевірки **вимкнути** захист Preview, потім
+увімкнути; (б) або обидва користувачі — члени команди Vercel, чия SSO-cookie
+проходить захист автоматично (тоді помічнику потрібен доступ до Vercel).
+Рекомендація — (а).
+
+### 3.4. Redeploy і перевірка
+
+8. Vercel → Deployments → останній деплой гілки → ⋯ → **Redeploy**
+   (env застосовуються лише до нової збірки).
+9. Відкрити `https://<branch-аліас>/keystatic` → **Sign in with GitHub** →
+   Authorize. Має відкритися список колекцій; `/panel` — дашборд.
+
+**Додавання env НЕ гарантує роботу.** Після цього — реальна перевірка входу,
+збереження й прав за протоколом `docs/PANEL-hosted-verification.md` (вхід двох
+користувачів, відмова сторонньому, публікація за SHA, конфлікт, відкликання).
+
+**Після підготовки — окреме погодження на конкретне підключення.**
 
 ---
 

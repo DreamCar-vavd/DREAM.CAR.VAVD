@@ -47,10 +47,10 @@ Vercel збирає  →  банер «✅ Поточний знімок в еф
 | | Коли | Куди пише |
 |---|---|---|
 | **local** | `next dev` | файли на диску (атомарно) |
-| **github** | деплой із `KEYSTATIC_STORAGE_KIND=github` | комміти через GitHub API токеном користувача, у гілку деплою; оптимістична конкурентність (409 → «оновіть сторінку») |
+| **github** | деплой із `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` | комміти через GitHub API токеном користувача, у гілку деплою; оптимістична конкурентність (409 → «оновіть сторінку») |
 
 `/keystatic`, `/panel`, `/api/*` → **404** на деплої без
-`KEYSTATIC_STORAGE_KIND=github`. Локальний файловий режим не має авторизації
+`NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`. Локальний файловий режим не має авторизації
 й не може писати на serverless FS — його не можна виставляти публічно.
 
 ## Галерея
@@ -107,7 +107,7 @@ Keystatic комітить фото в гілку контенту разом і
    Metadata: Read; install тільки на цей репозиторій.
    Callback: `https://<домен>/api/keystatic/github/oauth/callback`
    (+ `http://127.0.0.1:3000/…` для локальної розробки).
-2. Vercel env (Production + Preview): `KEYSTATIC_STORAGE_KIND=github`,
+2. Vercel env (Production + Preview): `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`,
    `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
    `KEYSTATIC_SECRET`, `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`,
    `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`.

@@ -21,7 +21,7 @@ export class NotConnectedError extends Error {
  *                          silent local write that a redeploy would lose.
  */
 export async function getStorage(): Promise<PanelStorage> {
-  if (process.env.KEYSTATIC_STORAGE_KIND !== "github") return new LocalFsStorage();
+  if (process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND !== "github") return new LocalFsStorage();
 
   const token = (await cookies()).get("keystatic-gh-access-token")?.value;
   if (!token) {
