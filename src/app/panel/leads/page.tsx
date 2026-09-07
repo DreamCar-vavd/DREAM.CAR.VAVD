@@ -94,7 +94,7 @@ export default async function LeadsPage({
     <main className="mx-auto max-w-3xl px-4 py-8">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">Заявки</h1>
-        <Link className="text-xs underline" href="/panel">
+        <Link className="inline-block py-1 text-xs underline" href="/panel">
           ← до публікації
         </Link>
       </div>
@@ -125,12 +125,15 @@ export default async function LeadsPage({
           </div>
           <div className="mt-4 flex gap-3 text-sm">
             {cursor && (
-              <Link className="underline" href="/panel/leads">
+              <Link className="inline-block py-1 underline" href="/panel/leads">
                 ⏮ на початок
               </Link>
             )}
             {page.nextCursor && (
-              <Link className="underline" href={`/panel/leads?cursor=${encodeURIComponent(page.nextCursor)}`}>
+              <Link
+                className="inline-block py-1 underline"
+                href={`/panel/leads?cursor=${encodeURIComponent(page.nextCursor)}`}
+              >
                 Наступні {PAGE_SIZE} →
               </Link>
             )}

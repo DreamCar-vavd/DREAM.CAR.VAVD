@@ -58,7 +58,7 @@ export default async function VideoPage() {
     <main className="mx-auto max-w-3xl px-4 py-8">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">Відео авто</h1>
-        <Link className="text-xs underline" href="/panel">
+        <Link className="inline-block py-1 text-xs underline" href="/panel">
           ← до публікації
         </Link>
       </div>

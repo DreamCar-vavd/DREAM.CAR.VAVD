@@ -68,7 +68,7 @@ export function PanelButton({
   }
 
   const base =
-    "inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed";
+    "inline-flex min-h-[36px] items-center gap-1 rounded border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed";
   const styles = {
     default: "border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800",
     primary: "border-amber-600 bg-amber-600 text-white hover:bg-amber-700",
@@ -119,7 +119,7 @@ export function RefreshButton() {
       type="button"
       onClick={() => startTransition(() => router.refresh())}
       disabled={pending}
-      className="rounded border border-neutral-400 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
+      className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
     >
       {pending ? "…" : "Оновити стан"}
     </button>

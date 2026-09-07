@@ -87,7 +87,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
           <span className="font-semibold">{row.title}</span>{" "}
           <span className="text-xs text-neutral-500">{row.subtitle}</span>
         </div>
-        <a className="text-xs underline" href={row.editHref}>
+        <a className="inline-block py-1 text-xs underline" href={row.editHref}>
           Редагувати в Keystatic →
         </a>
       </div>
@@ -158,7 +158,7 @@ function Group({ group, versions }: { group: PanelGroup; versions: PanelData["ve
         <h2 className="text-lg font-bold">{group.label}</h2>
         {group.createHref && (
           <a
-            className="rounded border border-neutral-400 px-2 py-1 text-xs underline hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs underline hover:bg-neutral-100 dark:hover:bg-neutral-800"
             href={group.createHref}
           >
             + Створити в Keystatic
@@ -295,13 +295,13 @@ export default async function PanelPage() {
         </span>
       </p>
       <p className="mt-2 text-sm">
-        <Link className="underline" href="/panel/leads">
+        <Link className="inline-block py-1 underline" href="/panel/leads">
           Заявки з форми →
         </Link>{" "}
         <span className="text-xs text-neutral-500">(перегляд; база ще не підключена — демо-дані)</span>
       </p>
       <p className="mt-1 text-sm">
-        <Link className="underline" href="/panel/video">
+        <Link className="inline-block py-1 underline" href="/panel/video">
           Відео авто →
         </Link>{" "}
         <span className="text-xs text-neutral-500">
@@ -314,7 +314,7 @@ export default async function PanelPage() {
           <a
             key={g.kind}
             href={`#group-${g.kind}`}
-            className="rounded-full border border-neutral-300 px-2.5 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            className="inline-flex min-h-[34px] items-center rounded-full border border-neutral-300 px-3 py-1.5 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
           >
             {g.label}
           </a>
