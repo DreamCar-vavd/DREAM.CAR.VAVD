@@ -32,7 +32,10 @@ const EMPTY: CmsContact["uk"] = { heading: "", subheading: "", hoursLabel: "", a
  */
 export async function getContactData(locale: ContentLocale): Promise<SiteContactData> {
   const { contact } = await readSiteContent();
-  const c = contact[0];
+  // Contacts are a single record. Read the canonical `site` entry explicitly —
+  // never "whichever sorts first" — so a stray second record can't change what
+  // the site shows.
+  const c = contact.find((x) => x.id === "site") ?? null;
   if (!c) {
     return {
       present: false,

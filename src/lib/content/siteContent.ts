@@ -78,7 +78,8 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
       cars: coerce(carsDir.data, coerceCar),
       gallery: coerce(galleryDir.data, coerceGalleryProject),
       services: coerce(servicesDir.data, coerceService),
-      contact: coerce(contactDir.data, (id, r) => coerceContact(id, r)),
+      // one record only — ignore any stray extra file in the draft copy
+      contact: coerce(contactDir.data, (id, r) => coerceContact(id, r)).filter((c) => c.id === "site"),
       promos: coerce(promosDir.data, coercePromo),
       isDraftPreview: true,
       draftVersion: shortHash(

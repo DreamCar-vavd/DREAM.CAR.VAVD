@@ -172,7 +172,16 @@ function Group({ group, versions }: { group: PanelGroup; versions: PanelData["ve
       )}
       <div className="mt-3 space-y-4">
         {group.rows.length === 0 && (
-          <p className="text-sm text-neutral-500">Порожньо.</p>
+          <p className="rounded border border-dashed border-neutral-300 p-3 text-sm text-neutral-500 dark:border-neutral-700">
+            Матеріалів ще немає.{" "}
+            {group.createHref ? (
+              <a className="underline" href={group.createHref}>
+                Створити перший у Keystatic →
+              </a>
+            ) : (
+              "Заповніть запис у Keystatic."
+            )}
+          </p>
         )}
         {group.rows.map((row) => (
           <Row key={row.id} row={row} kind={group.kind} versions={versions} />

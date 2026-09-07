@@ -186,6 +186,7 @@ const FIELD_LABELS: Record<string, string> = {
   linkUrl: "посилання (внутрішнє «/…» або https)",
   promoType: "тип матеріалу (банер / акція / новина)",
   promoDate: "дата (у форматі РРРР-ММ-ДД)",
+  contactId: "ID запису контактів — має бути «site» (єдиний запис)",
   phoneDisplay: "телефон (показ)",
   phoneE164: "телефон (для tel:)",
   email: "email",

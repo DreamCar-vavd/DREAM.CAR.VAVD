@@ -97,6 +97,11 @@ export function getContactLangStatus(
 
 export function getContactPublishBlockers(c: CmsContact, ctx: GateContext = {}): GateFailure[] {
   const failures: GateFailure[] = [];
+  // Contacts are one record with a fixed id. Anything else must not publish —
+  // it would be a second, conflicting contact set.
+  if (c.id !== "site") {
+    failures.push({ kind: "missing-field", locale: "uk", field: "contactId" });
+  }
   if (c.phoneDisplay?.trim() && !isValidPhone(c.phoneDisplay)) {
     failures.push({ kind: "missing-field", locale: "uk", field: "phoneDisplay" });
   }

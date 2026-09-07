@@ -135,7 +135,9 @@ function subtitleFor(kind: KindKey, item: { id: string; order: number } & Record
   return `${item.id} · порядок ${item.order}`;
 }
 const editHrefFor = (kind: KindKey, id: string) =>
-  `/keystatic/collection/${COLLECTION_SLUG[kind]}/item/${id}`;
+  kind === "contact"
+    ? "/keystatic/singleton/siteContact" // singleton — one edit page, no "Add"
+    : `/keystatic/collection/${COLLECTION_SLUG[kind]}/item/${id}`;
 
 export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));

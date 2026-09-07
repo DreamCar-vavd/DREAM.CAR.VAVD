@@ -28,7 +28,28 @@ async function guard(publishedObj: unknown) {
 
 const realSnapshot = JSON.parse(
   readFileSync(path.join(ROOT, "src/content/cms/published.json"), "utf8"),
-) as { publishedAt: string; cars: Record<string, unknown>[]; gallery: Record<string, unknown>[] };
+) as {
+  publishedAt: string;
+  cars: Record<string, unknown>[];
+  gallery: Record<string, unknown>[];
+  contact: Record<string, unknown>[];
+};
+
+test("content-guard rejects a second contact record", async () => {
+  const bad = structuredClone(realSnapshot);
+  bad.contact = [...(bad.contact ?? []), { ...(bad.contact?.[0] ?? {}), id: "site-2" }];
+  const r = await guard(bad);
+  assert.equal(r.ok, false);
+  assert.match(r.out, /більше одного запису contact/);
+});
+
+test("content-guard rejects a contact record whose id is not 'site'", async () => {
+  const bad = structuredClone(realSnapshot);
+  bad.contact = [{ ...(bad.contact?.[0] ?? {}), id: "primary" }];
+  const r = await guard(bad);
+  assert.equal(r.ok, false);
+  assert.match(r.out, /має бути «site»|contactId/);
+});
 
 test("content-guard passes on the real published snapshot", async () => {
   const r = await guard(realSnapshot);

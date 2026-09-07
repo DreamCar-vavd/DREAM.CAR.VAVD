@@ -56,7 +56,7 @@ function assertServiceSane(s: CmsService): void {
 }
 function assertContactSane(c: CmsContact): void {
   const w = `published.json → contact "${c?.id ?? "?"}"`;
-  if (!c?.id) throw new Error(`${w}: missing id`);
+  if (c?.id !== "site") throw new Error(`${w}: contact id must be "site"`);
   for (const l of LOCALES) {
     if (!String(c[l]?.heading ?? "").trim() || !String(c[l]?.subheading ?? "").trim()) {
       throw new Error(`${w}: ${l.toUpperCase()} heading/subheading empty`);
@@ -104,7 +104,11 @@ export const readPublishedSnapshot = cache(async (): Promise<PublishedSnapshot> 
   const services = list("services")
     .map((s) => coerceService(String(s.id ?? ""), s))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-  const contact = list("contact").map((c) => coerceContact(String(c.id ?? "site"), c));
+  const contactRaw = list("contact").map((c) => coerceContact(String(c.id ?? "site"), c));
+  if (contactRaw.length > 1) {
+    throw new Error(`published.json → contact: expected 0 or 1 record, got ${contactRaw.length}`);
+  }
+  const contact = contactRaw;
   const promos = list("promos")
     .map((x) => coercePromo(String(x.id ?? ""), x))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));

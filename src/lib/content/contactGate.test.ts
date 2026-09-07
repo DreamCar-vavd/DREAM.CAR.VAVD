@@ -62,6 +62,14 @@ test("a contact with only the required facts + all empty optional fields publish
   assert.deepEqual(getContactPublishBlockers(c, { review: reviewedAll(c), sha256 }), []);
 });
 
+test("single-record rule: only id 'site' can publish — a second/renamed record is blocked", () => {
+  const c = contact({ id: "site-2" });
+  const b = getContactPublishBlockers(c, { review: reviewedAll(contact()), sha256 });
+  assert.ok(b.some((f) => "field" in f && f.field === "contactId"));
+  // the canonical record still publishes fine
+  assert.deepEqual(getContactPublishBlockers(contact(), { review: reviewedAll(contact()), sha256 }), []);
+});
+
 test("shared facts are entered once; the same phone/email serves all three languages", () => {
   const c = contact();
   // No per-language phone/email fields exist on the model at all.

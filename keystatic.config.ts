@@ -150,13 +150,21 @@ const carLanguage = (label: string) =>
 
 export default config({
   storage,
+  // Keystatic ships a partial uk-UA translation (nav, Search, Add, Create,
+  // Save, Edit, Delete, Cancel, Dashboard, Collections, Singletons). Some
+  // system strings — "No results", "Unsaved" and a few dialog / empty-state
+  // texts — are hard-coded English in @keystatic/core@0.6.9 and cannot be
+  // translated without forking the library. The panel's own pages (/panel,
+  // /panel/leads, …) are fully Ukrainian.
+  locale: "uk-UA",
   ui: {
     brand: { name: "DREAM.CAR.VAVD — панель" },
     navigation: {
+      // Human-readable overview with names + statuses is at /panel; these are
+      // the field editors behind it.
       Контент: ["cars", "galleryProjects", "services"],
       "Банери, акції, новини": ["promos"],
       "Контакти й графік": ["siteContact"],
-      Налаштування: ["siteSettings"],
     },
   },
   collections: {
@@ -165,13 +173,17 @@ export default config({
       slugField: "id",
       path: "src/content/cms/cars/*",
       format: { data: "json" },
-      columns: ["id", "saleStatus", "order"],
+      // Keystatic list columns can only show a top-level field's RAW value
+      // (a select shows "for-sale", not «У продажі»; a nested uk.title can't be
+      // a column at all). The readable overview — names + human statuses — is
+      // /panel; here the slug is the row name.
+      columns: ["saleStatus", "order"],
       schema: {
         id: fields.slug({
           name: {
-            label: "ID автомобіля",
+            label: "ID / адреса авто (латиницею, напр. suzuki-sx4-s-cross)",
             description:
-              "Стабільний ідентифікатор. Використовується формою зворотного зв'язку та CTA. Не змінюйте у наявних авто.",
+              "Стабільний ідентифікатор і частина адреси. Назва авто вводиться в мовних блоках нижче. Використовується формою зворотного зв'язку та CTA — не змінюйте у наявних авто.",
             validation: { isRequired: true },
           },
         }),
@@ -264,11 +276,11 @@ export default config({
     }),
 
     galleryProjects: collection({
-      label: "Галерея (тексти)",
+      label: "Галерея робіт (фото + тексти)",
       slugField: "id",
       path: "src/content/cms/gallery/*",
       format: { data: "json" },
-      columns: ["id", "kind", "order"],
+      columns: ["kind", "year", "order"],
       schema: {
         id: fields.slug({
           name: {
@@ -326,7 +338,7 @@ export default config({
       slugField: "id",
       path: "src/content/cms/services/*",
       format: { data: "json" },
-      columns: ["id", "status", "order"],
+      columns: ["status", "order"],
       schema: {
         id: fields.slug({
           name: {
@@ -386,69 +398,12 @@ export default config({
       },
     }),
 
-    siteContact: collection({
-      label: "Контакти й графік",
-      slugField: "id",
-      path: "src/content/cms/contact/*",
-      format: { data: "json" },
-      columns: ["id"],
-      schema: {
-        id: fields.slug({
-          name: {
-            label: "ID запису",
-            description:
-              "Завжди «site». Це єдиний запис контактів — не створюйте другий.",
-            validation: { isRequired: true },
-          },
-        }),
-        order: fields.integer({ label: "Порядок", defaultValue: 1 }),
-
-        // ---- Спільні факти (вводяться один раз, застосовуються до всіх мов) ----
-        phoneDisplay: fields.text({
-          label: "Телефон (як показувати)",
-          description: "Напр. «+44 7706 054203».",
-        }),
-        phoneE164: fields.text({
-          label: "Телефон для посилання (E.164)",
-          description: "Лише + і цифри, напр. «+447706054203». Формує посилання tel:.",
-        }),
-        email: fields.text({
-          label: "Публічний email",
-          description:
-            "Показується на сайті. НЕ впливає на адресу, куди надходять заявки з форми (це технічне налаштування).",
-        }),
-        whatsappNumber: fields.text({
-          label: "Номер WhatsApp",
-          description: "Лише цифри, напр. «447706054203». Формує посилання wa.me.",
-        }),
-        telegramUrl: fields.text({ label: "Telegram (посилання, необов'язково)" }),
-        instagramUrl: fields.text({ label: "Instagram (посилання, необов'язково)" }),
-        facebookUrl: fields.text({ label: "Facebook (посилання, необов'язково)" }),
-        youtubeUrl: fields.text({ label: "YouTube (посилання, необов'язково)" }),
-        addressText: fields.text({
-          label: "Адреса (необов'язково)",
-          description: "Якщо адреси немає — залиште порожнім, блок не показуватиметься.",
-          multiline: true,
-        }),
-        mapsUrl: fields.text({ label: "Посилання на карту (Google Maps, необов'язково)" }),
-        hours: fields.text({
-          label: "Графік роботи (необов'язково)",
-          description: "Вільний текст, напр. «Пн–Пт 9:00–18:00». Порожньо — блок прихований.",
-          multiline: true,
-        }),
-
-        uk: contactLanguage("Українська"),
-        en: contactLanguage("English"),
-        ru: contactLanguage("Русский"),
-      },
-    }),
-
     promos: collection({
       label: "Банери, акції, новини",
       slugField: "id",
       path: "src/content/cms/promos/*",
       format: { data: "json" },
-      columns: ["id", "type", "visible", "order"],
+      columns: ["type", "visible", "order"],
       schema: {
         id: fields.slug({
           name: {
@@ -499,17 +454,61 @@ export default config({
     }),
   },
   singletons: {
-    siteSettings: singleton({
-      label: "Налаштування сайту",
-      path: "src/content/cms/settings/site",
+    // Contacts + schedule are ONE record for the whole site. A singleton (not a
+    // collection) so Keystatic shows a single edit page with no "Add" button —
+    // a second, conflicting contact set can't be created by accident. The file
+    // stays at src/content/cms/contact/site.json; the panel + snapshot still
+    // treat it as the single `site` entry, and the publish gate rejects any id
+    // other than "site".
+    siteContact: singleton({
+      label: "Контакти й графік",
+      path: "src/content/cms/contact/site",
       format: { data: "json" },
       schema: {
-        note: fields.text({
-          label: "Службова примітка",
+        id: fields.text({
+          label: "ID запису",
+          description: "Завжди «site». Не змінюйте.",
+          defaultValue: "site",
+        }),
+        order: fields.integer({ label: "Порядок", defaultValue: 1 }),
+
+        // ---- Спільні факти (вводяться один раз, застосовуються до всіх мов) ----
+        phoneDisplay: fields.text({
+          label: "Телефон (як показувати)",
+          description: "Напр. «+44 7706 054203».",
+        }),
+        phoneE164: fields.text({
+          label: "Телефон для посилання (E.164)",
+          description: "Лише + і цифри, напр. «+447706054203». Формує посилання tel:.",
+        }),
+        email: fields.text({
+          label: "Публічний email",
           description:
-            "Розділи «Контакти», «Графік», «Банери» додаються на наступному етапі (report/33 §10). Цей сінглтон — заготовка.",
+            "Показується на сайті. НЕ впливає на адресу, куди надходять заявки з форми (це технічне налаштування).",
+        }),
+        whatsappNumber: fields.text({
+          label: "Номер WhatsApp",
+          description: "Лише цифри, напр. «447706054203». Формує посилання wa.me.",
+        }),
+        telegramUrl: fields.text({ label: "Telegram (посилання, необов'язково)" }),
+        instagramUrl: fields.text({ label: "Instagram (посилання, необов'язково)" }),
+        facebookUrl: fields.text({ label: "Facebook (посилання, необов'язково)" }),
+        youtubeUrl: fields.text({ label: "YouTube (посилання, необов'язково)" }),
+        addressText: fields.text({
+          label: "Адреса (необов'язково)",
+          description: "Якщо адреси немає — залиште порожнім, блок не показуватиметься.",
           multiline: true,
         }),
+        mapsUrl: fields.text({ label: "Посилання на карту (Google Maps, необов'язково)" }),
+        hours: fields.text({
+          label: "Графік роботи (необов'язково)",
+          description: "Вільний текст, напр. «Пн–Пт 9:00–18:00». Порожньо — блок прихований.",
+          multiline: true,
+        }),
+
+        uk: contactLanguage("Українська"),
+        en: contactLanguage("English"),
+        ru: contactLanguage("Русский"),
       },
     }),
   },
