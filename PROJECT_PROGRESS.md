@@ -2151,6 +2151,11 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
     підуть у `…-panel-setup-verify/.env` (git-ignored). Worktree й `.env` **не
     видаляти** до перенесення у Vercel + hosted-перевірки. Зупиняти сервер —
     конкретним `kill <pid>` (pid у `…-panel-setup-verify/setup-server.log`).
+    **Перша спроба власника впала** («We didn't find an App Manifest») —
+    діагноз: 5-хв cookie `app_manifest_token` GitHub + логін-редірект, НЕ код і
+    НЕ попередження React (форма шле повний маніфест — перевірено curl-ом).
+    Фікс: увійти в GitHub наперед + швидко; запасний ручний шлях у тому ж
+    документі. Журнал — П18.
 
 ## 2. Що зроблено повністю (код готовий, покрито тестами)
 

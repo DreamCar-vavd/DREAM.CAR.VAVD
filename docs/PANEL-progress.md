@@ -19,10 +19,14 @@
 - **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
-  `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` @ `2b4d9f3`,
+  `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (кінець гілки),
   `.env.local` (3 несекретні рядки) на місці, `next dev` на `http://127.0.0.1:3010`.
   Одна дія власника — `docs/PANEL-owner-request-B1.md`. Секрети після створення App
   запишуться у `…-panel-setup-verify/.env` (git-ignored). Worktree **не видаляти**.
+- **Перша спроба власника впала** («We didn't find an App Manifest») — причина
+  діагностована (5-хв cookie `app_manifest_token` + логін-редірект), не код і не
+  попередження React. Виправлення — процедурне (увійти в GitHub наперед) +
+  запасний ручний шлях. Деталі — журнал П18, `docs/PANEL-owner-request-B1.md`.
 - **Незакомічених змін у гілці немає**
 
 ### Що НЕ перевірено наживо (важливо для приймання)
@@ -38,6 +42,38 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П18 — діагностика провалу створення App: «We didn't find an App Manifest»
+- **Симптом власника:** GitHub → «We didn't find an App Manifest for your
+  request.» + консольне попередження React про `value` без `onChange` на
+  `input[name="manifest"]`.
+- **Попередження React — НЕ причина (доведено).** У браузері
+  `new FormData(form).get("manifest")` = повний валідний JSON (409 симв.),
+  `input.readOnly=false`, `disabled=false`, форма `POST`
+  `application/x-www-form-urlencoded` → `github.com/settings/apps/new`. Джерело
+  попередження — зібраний `keystatic-core-ui.js` (вендор). `node_modules` не
+  патчили, перевірки не вимикали.
+- **Маніфест доходить і приймається (доведено).** `curl -X POST … --data-urlencode
+  "manifest=<той самий json>"` → GitHub `302 → /settings/apps/manifest` +
+  `Set-Cookie app_manifest_token=… expires ~5 хв, HttpOnly, SameSite=Lax`.
+  Помилкової сторінки немає.
+- **`/settings/apps/manifest` вимагає входу:** без сесії → `302 /login?return_to=…`.
+- **Підтверджена причина:** GitHub тримає маніфест за короткоживучим (~5 хв)
+  cookie `app_manifest_token`. Якщо власник не залогінений у GitHub наперед,
+  ланцюг логін+2FA/SSO перевищує 5 хв, cookie згасає → цей текст помилки.
+  (1-годинний ліміт із доків GitHub — це інший токен, `code` на кроці
+  `redirect_url`→`/app-manifests/{code}/conversions`.)
+- **Мінімальне усунення:** увійти в GitHub у тому самому браузері **до**
+  відкриття setup, пройти екран GitHub швидко (< 5 хв). Провалена спроба нічого
+  не створює — перезавантажити `/keystatic/setup`, клікнути ще раз (дубля не
+  буде). Запасний детермінований шлях без manifest-flow (ручне створення App +
+  `openssl rand -hex 32` для `KEYSTATIC_SECRET`) — `docs/PANEL-owner-request-B1.md`
+  §«Запасний шлях».
+- **Код не змінювали.** Оновлено `docs/PANEL-owner-request-B1.md` (розділ
+  «Діагностика» + крок 0 «увійти в GitHub» + «Запасний шлях») і
+  `docs/PANEL-hosting-and-approvals.md` §2, §3.1.
+- Setup-сервер (`next dev`, worktree `panel-setup-verify`, `127.0.0.1:3010`)
+  лишили запущеним; App не створювали; `main`/Production не чіпали.
 
 ### П17 — GitHub App: готове середовище + один запит власнику
 - **Мета:** одне перевірене посилання для СПРАВЖНЬОГО створення App власником,
