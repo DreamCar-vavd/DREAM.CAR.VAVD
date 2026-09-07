@@ -58,20 +58,31 @@ export function createPgLeadsStore(db: Queryable): WritableLeadsStore {
   return {
     kind: "database",
 
-    async create(input: LeadInput, idempotencyKey: string) {
-      // ON CONFLICT DO NOTHING -> 0 rows when this is a retry of a submission
-      // already stored. Either way the submission IS captured.
+    async create(input: LeadInput, keys: { current: string; previous: string }) {
+      // Boundary-safe dedup: a straddling retry may already be stored under the
+      // PREVIOUS bucket's key. If either key is present, do not insert again.
+      const dup = await db.query<{ id: string }>(
+        `SELECT id FROM leads
+         WHERE idempotency_key IN ($1, $2)
+         ORDER BY created_at DESC LIMIT 1`,
+        [keys.current, keys.previous],
+      );
+      if (dup.rows[0]?.id) return { id: dup.rows[0].id, inserted: false };
+
+      // ON CONFLICT DO NOTHING also guards the race where two identical
+      // requests land at once — the loser gets 0 rows and we re-select.
       const res = await db.query<{ id: string }>(
         `INSERT INTO leads (name, phone, email, service, vehicle, message, idempotency_key)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (idempotency_key) DO NOTHING
          RETURNING id`,
-        [input.name, input.phone, input.email, input.service, input.vehicle, input.message, idempotencyKey],
+        [input.name, input.phone, input.email, input.service, input.vehicle, input.message, keys.current],
       );
       if (res.rows[0]?.id) return { id: res.rows[0].id, inserted: true };
+
       const found = await db.query<{ id: string }>(
         `SELECT id FROM leads WHERE idempotency_key = $1`,
-        [idempotencyKey],
+        [keys.current],
       );
       return { id: found.rows[0]?.id ?? "", inserted: false };
     },

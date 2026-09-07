@@ -8,7 +8,7 @@ import {
   resolveAllowedEndpoint,
   validateContactPayload,
 } from "@/lib/contact";
-import { getWritableLeadsStore, deriveIdempotencyKey, type LeadInput } from "@/lib/leads/store";
+import { getWritableLeadsStore, deriveIdempotencyKeys, type LeadInput } from "@/lib/leads/store";
 import { resolveLeadResponse, type EmailOutcome } from "@/lib/leads/deliver";
 
 const MAX_BODY_BYTES = 32 * 1024;
@@ -76,8 +76,8 @@ export async function POST(request: Request) {
   let savedToDb = false;
   if (leadsStore) {
     try {
-      const key = await deriveIdempotencyKey(validation.payload as LeadInput);
-      await leadsStore.create(validation.payload as LeadInput, key);
+      const keys = await deriveIdempotencyKeys(validation.payload as LeadInput);
+      await leadsStore.create(validation.payload as LeadInput, keys);
       savedToDb = true;
     } catch {
       console.warn("[contact] lead DB write failed; continuing with email only");

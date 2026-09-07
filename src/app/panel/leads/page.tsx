@@ -16,11 +16,25 @@ function fmtDate(iso: string): string {
 function DemoBanner() {
   return (
     <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-      <strong>Демонстраційні дані.</strong> Базу заявок ще не підключено — цей список
-      згенеровано на сервері для перевірки інтерфейсу. Це <strong>не</strong> справжні
-      звернення клієнтів. Справжні заявки й далі надходять на пошту через наявний
-      канал (він тут не змінюється).
+      <strong>Тестовий режим — демонстраційні дані.</strong> Список згенеровано на
+      сервері для перевірки інтерфейсу. Це <strong>не</strong> справжні звернення
+      клієнтів. Справжні заявки й далі надходять на пошту через наявний канал (він
+      тут не змінюється).
     </p>
+  );
+}
+
+function NotConfiguredNotice() {
+  return (
+    <div className="mt-3 rounded border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+      <p className="font-semibold">Сховище заявок не налаштоване.</p>
+      <p className="mt-1">
+        Змінна <code>LEADS_DATABASE_URL</code> не задана в цьому середовищі. Заявки з
+        форми <strong>не зберігаються</strong> тут — вони й далі надходять на пошту
+        через наявний канал. Щоб бачити заявки в панелі, підключіть базу (див.{" "}
+        <code>docs/PANEL-leads-db.md</code>).
+      </p>
+    </div>
   );
 }
 
@@ -100,6 +114,7 @@ export default async function LeadsPage({
       </div>
 
       {store.kind === "demo" && <DemoBanner />}
+      {store.kind === "not-configured" && <NotConfiguredNotice />}
 
       {loadError && (
         <p className="mt-4 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300">
@@ -107,7 +122,7 @@ export default async function LeadsPage({
         </p>
       )}
 
-      {page && page.leads.length === 0 && !loadError && (
+      {page && page.leads.length === 0 && !loadError && store.kind !== "not-configured" && (
         <p className="mt-6 rounded border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
           Заявок поки немає.
         </p>

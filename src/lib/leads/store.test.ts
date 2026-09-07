@@ -1,6 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getLeadsStore } from "./store";
+import { getLeadsStore, resolveLeadsMode } from "./store";
+
+test("resolveLeadsMode: DB url wins; else demo in dev / when explicitly on; else not-configured", () => {
+  const orig = { url: process.env.LEADS_DATABASE_URL, demo: process.env.LEADS_DEMO_MODE };
+  try {
+    delete process.env.LEADS_DATABASE_URL;
+    delete process.env.LEADS_DEMO_MODE;
+    // node:test runs with NODE_ENV !== "production" -> dev -> demo
+    assert.equal(resolveLeadsMode(), "demo");
+
+    process.env.LEADS_DEMO_MODE = "1";
+    assert.equal(resolveLeadsMode(), "demo");
+
+    process.env.LEADS_DATABASE_URL = "postgres://x";
+    assert.equal(resolveLeadsMode(), "database");
+  } finally {
+    if (orig.url === undefined) delete process.env.LEADS_DATABASE_URL;
+    else process.env.LEADS_DATABASE_URL = orig.url;
+    if (orig.demo === undefined) delete process.env.LEADS_DEMO_MODE;
+    else process.env.LEADS_DEMO_MODE = orig.demo;
+  }
+});
 
 test("with no LEADS_DATABASE_URL, the store is the demo store and every row is flagged demo", async () => {
   delete process.env.LEADS_DATABASE_URL;

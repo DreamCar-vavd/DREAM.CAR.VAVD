@@ -1,0 +1,9 @@
+# Source files are always text — never let a stray byte flip binary detection.
+*.ts    text
+*.tsx   text
+*.mjs   text
+*.js    text
+*.json  text
+*.css   text
+*.md    text
+*.sql   text

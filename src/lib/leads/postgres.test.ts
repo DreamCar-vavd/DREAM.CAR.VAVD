@@ -26,32 +26,44 @@ function fakeDb(results: Array<{ rows: Record<string, unknown>[]; rowCount?: num
   return { db, calls };
 }
 
-test("create: a fresh row -> inserted:true, one INSERT ... ON CONFLICT", async () => {
-  const { db, calls } = fakeDb([{ rows: [{ id: "11111111-1111-1111-1111-111111111111" }] }]);
+const KEYS = { current: "key-cur", previous: "key-prev" };
+
+test("create: no existing key -> checks both keys, then INSERT ... ON CONFLICT", async () => {
+  const { db, calls } = fakeDb([
+    { rows: [], rowCount: 0 }, // dedup SELECT (current, previous) — none
+    { rows: [{ id: "11111111-1111-1111-1111-111111111111" }] }, // INSERT
+  ]);
   const store = createPgLeadsStore(db);
-  const r = await store.create(input, "key-abc");
+  const r = await store.create(input, KEYS);
   assert.deepEqual(r, { id: "11111111-1111-1111-1111-111111111111", inserted: true });
-  assert.match(calls[0].text, /INSERT INTO leads .* ON CONFLICT \(idempotency_key\) DO NOTHING RETURNING id/);
-  assert.deepEqual(calls[0].params, [
-    input.name,
-    input.phone,
-    input.email,
-    input.service,
-    input.vehicle,
-    input.message,
-    "key-abc",
+  assert.match(calls[0].text, /SELECT id FROM leads WHERE idempotency_key IN \(\$1, \$2\)/);
+  assert.deepEqual(calls[0].params, ["key-cur", "key-prev"]);
+  assert.match(calls[1].text, /INSERT INTO leads .* ON CONFLICT \(idempotency_key\) DO NOTHING RETURNING id/);
+  assert.deepEqual(calls[1].params, [
+    input.name, input.phone, input.email, input.service, input.vehicle, input.message, "key-cur",
   ]);
 });
 
-test("create: a deduped retry (0 rows) -> inserted:false, still returns the existing id", async () => {
+test("create: a boundary retry stored under the PREVIOUS key -> inserted:false, no INSERT", async () => {
   const { db, calls } = fakeDb([
-    { rows: [], rowCount: 0 }, // ON CONFLICT DO NOTHING
-    { rows: [{ id: "22222222-2222-2222-2222-222222222222" }] }, // SELECT by key
+    { rows: [{ id: "22222222-2222-2222-2222-222222222222" }] }, // dedup SELECT matched previous
   ]);
   const store = createPgLeadsStore(db);
-  const r = await store.create(input, "key-dup");
+  const r = await store.create(input, KEYS);
   assert.deepEqual(r, { id: "22222222-2222-2222-2222-222222222222", inserted: false });
-  assert.match(calls[1].text, /SELECT id FROM leads WHERE idempotency_key = \$1/);
+  assert.equal(calls.length, 1); // never reached the INSERT
+});
+
+test("create: a concurrent insert wins the race (0 rows from INSERT) -> re-select current key", async () => {
+  const { db, calls } = fakeDb([
+    { rows: [], rowCount: 0 }, // dedup SELECT — none yet
+    { rows: [], rowCount: 0 }, // INSERT lost the ON CONFLICT race
+    { rows: [{ id: "33333333-3333-3333-3333-333333333333" }] }, // re-select current
+  ]);
+  const store = createPgLeadsStore(db);
+  const r = await store.create(input, KEYS);
+  assert.deepEqual(r, { id: "33333333-3333-3333-3333-333333333333", inserted: false });
+  assert.match(calls[2].text, /SELECT id FROM leads WHERE idempotency_key = \$1/);
 });
 
 test("list: first page requests limit+1, orders newest-first, excludes soft-deleted", async () => {

@@ -30,12 +30,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS leads_idempotency_key_uidx ON leads (idempoten
 -- Cursor pagination is by (created_at DESC, id) — a covering index keeps it cheap.
 CREATE INDEX IF NOT EXISTS leads_created_at_idx ON leads (created_at DESC, id);
 
--- The adapter's write, for reference:
+-- The adapter's write, for reference (boundary-safe dedup — see
+-- deriveIdempotencyKeys: keys.current + keys.previous cover a retry that
+-- straddled a 10-minute bucket boundary):
+--   SELECT id FROM leads
+--     WHERE idempotency_key IN ($current, $previous)
+--     ORDER BY created_at DESC LIMIT 1;          -- hit -> inserted:false, done
 --   INSERT INTO leads (name, phone, email, service, vehicle, message, idempotency_key)
---   VALUES ($1,$2,$3,$4,$5,$6,$7)
---   ON CONFLICT (idempotency_key) DO NOTHING
---   RETURNING id;
--- (0 rows returned == deduped retry; still report the submission as saved.)
+--     VALUES ($1,$2,$3,$4,$5,$6,$current)
+--     ON CONFLICT (idempotency_key) DO NOTHING
+--     RETURNING id;                              -- 0 rows -> lost a race; re-select
 --
 -- The adapter's read (one page):
 --   SELECT id, created_at, name, phone, email, service, vehicle, message
