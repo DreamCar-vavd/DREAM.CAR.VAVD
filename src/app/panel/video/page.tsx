@@ -40,14 +40,18 @@ export default async function VideoPage() {
       err instanceof VideoStoreNotConfiguredError ? err.message : (err as Error).message;
   }
 
-  // Which uploaded video does each working car reference?
+  // Which uploaded video does each working car reference? A local key is a bare
+  // filename in `/uploads/videos/<key>`; a blob key IS the full https URL, which
+  // is what the car's `video.src` stores directly.
   const usage: Record<string, string | null> = Object.fromEntries(videos.map((v) => [v.key, null]));
   try {
     const dir = await storage.readDir("src/content/cms/cars");
     for (const entry of dir.data) {
       const car = coerceCar(entry.name.replace(/\.json$/, ""), JSON.parse(entry.text || "{}"));
-      const src = car.video?.src ?? "";
-      const m = /\/uploads\/videos\/([^/]+)$/.exec(src);
+      const src = (car.video?.src ?? "").trim();
+      if (!src) continue;
+      if (src in usage) usage[src] = car.id; // blob: exact URL match
+      const m = /\/uploads\/videos\/([^/]+)$/.exec(src); // local: filename
       if (m && m[1] in usage) usage[m[1]] = car.id;
     }
   } catch {
@@ -66,20 +70,20 @@ export default async function VideoPage() {
       <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
         Відеофайли зберігаються <strong>поза Git</strong>. Локально —{" "}
         <code>public/uploads/videos/</code> (не потрапляє в репозиторій); на хостингу —
-        зовнішнє сховище (потрібне підключення, див. звіт). Після завантаження посилання
+        зовнішнє сховище Vercel Blob (потрібне підключення — docs/PANEL-video-hosting.md, там же про приватність чернеток). Після завантаження посилання
         вставляється в поле «Відео» авто в Keystatic — саме воно й публікується.
       </p>
 
-      {store.kind === "blob" && (
-        <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300">
-          Хостинг-режим: адаптер зовнішнього сховища ще не реалізований. Завантаження відео
-          доступне лише локально (<code>next dev</code>).
+      {store.kind === "blob" && listError && (
+        <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+          Хостинг-режим Vercel Blob: {listError} Перевірте <code>BLOB_READ_WRITE_TOKEN</code>{" "}
+          (Vercel → Storage → Blob).
         </p>
       )}
 
       <h2 className="mt-6 text-sm font-semibold">Завантажити відео</h2>
       <div className="mt-2">
-        <VideoUploader />
+        <VideoUploader mode={store.kind} />
       </div>
 
       <h2 className="mt-8 text-sm font-semibold">

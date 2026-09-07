@@ -4,12 +4,14 @@ import { getStorage, NotConnectedError } from "@/lib/content/store";
 import {
   getVideoStore,
   isValidVideoKey,
+  tokenRulesFor,
   validateSpec,
   VideoStoreNotConfiguredError,
   VIDEO_MAX_BYTES,
   type VideoUploadSpec,
 } from "@/lib/media/videoStore";
 import { sniffMedia } from "@/lib/content/mediaSniff";
+import type { HandleUploadBody } from "@vercel/blob/client";
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -33,23 +35,68 @@ const asNotConfigured = (err: unknown) =>
     ? json({ ok: false, message: err.message, notConfigured: true }, 501)
     : null;
 
-/** create an upload target */
+/**
+ * POST is two things by mode:
+ *  - Vercel Blob mode: the `@vercel/blob` client-upload token endpoint. The
+ *    browser (via `upload()`) POSTs a `HandleUploadBody`; we authorise the
+ *    user in `onBeforeGenerateToken` and hand back a short-lived token. The
+ *    file NEVER passes through here (Vercel caps request bodies at 4.5 MB).
+ *  - local mode: "create an upload target" -> `{ uploadUrl, publicUrl, key }`,
+ *    then the browser PUTs the bytes to this route (dev only, no size cap).
+ */
 export async function POST(request: Request) {
   const gate = await requireSession();
   if (!gate.ok) return gate.res;
 
-  let spec: VideoUploadSpec;
+  let body: Record<string, unknown>;
   try {
-    const b = (await request.json()) as Partial<VideoUploadSpec>;
-    spec = { filename: String(b.filename ?? ""), contentType: String(b.contentType ?? ""), size: Number(b.size ?? 0) };
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     return json({ ok: false, message: "Некоректний запит." }, 400);
   }
+
+  // --- Vercel Blob client-upload token exchange ---
+  if (typeof body.type === "string" && body.type.startsWith("blob.")) {
+    try {
+      const { handleUpload } = await import("@vercel/blob/client");
+      const res = await handleUpload({
+        body: body as unknown as HandleUploadBody,
+        request,
+        onBeforeGenerateToken: async (pathname: string) => {
+          // The session was already verified above; re-assert defensively.
+          await getStorage();
+          const rules = tokenRulesFor(pathname);
+          if (!rules.ok || !rules.rules) throw new Error(rules.reason ?? "шлях відхилено");
+          return { ...rules.rules, tokenPayload: JSON.stringify({ at: Date.now() }) };
+        },
+        onUploadCompleted: async () => {
+          // No separate index — /panel/video lists straight from Blob.
+        },
+      });
+      return json(res);
+    } catch (err) {
+      // 400 so the client SDK surfaces the message.
+      return json({ ok: false, message: (err as Error).message }, 400);
+    }
+  }
+
+  // --- local mode: create an upload target ---
+  const store = getVideoStore();
+  if (store.kind !== "local") {
+    return json(
+      { ok: false, message: "У режимі Vercel Blob використовуйте клієнтське завантаження." },
+      400,
+    );
+  }
+  const spec: VideoUploadSpec = {
+    filename: String(body.filename ?? ""),
+    contentType: String(body.contentType ?? ""),
+    size: Number(body.size ?? 0),
+  };
   const bad = validateSpec(spec);
   if (bad) return json({ ok: false, message: bad }, 400);
-
   try {
-    const created = await getVideoStore().createUpload(spec);
+    const created = await store.createUpload(spec);
     return json({ ok: true, ...created });
   } catch (err) {
     return asNotConfigured(err) ?? json({ ok: false, message: (err as Error).message }, 500);
@@ -102,10 +149,14 @@ export async function DELETE(request: Request) {
   const gate = await requireSession();
   if (!gate.ok) return gate.res;
   const key = new URL(request.url).searchParams.get("key") ?? "";
-  if (!isValidVideoKey(key)) return json({ ok: false, message: "Некоректний ключ." }, 400);
+  const store = getVideoStore();
+  // local: a bare filename; blob: the full https blob URL.
+  if (store.kind === "local" && !isValidVideoKey(key)) {
+    return json({ ok: false, message: "Некоректний ключ." }, 400);
+  }
   try {
-    await getVideoStore().remove(key);
-    return json({ ok: true, message: `Видалено «${key}».` });
+    await store.remove(key);
+    return json({ ok: true, message: "Видалено." });
   } catch (err) {
     return asNotConfigured(err) ?? json({ ok: false, message: (err as Error).message }, 500);
   }

@@ -7,7 +7,7 @@ type Phase = "idle" | "creating" | "uploading" | "done" | "error";
 const MAX_MB = 200;
 const ACCEPT = ["video/mp4", "video/webm"];
 
-export function VideoUploader() {
+export function VideoUploader({ mode }: { mode: "local" | "blob" }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
   const [file, setFile] = useState<File | null>(null);
@@ -16,6 +16,7 @@ export function VideoUploader() {
   const [result, setResult] = useState<{ url: string; size: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function pick(f: File | null) {
@@ -40,59 +41,14 @@ export function VideoUploader() {
     setPhase("creating");
     setProgress(0);
     try {
-      const res = await fetch("/api/panel/video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        message?: string;
-        uploadUrl?: string;
-        publicUrl?: string;
-        notConfigured?: boolean;
-      };
-      if (!data.ok || !data.uploadUrl || !data.publicUrl) {
-        setPhase("error");
-        return setError(data.message ?? "Не вдалося створити завантаження.");
+      if (mode === "blob") {
+        await uploadToBlob(file);
+        return;
       }
-
-      setPhase("uploading");
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhrRef.current = xhr;
-        xhr.open("PUT", data.uploadUrl!);
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload = () => {
-          xhrRef.current = null;
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else {
-            let m = `Помилка ${xhr.status}`;
-            try {
-              m = JSON.parse(xhr.responseText).message ?? m;
-            } catch {}
-            reject(new Error(m));
-          }
-        };
-        xhr.onerror = () => {
-          xhrRef.current = null;
-          reject(new Error("Мережева помилка під час завантаження."));
-        };
-        xhr.onabort = () => {
-          xhrRef.current = null;
-          reject(new Error("__aborted__"));
-        };
-        xhr.send(file);
-      });
-
-      setResult({ url: data.publicUrl, size: file.size });
-      setPhase("done");
-      router.refresh();
+      await uploadLocal(file);
     } catch (err) {
       const msg = (err as Error).message;
-      if (msg === "__aborted__") {
+      if (msg === "__aborted__" || /abort/i.test(msg)) {
         setPhase("idle");
         setProgress(0);
         setError("Завантаження скасовано.");
@@ -103,8 +59,80 @@ export function VideoUploader() {
     }
   }
 
+  /** Vercel Blob: browser streams straight to storage after a token exchange. */
+  async function uploadToBlob(f: File) {
+    const { upload } = await import("@vercel/blob/client");
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setPhase("uploading");
+    const blob = await upload(`panel/videos/${f.name}`, f, {
+      access: "public",
+      handleUploadUrl: "/api/panel/video",
+      contentType: f.type,
+      abortSignal: ctrl.signal,
+      onUploadProgress: (p) => setProgress(Math.round(p.percentage)),
+    });
+    abortRef.current = null;
+    setResult({ url: blob.url, size: f.size });
+    setPhase("done");
+    router.refresh();
+  }
+
+  /** Local dev: PUT the bytes through the route (no size cap under next dev). */
+  async function uploadLocal(file: File) {
+    const res = await fetch("/api/panel/video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
+    });
+    const data = (await res.json()) as {
+      ok: boolean;
+      message?: string;
+      uploadUrl?: string;
+      publicUrl?: string;
+    };
+    if (!data.ok || !data.uploadUrl || !data.publicUrl) {
+      throw new Error(data.message ?? "Не вдалося створити завантаження.");
+    }
+
+    setPhase("uploading");
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
+      xhr.open("PUT", data.uploadUrl!);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        xhrRef.current = null;
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else {
+          let m = `Помилка ${xhr.status}`;
+          try {
+            m = JSON.parse(xhr.responseText).message ?? m;
+          } catch {}
+          reject(new Error(m));
+        }
+      };
+      xhr.onerror = () => {
+        xhrRef.current = null;
+        reject(new Error("Мережева помилка під час завантаження."));
+      };
+      xhr.onabort = () => {
+        xhrRef.current = null;
+        reject(new Error("__aborted__"));
+      };
+      xhr.send(file);
+    });
+
+    setResult({ url: data.publicUrl, size: file.size });
+    setPhase("done");
+    router.refresh();
+  }
+
   function cancel() {
     xhrRef.current?.abort();
+    abortRef.current?.abort();
   }
 
   const busy = phase === "creating" || phase === "uploading";

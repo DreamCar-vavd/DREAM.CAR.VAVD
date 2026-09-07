@@ -79,6 +79,48 @@ export function validateSpec(spec: VideoUploadSpec): string | null {
 const KEY_RE = /^[a-z0-9]{8,}-[a-z0-9-]+\.(mp4|webm)$/;
 export const isValidVideoKey = (k: string) => KEY_RE.test(k) && !k.includes("..");
 
+/** All panel video blobs live under this prefix. */
+export const BLOB_VIDEO_PREFIX = "panel/videos/";
+
+/** A safe blob pathname for the client SDK's `upload(pathname, …)` call. */
+export function blobPathnameFor(filename: string, contentType: string): string {
+  const ext = VIDEO_TYPES[contentType] ?? "mp4";
+  const slug =
+    filename
+      .replace(/\.[^.]+$/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "video";
+  return `${BLOB_VIDEO_PREFIX}${slug}.${ext}`;
+}
+
+/** The token generator's answer — mirrors @vercel/blob's onBeforeGenerateToken
+ *  return shape, kept here so it is unit-testable without the SDK. */
+export function tokenRulesFor(pathname: string): {
+  ok: boolean;
+  reason?: string;
+  rules?: { allowedContentTypes: string[]; maximumSizeInBytes: number; addRandomSuffix: boolean };
+} {
+  if (!pathname.startsWith(BLOB_VIDEO_PREFIX)) {
+    return { ok: false, reason: `шлях має починатися з ${BLOB_VIDEO_PREFIX}` };
+  }
+  if (pathname.includes("..") || pathname.includes("//")) {
+    return { ok: false, reason: "недопустимий шлях" };
+  }
+  if (!/\.(mp4|webm)$/i.test(pathname)) {
+    return { ok: false, reason: "лише .mp4 / .webm" };
+  }
+  return {
+    ok: true,
+    rules: {
+      allowedContentTypes: Object.keys(VIDEO_TYPES),
+      maximumSizeInBytes: VIDEO_MAX_BYTES,
+      addRandomSuffix: true,
+    },
+  };
+}
+
 // --- local store ----------------------------------------------------------
 
 class LocalVideoStore implements VideoStore {
@@ -149,31 +191,79 @@ class LocalVideoStore implements VideoStore {
   }
 }
 
-// --- hosted (not wired) --------------------------------------------------
+// --- hosted: Vercel Blob (direct browser → Blob client uploads) -----------
+//
+// Uploads never pass through this serverless function (Vercel caps request
+// bodies at 4.5 MB — see docs/PANEL-video-hosting.md). The route only issues a
+// short-lived client token via `handleUpload`; the browser then streams the
+// file straight to Blob. This class covers the list / delete / head side.
+// The token-issuing + client `upload()` wiring lives in the route + uploader;
+// its rules are `tokenRulesFor()` above (unit-tested).
 
 class BlobVideoStore implements VideoStore {
   readonly kind = "blob" as const;
+
+  /** Read at call time so a deploy that gains/loses the token behaves live. */
+  private need(): string {
+    const t = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+    if (!t) throw new VideoStoreNotConfiguredError();
+    return t;
+  }
+
   async createUpload(): Promise<CreatedUpload> {
-    throw new VideoStoreNotConfiguredError();
+    // Not used in blob mode — the client SDK's `upload()` does the token
+    // exchange against the route's `handleUpload`.
+    throw new Error("У режимі Vercel Blob завантаження йде через клієнтський SDK, не через createUpload().");
   }
-  async head(): Promise<VideoObject | null> {
-    throw new VideoStoreNotConfiguredError();
-  }
-  async remove(): Promise<void> {
-    throw new VideoStoreNotConfiguredError();
-  }
+
   async list(): Promise<VideoObject[]> {
-    throw new VideoStoreNotConfiguredError();
+    const { list } = await import("@vercel/blob");
+    const out: VideoObject[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix: BLOB_VIDEO_PREFIX, cursor, token: this.need() });
+      for (const b of page.blobs) {
+        out.push({
+          key: b.url, // full blob URL — what a car's video.src stores, and what del() needs
+          url: b.url,
+          size: b.size,
+          uploadedAt: (b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt)).toISOString(),
+        });
+      }
+      cursor = page.cursor;
+    } while (cursor);
+    return out.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  }
+
+  async head(keyOrUrl: string): Promise<VideoObject | null> {
+    try {
+      const { head } = await import("@vercel/blob");
+      const b = await head(keyOrUrl, { token: this.need() });
+      return {
+        key: b.url,
+        url: b.url,
+        size: b.size,
+        uploadedAt: (b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt)).toISOString(),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async remove(url: string): Promise<void> {
+    if (!url.startsWith("https://") || !url.includes(".blob.vercel-storage.com")) {
+      throw new Error("Очікується повний URL блоба.");
+    }
+    const { del } = await import("@vercel/blob");
+    await del(url, { token: this.need() });
   }
 }
 
 export function getVideoStore(): VideoStore {
   const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
-  if (process.env.NODE_ENV === "production" || hasBlob) {
-    // A real token would still hit BlobVideoStore's stub methods — the adapter
-    // implementation is the remaining hosted work (report). It must not fall
-    // back to writing into the repo on a serverless FS.
-    return new BlobVideoStore();
-  }
+  // A real token -> the real Blob adapter. Production without a token -> also
+  // the Blob adapter, but its methods raise VideoStoreNotConfiguredError; it
+  // must never fall back to writing the repo FS on a serverless deploy.
+  if (hasBlob || process.env.NODE_ENV === "production") return new BlobVideoStore();
   return new LocalVideoStore();
 }
