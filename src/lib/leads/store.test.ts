@@ -55,7 +55,10 @@ test("get() returns one demo row by id, null for anything else", async () => {
 test("a set LEADS_DATABASE_URL does NOT silently fall back to demo data", async () => {
   process.env.LEADS_DATABASE_URL = "postgres://example/db";
   try {
-    await assert.rejects(() => getLeadsStore(), LeadsNotConfiguredError);
+    const store = await getLeadsStore();
+    assert.equal(store.kind, "database");
+    // adapter not implemented -> reading throws, it does NOT return demo rows
+    await assert.rejects(() => store.list({ limit: 5 }), LeadsNotConfiguredError);
   } finally {
     delete process.env.LEADS_DATABASE_URL;
   }
