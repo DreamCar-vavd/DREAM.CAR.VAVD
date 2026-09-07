@@ -8,6 +8,7 @@ export interface PanelVersions {
   gallery: string;
   service: string;
   contact: string;
+  promo: string;
   review: string;
   published: string;
 }

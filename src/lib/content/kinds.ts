@@ -14,7 +14,7 @@ import {
   type GateFailure,
   type LangReviewStatus,
 } from "./carsGate";
-import { coerceCar, coerceContact, coerceGalleryProject, coerceService } from "./coerce";
+import { coerceCar, coerceContact, coerceGalleryProject, coercePromo, coerceService } from "./coerce";
 import {
   galleryConfirmedText,
   getGalleryLangStatus,
@@ -36,16 +36,29 @@ import {
   isContactRenderable,
   type CmsContact,
 } from "./contactGate";
+import {
+  getPromoLangStatus,
+  getPromoPublishBlockers,
+  isPromoRenderable,
+  promoConfirmedText,
+  type CmsPromo,
+} from "./promoGate";
 import type { AllowedDir } from "./store/adapter";
 
-export type KindKey = "car" | "gallery" | "service" | "contact";
+export type KindKey = "car" | "gallery" | "service" | "contact" | "promo";
+
+const PROMO_TYPE_LABEL: Record<CmsPromo["type"], string> = {
+  banner: "Банер",
+  promo: "Акція",
+  news: "Новина",
+};
 
 export interface ContentKind<W extends { id: string; order: number }> {
   key: KindKey;
   label: string;
   dir: AllowedDir;
   /** key of the array inside published.json */
-  snapshotKey: "cars" | "gallery" | "services" | "contact";
+  snapshotKey: "cars" | "gallery" | "services" | "contact" | "promos";
   /** true for the single-entry Contacts kind (one row, no "add"). */
   singleEntry?: boolean;
   coerce(id: string, raw: Record<string, unknown>): W;
@@ -109,12 +122,26 @@ export const CONTACT_KIND: ContentKind<CmsContact> = {
   isRenderable: () => isContactRenderable(),
 };
 
+export const PROMO_KIND: ContentKind<CmsPromo> = {
+  key: "promo",
+  label: "Банери, акції, новини",
+  dir: "src/content/cms/promos",
+  snapshotKey: "promos",
+  coerce: coercePromo,
+  displayTitle: (p) => `${PROMO_TYPE_LABEL[p.type] ?? p.type}: ${p.uk.title || p.id}`,
+  langStatus: (p, l, ctx) => getPromoLangStatus(p, l, ctx),
+  confirmedText: (p, l) => promoConfirmedText(p[l]),
+  publishBlockers: (p, ctx) => getPromoPublishBlockers(p, ctx),
+  isRenderable: (p) => isPromoRenderable(p),
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const KINDS: Record<KindKey, ContentKind<any>> = {
   car: CAR_KIND,
   gallery: GALLERY_KIND,
   service: SERVICE_KIND,
   contact: CONTACT_KIND,
+  promo: PROMO_KIND,
 };
 
-export const KIND_ORDER: KindKey[] = ["car", "gallery", "service", "contact"];
+export const KIND_ORDER: KindKey[] = ["car", "gallery", "service", "contact", "promo"];

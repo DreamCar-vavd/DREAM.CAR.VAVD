@@ -115,6 +115,23 @@ const contactLanguage = (label: string) =>
     { label },
   );
 
+const promoLanguage = (label: string) =>
+  fields.object(
+    {
+      title: fields.text({ label: `${label} — заголовок` }),
+      summary: fields.text({ label: `${label} — короткий текст`, multiline: true }),
+      linkLabel: fields.text({
+        label: `${label} — підпис кнопки (необов'язково)`,
+        description: "Показується лише якщо задано посилання.",
+      }),
+      body: fields.text({
+        label: `${label} — повний текст (обов'язковий для новини)`,
+        multiline: true,
+      }),
+    },
+    { label },
+  );
+
 const carLanguage = (label: string) =>
   fields.object(
     {
@@ -137,6 +154,7 @@ export default config({
     brand: { name: "DREAM.CAR.VAVD — панель" },
     navigation: {
       Контент: ["cars", "galleryProjects", "services"],
+      "Банери, акції, новини": ["promos"],
       "Контакти й графік": ["siteContact"],
       Налаштування: ["siteSettings"],
     },
@@ -421,6 +439,61 @@ export default config({
         uk: contactLanguage("Українська"),
         en: contactLanguage("English"),
         ru: contactLanguage("Русский"),
+      },
+    }),
+
+    promos: collection({
+      label: "Банери, акції, новини",
+      slugField: "id",
+      path: "src/content/cms/promos/*",
+      format: { data: "json" },
+      columns: ["id", "type", "visible", "order"],
+      schema: {
+        id: fields.slug({
+          name: {
+            label: "ID / адреса матеріалу",
+            description: "Лише малі латинські літери, цифри й дефіси.",
+            validation: { isRequired: true },
+          },
+        }),
+        order: fields.integer({
+          label: "Порядок показу",
+          description: "Менше число — вище у списку.",
+          defaultValue: 100,
+          validation: { isRequired: true },
+        }),
+        type: fields.select({
+          label: "Тип",
+          options: [
+            { label: "Банер (вузька смуга вгорі)", value: "banner" },
+            { label: "Акція (картка)", value: "promo" },
+            { label: "Новина (картка + повний текст)", value: "news" },
+          ],
+          defaultValue: "promo",
+        }),
+        visible: fields.checkbox({
+          label: "Показувати на сайті",
+          description: "Зніміть — матеріал лишиться в панелі, але зникне з сайту.",
+          defaultValue: true,
+        }),
+        image: fields.image({
+          label: "Зображення (необов'язково)",
+          directory: "public/images/cms/promos",
+          publicPath: "/images/cms/promos",
+        }),
+        linkUrl: fields.text({
+          label: "Посилання (необов'язково)",
+          description:
+            'Внутрішнє — «/uk/cars-for-sale» або «#services»; зовнішнє — лише https://. http:, javascript:, data: відхиляються.',
+        }),
+        date: fields.text({
+          label: "Дата (для новини, необов'язково)",
+          description:
+            "Формат РРРР-ММ-ДД. Лише для показу поряд із новиною — НЕ запускає публікацію.",
+        }),
+        uk: promoLanguage("Українська"),
+        en: promoLanguage("English"),
+        ru: promoLanguage("Русский"),
       },
     }),
   },

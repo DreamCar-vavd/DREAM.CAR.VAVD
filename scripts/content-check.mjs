@@ -92,6 +92,19 @@ async function main() {
     }
   }
 
+  for (const p of snapshot.promos ?? []) {
+    const w = `published.json → матеріал «${p?.id ?? "?"}»`;
+    if (!p?.id || !SLUG_RE.test(p.id)) errors.push(`${w}: некоректний slug`);
+    if (!["banner", "promo", "news"].includes(p.type)) errors.push(`${w}: невідомий тип «${p.type}»`);
+    const needsBody = p.type === "news";
+    for (const l of LOCALES) {
+      if (!String(p[l]?.title ?? "").trim()) errors.push(`${w}: ${l.toUpperCase()} заголовок порожній`);
+      if (needsBody && !String(p[l]?.body ?? "").trim()) {
+        errors.push(`${w}: ${l.toUpperCase()} повний текст новини порожній`);
+      }
+    }
+  }
+
   // Working cars: warn on stale / missing review.
   let workingFiles = [];
   try {
@@ -126,7 +139,8 @@ async function main() {
     `\n✓ published.json: ${(snapshot.cars ?? []).length} авто + ` +
       `${(snapshot.gallery ?? []).length} робіт галереї + ` +
       `${(snapshot.services ?? []).length} послуг + ` +
-      `${(snapshot.contact ?? []).length} запис(ів) контактів, усі придатні.` +
+      `${(snapshot.contact ?? []).length} запис(ів) контактів + ` +
+      `${(snapshot.promos ?? []).length} матеріалів (банери/акції/новини), усі придатні.` +
       (warnings.length ? ` (${warnings.length} попереджень у робочих чернетках)` : ""),
   );
 }

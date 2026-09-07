@@ -16,11 +16,18 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { coerceCar, coerceContact, coerceGalleryProject, coerceService } from "../src/lib/content/coerce";
+import {
+  coerceCar,
+  coerceContact,
+  coerceGalleryProject,
+  coercePromo,
+  coerceService,
+} from "../src/lib/content/coerce";
 import { getPublishBlockers, describeFailure, type ReviewState } from "../src/lib/content/carsGate";
 import { getGalleryPublishBlockers } from "../src/lib/content/galleryGate";
 import { getServicePublishBlockers } from "../src/lib/content/serviceGate";
 import { getContactPublishBlockers } from "../src/lib/content/contactGate";
+import { getPromoPublishBlockers } from "../src/lib/content/promoGate";
 import { sniffMedia } from "../src/lib/content/mediaSniff";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -39,7 +46,7 @@ const MEDIA_ROOT = path.resolve(process.cwd(), arg("media-root", "public"));
 /** Only these media roots + extensions may be referenced by a published item. */
 const MEDIA_PREFIX = "/images/cms/";
 const MEDIA_RE =
-  /^\/images\/cms\/(cars|gallery|services)\/[A-Za-z0-9][A-Za-z0-9._/-]*\.(jpe?g|png|webp|mp4|webm)$/;
+  /^\/images\/cms\/(cars|gallery|services|promos)\/[A-Za-z0-9][A-Za-z0-9._/-]*\.(jpe?g|png|webp|mp4|webm)$/;
 
 const problems: string[] = [];
 const mediaPaths = new Set<string>();
@@ -107,6 +114,7 @@ async function main() {
     gallery?: unknown;
     services?: unknown;
     contact?: unknown;
+    promos?: unknown;
   };
   try {
     snapshot = JSON.parse(await fs.readFile(PUBLISHED, "utf8"));
@@ -135,11 +143,18 @@ async function main() {
       : Array.isArray(snapshot.contact)
         ? (snapshot.contact as Record<string, unknown>[])
         : null;
+  const promos =
+    snapshot.promos === undefined
+      ? []
+      : Array.isArray(snapshot.promos)
+        ? (snapshot.promos as Record<string, unknown>[])
+        : null;
   if (!cars) problems.push("published.json: cars не масив");
   if (!gallery) problems.push("published.json: gallery не масив");
   if (!services) problems.push("published.json: services не масив");
   if (!contact) problems.push("published.json: contact не масив");
   if (contact && contact.length > 1) problems.push("published.json: більше одного запису contact");
+  if (!promos) problems.push("published.json: promos не масив");
 
   for (const raw of cars ?? []) {
     const car = coerceCar(String(raw.id ?? ""), raw);
@@ -183,6 +198,16 @@ async function main() {
     }
   }
 
+  for (const raw of promos ?? []) {
+    const pr = coercePromo(String(raw.id ?? ""), raw);
+    const w = `матеріал «${pr.id || "?"}»`;
+    if (!pr.id) problems.push(`${w}: немає id`);
+    for (const b of getPromoPublishBlockers(pr, { review, sha256 })) {
+      problems.push(`${w}: ${describeFailure(b)}`);
+    }
+    checkMedia(`${w} зображення`, pr.image);
+  }
+
   // Every referenced media file: real file, right type (magic bytes), sane size.
   for (const p of mediaPaths) {
     problems.push(...(await checkMediaFile(p)));
@@ -196,7 +221,8 @@ async function main() {
 
   console.log(
     `✓ content-guard: ${(cars ?? []).length} авто + ${(gallery ?? []).length} робіт галереї + ` +
-      `${(services ?? []).length} послуг + ${(contact ?? []).length} запис(ів) контактів, ` +
+      `${(services ?? []).length} послуг + ${(contact ?? []).length} запис(ів) контактів + ` +
+      `${(promos ?? []).length} матеріалів (банери/акції/новини), ` +
       `${mediaPaths.size} медіафайлів — усі перевірені.`,
   );
 

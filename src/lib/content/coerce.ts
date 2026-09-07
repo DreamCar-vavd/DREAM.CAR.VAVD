@@ -2,6 +2,7 @@ import type { CmsCar } from "./carsGate";
 import type { CmsGalleryProject, CmsGalleryLanguage } from "./galleryGate";
 import type { CmsService, CmsServiceLanguage } from "./serviceGate";
 import type { CmsContact, CmsContactLanguage } from "./contactGate";
+import type { CmsPromo, CmsPromoLanguage, PromoType } from "./promoGate";
 
 const str = (v: unknown) => String(v ?? "");
 const strArr = (v: unknown) =>
@@ -148,5 +149,32 @@ export function coerceContact(id: string, raw: Record<string, unknown>): CmsCont
     uk: contactLang(raw.uk),
     en: contactLang(raw.en),
     ru: contactLang(raw.ru),
+  };
+}
+
+function promoLang(x: unknown): CmsPromoLanguage {
+  const o = (x ?? {}) as Record<string, unknown>;
+  return {
+    title: str(o.title),
+    summary: str(o.summary),
+    linkLabel: str(o.linkLabel),
+    body: str(o.body),
+  };
+}
+
+const PROMO_TYPES = ["banner", "promo", "news"];
+
+export function coercePromo(id: string, raw: Record<string, unknown>): CmsPromo {
+  return {
+    id,
+    order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 100,
+    type: (PROMO_TYPES.includes(str(raw.type)) ? str(raw.type) : "promo") as PromoType,
+    visible: raw.visible !== false,
+    image: str(raw.image),
+    linkUrl: str(raw.linkUrl),
+    date: str(raw.date),
+    uk: promoLang(raw.uk),
+    en: promoLang(raw.en),
+    ru: promoLang(raw.ru),
   };
 }

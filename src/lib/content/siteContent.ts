@@ -6,7 +6,8 @@ import type { CmsCar } from "./carsGate";
 import type { CmsGalleryProject } from "./galleryGate";
 import type { CmsService } from "./serviceGate";
 import type { CmsContact } from "./contactGate";
-import { coerceCar, coerceContact, coerceGalleryProject, coerceService } from "./coerce";
+import type { CmsPromo } from "./promoGate";
+import { coerceCar, coerceContact, coerceGalleryProject, coercePromo, coerceService } from "./coerce";
 import { readPublishedSnapshot } from "./snapshot";
 
 export interface SiteContent {
@@ -14,6 +15,7 @@ export interface SiteContent {
   gallery: CmsGalleryProject[];
   services: CmsService[];
   contact: CmsContact[];
+  promos: CmsPromo[];
   isDraftPreview: boolean;
   draftVersion?: string;
   draftError?: string;
@@ -48,6 +50,7 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
     gallery: snap.gallery,
     services: snap.services,
     contact: snap.contact,
+    promos: snap.promos,
     isDraftPreview: false,
   };
   if (!isDraftPreview) return published;
@@ -64,20 +67,22 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
   }
 
   try {
-    const [carsDir, galleryDir, servicesDir, contactDir] = await Promise.all([
+    const [carsDir, galleryDir, servicesDir, contactDir, promosDir] = await Promise.all([
       storage.readDir("src/content/cms/cars"),
       storage.readDir("src/content/cms/gallery"),
       storage.readDir("src/content/cms/services"),
       storage.readDir("src/content/cms/contact"),
+      storage.readDir("src/content/cms/promos"),
     ]);
     return {
       cars: coerce(carsDir.data, coerceCar),
       gallery: coerce(galleryDir.data, coerceGalleryProject),
       services: coerce(servicesDir.data, coerceService),
       contact: coerce(contactDir.data, (id, r) => coerceContact(id, r)),
+      promos: coerce(promosDir.data, coercePromo),
       isDraftPreview: true,
       draftVersion: shortHash(
-        [carsDir, galleryDir, servicesDir, contactDir].map((d) => d.version).join("|"),
+        [carsDir, galleryDir, servicesDir, contactDir, promosDir].map((d) => d.version).join("|"),
       ),
     };
   } catch (err) {

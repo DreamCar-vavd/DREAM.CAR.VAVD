@@ -3,6 +3,7 @@ import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getGalleryMedia } from "@/lib/content/publishedGallery";
 import { getServicesMeta } from "@/lib/content/publishedServices";
+import { getPromoSlots } from "@/lib/content/publishedPromos";
 import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/HeroSection";
 import { ServicesGrid } from "@/components/ServicesGrid";
@@ -15,6 +16,7 @@ import { FaqAccordion } from "@/components/FaqAccordion";
 import { ContactForm } from "@/components/ContactForm";
 import { GoldLink } from "@/components/GoldButton";
 import { SocialLinks } from "@/components/SocialLinks";
+import { PromoBanners, PromoSection } from "@/components/PromoSection";
 
 export default async function LocaleHomePage({
   params,
@@ -25,18 +27,21 @@ export default async function LocaleHomePage({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
-  const [galleryMedia, serviceMeta] = await Promise.all([
+  const [galleryMedia, serviceMeta, promos] = await Promise.all([
     getGalleryMedia(),
     getServicesMeta(locale),
+    getPromoSlots(locale),
   ]);
 
   return (
     <>
+      <PromoBanners banners={promos.banners} />
       <HeroSection dict={dict} locale={locale} />
       <ServicesGrid dict={dict} locale={locale} serviceMeta={serviceMeta} />
       <CarsForSaleSection dict={dict} locale={locale} />
       <ProcessTimeline dict={dict} />
       <BenefitsSection dict={dict} />
+      <PromoSection cards={promos.cards} locale={locale} />
       <GalleryGrid dict={dict} locale={locale} media={galleryMedia} />
       <AboutSection dict={dict} />
       <FaqAccordion dict={dict} />

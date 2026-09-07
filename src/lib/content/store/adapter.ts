@@ -18,6 +18,7 @@ export const ALLOWED_DIRS = [
   "src/content/cms/gallery",
   "src/content/cms/services",
   "src/content/cms/contact",
+  "src/content/cms/promos",
 ] as const;
 export const ALLOWED_FILES = [
   "src/content/cms/published.json",

@@ -15,13 +15,14 @@ const PUBLISHED = "src/content/cms/published.json" as const;
 const REVIEW = "src/content/cms/review-state.json" as const;
 
 /** keys inside published.json, one per kind, in a fixed order. */
-const SNAPSHOT_KEYS = ["cars", "gallery", "services", "contact"] as const;
+const SNAPSHOT_KEYS = ["cars", "gallery", "services", "contact", "promos"] as const;
 type SnapshotKey = (typeof SNAPSHOT_KEYS)[number];
 const KEY_FOR_KIND: Record<KindKey, SnapshotKey> = {
   car: "cars",
   gallery: "gallery",
   service: "services",
   contact: "contact",
+  promo: "promos",
 };
 
 // deep, key-sorted JSON so "modified" detection sees nested text edits
@@ -123,10 +124,14 @@ const COLLECTION_SLUG: Record<KindKey, string> = {
   gallery: "galleryProjects",
   service: "services",
   contact: "siteContact",
+  promo: "promos",
 };
 function subtitleFor(kind: KindKey, item: { id: string; order: number } & Record<string, unknown>) {
   if (kind === "car") return `${item.id} · ${item.price ?? ""} · порядок ${item.order}`;
   if (kind === "contact") return "телефон, email, соцмережі, графік — трьома мовами";
+  if (kind === "promo") {
+    return `${item.id} · ${item.visible === false ? "прихований" : "видимий"} · порядок ${item.order}`;
+  }
   return `${item.id} · порядок ${item.order}`;
 }
 const editHrefFor = (kind: KindKey, id: string) =>

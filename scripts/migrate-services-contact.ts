@@ -170,6 +170,9 @@ async function main() {
   );
   published.services = publishedServices;
   published.contact = [contact];
+  // Banners / promos / news: no real material exists — the key is present but
+  // empty so the public site renders nothing (no empty section, no stub).
+  if (!Array.isArray(published.promos)) published.promos = [];
   await fs.writeFile(PUBLISHED, `${JSON.stringify(published, null, 2)}\n`, "utf8");
   await fs.writeFile(REVIEW, `${JSON.stringify(review, null, 2)}\n`, "utf8");
 

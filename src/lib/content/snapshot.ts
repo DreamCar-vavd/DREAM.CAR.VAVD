@@ -5,7 +5,8 @@ import { LOCALES, type CmsCar } from "./carsGate";
 import type { CmsGalleryProject } from "./galleryGate";
 import type { CmsService } from "./serviceGate";
 import type { CmsContact } from "./contactGate";
-import { coerceCar, coerceContact, coerceGalleryProject, coerceService } from "./coerce";
+import type { CmsPromo } from "./promoGate";
+import { coerceCar, coerceContact, coerceGalleryProject, coercePromo, coerceService } from "./coerce";
 import { PUBLISHED_FILE } from "./paths";
 
 /**
@@ -59,6 +60,18 @@ function assertContactSane(c: CmsContact): void {
     }
   }
 }
+function assertPromoSane(p: CmsPromo): void {
+  const w = `published.json → promo "${p?.id ?? "?"}"`;
+  if (!p?.id || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p.id)) throw new Error(`${w}: bad slug`);
+  if (!["banner", "promo", "news"].includes(p.type)) throw new Error(`${w}: bad type`);
+  const needsBody = p.type === "news";
+  for (const l of LOCALES) {
+    if (!String(p[l]?.title ?? "").trim()) throw new Error(`${w}: ${l.toUpperCase()} title empty`);
+    if (needsBody && !String(p[l]?.body ?? "").trim()) {
+      throw new Error(`${w}: ${l.toUpperCase()} news body empty`);
+    }
+  }
+}
 
 export interface PublishedSnapshot {
   publishedAt: string;
@@ -67,6 +80,7 @@ export interface PublishedSnapshot {
   services: CmsService[];
   /** 0 or 1 entry. */
   contact: CmsContact[];
+  promos: CmsPromo[];
 }
 
 export const readPublishedSnapshot = cache(async (): Promise<PublishedSnapshot> => {
@@ -74,7 +88,7 @@ export const readPublishedSnapshot = cache(async (): Promise<PublishedSnapshot> 
   try {
     raw = await fs.readFile(PUBLISHED_FILE, "utf8");
   } catch {
-    return { publishedAt: "", cars: [], gallery: [], services: [], contact: [] };
+    return { publishedAt: "", cars: [], gallery: [], services: [], contact: [], promos: [] };
   }
   const p = JSON.parse(raw) as Record<string, Record<string, unknown>[] | string>;
   const list = (k: string) => (Array.isArray(p[k]) ? (p[k] as Record<string, unknown>[]) : []);
@@ -88,9 +102,13 @@ export const readPublishedSnapshot = cache(async (): Promise<PublishedSnapshot> 
     .map((s) => coerceService(String(s.id ?? ""), s))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   const contact = list("contact").map((c) => coerceContact(String(c.id ?? "site"), c));
+  const promos = list("promos")
+    .map((x) => coercePromo(String(x.id ?? ""), x))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   cars.forEach(assertCarSane);
   gallery.forEach(assertGallerySane);
   services.forEach(assertServiceSane);
   contact.forEach(assertContactSane);
-  return { publishedAt: String(p.publishedAt ?? ""), cars, gallery, services, contact };
+  promos.forEach(assertPromoSane);
+  return { publishedAt: String(p.publishedAt ?? ""), cars, gallery, services, contact, promos };
 });
