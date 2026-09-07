@@ -134,7 +134,7 @@ export interface Dictionary {
     heading: string;
     subheading: string;
   };
-  services: Record<ServiceSlug, ServiceCopy>;
+  services: Record<string, ServiceCopy>;
   specialOrderService: {
     title: string;
     description: string;
@@ -205,6 +205,24 @@ export interface Dictionary {
     subheading: string;
     phone: string;
     email: string;
+    /**
+     * Effective contact details for the current locale. Populated at build
+     * time by getDictionary() from the panel snapshot (src/content/cms/contact),
+     * falling back to src/lib/social.ts defaults + NEXT_PUBLIC_* env when no
+     * contact record is published. Never carries CONTACT_FORM_ENDPOINT.
+     */
+    phoneHref: string;
+    emailHref: string;
+    whatsappUrl: string;
+    telegramUrl: string;
+    instagramUrl: string;
+    facebookUrl: string;
+    youtubeUrl: string;
+    addressText: string;
+    mapsUrl: string;
+    hours: string;
+    hoursLabel: string;
+    addressLabel: string;
     form: {
       name: string;
       phone: string;

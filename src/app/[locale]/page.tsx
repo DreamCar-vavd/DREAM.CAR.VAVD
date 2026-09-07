@@ -2,6 +2,7 @@ import { Phone, Mail, MessageCircle } from "lucide-react";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getGalleryMedia } from "@/lib/content/publishedGallery";
+import { getServicesMeta } from "@/lib/content/publishedServices";
 import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/HeroSection";
 import { ServicesGrid } from "@/components/ServicesGrid";
@@ -14,7 +15,6 @@ import { FaqAccordion } from "@/components/FaqAccordion";
 import { ContactForm } from "@/components/ContactForm";
 import { GoldLink } from "@/components/GoldButton";
 import { SocialLinks } from "@/components/SocialLinks";
-import { phoneDisplay, phoneHref, emailDisplay, emailHref, whatsappUrl } from "@/lib/social";
 
 export default async function LocaleHomePage({
   params,
@@ -25,12 +25,15 @@ export default async function LocaleHomePage({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
-  const galleryMedia = await getGalleryMedia();
+  const [galleryMedia, serviceMeta] = await Promise.all([
+    getGalleryMedia(),
+    getServicesMeta(locale),
+  ]);
 
   return (
     <>
       <HeroSection dict={dict} locale={locale} />
-      <ServicesGrid dict={dict} locale={locale} />
+      <ServicesGrid dict={dict} locale={locale} serviceMeta={serviceMeta} />
       <CarsForSaleSection dict={dict} locale={locale} />
       <ProcessTimeline dict={dict} />
       <BenefitsSection dict={dict} />
@@ -52,21 +55,48 @@ export default async function LocaleHomePage({
 
             <div className="mt-8 flex flex-col gap-4">
               <a
-                href={phoneHref}
+                href={dict.contact.phoneHref}
                 className="flex items-center gap-3 text-text transition-colors hover:text-gold"
               >
                 <Phone size={18} className="text-gold" aria-hidden="true" />
-                {phoneDisplay}
+                {dict.contact.phone}
               </a>
               <a
-                href={emailHref}
+                href={dict.contact.emailHref}
                 className="flex items-center gap-3 text-text transition-colors hover:text-gold"
               >
                 <Mail size={18} className="text-gold" aria-hidden="true" />
-                {emailDisplay}
+                {dict.contact.email}
               </a>
+              {dict.contact.hours && (
+                <p className="flex items-start gap-3 text-sm text-muted">
+                  <span className="font-semibold text-gold">
+                    {dict.contact.hoursLabel || "Графік"}:
+                  </span>
+                  <span className="whitespace-pre-line">{dict.contact.hours}</span>
+                </p>
+              )}
+              {dict.contact.addressText && (
+                <p className="flex items-start gap-3 text-sm text-muted">
+                  <span className="font-semibold text-gold">
+                    {dict.contact.addressLabel || "Адреса"}:
+                  </span>
+                  {dict.contact.mapsUrl ? (
+                    <a
+                      href={dict.contact.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-gold"
+                    >
+                      {dict.contact.addressText}
+                    </a>
+                  ) : (
+                    dict.contact.addressText
+                  )}
+                </p>
+              )}
               <GoldLink
-                href={whatsappUrl}
+                href={dict.contact.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="outline"
@@ -76,7 +106,7 @@ export default async function LocaleHomePage({
                 {dict.hero.ctaSecondary}
               </GoldLink>
 
-              <SocialLinks className="mt-1" />
+              <SocialLinks className="mt-1" links={dict.contact} />
             </div>
           </div>
 

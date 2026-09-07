@@ -1,0 +1,59 @@
+{
+  "id": "diagnostics",
+  "order": 30,
+  "status": "available",
+  "iconSrc": "/images/services/premium-3d/03-computer-diagnostics-premium-3d.png",
+  "price": "",
+  "photos": [],
+  "uk": {
+    "title": "Комп'ютерна діагностика",
+    "shortDescription": "Точна комп'ютерна діагностика для виявлення несправностей.",
+    "longDescription": "Використовуємо сучасне діагностичне обладнання, щоб швидко та точно визначити причину несправності та запропонувати обґрунтоване рішення.",
+    "cardDescription": "",
+    "bullets": [
+      "Повна комп'ютерна діагностика систем автомобіля",
+      "Читання та розшифрування кодів помилок",
+      "Перевірка датчиків та електронних блоків",
+      "Детальний висновок за результатами діагностики"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "en": {
+    "title": "Computer Diagnostics",
+    "shortDescription": "Accurate computer diagnostics to identify faults.",
+    "longDescription": "We use modern diagnostic equipment to quickly and accurately identify the cause of a fault and propose a well-founded solution.",
+    "cardDescription": "",
+    "bullets": [
+      "Full computer diagnostics of vehicle systems",
+      "Reading and interpreting fault codes",
+      "Checking sensors and control units",
+      "A detailed report following diagnostics"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "ru": {
+    "title": "Компьютерная диагностика",
+    "shortDescription": "Точная компьютерная диагностика для выявления неисправностей.",
+    "longDescription": "Используем современное диагностическое оборудование, чтобы быстро и точно определить причину неисправности и предложить обоснованное решение.",
+    "cardDescription": "",
+    "bullets": [
+      "Полная компьютерная диагностика систем автомобиля",
+      "Чтение и расшифровка кодов ошибок",
+      "Проверка датчиков и электронных блоков",
+      "Подробное заключение по результатам диагностики"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "seoTitle": "",
+    "seoDescription": ""
+  }
+}

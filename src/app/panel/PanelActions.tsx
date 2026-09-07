@@ -6,6 +6,8 @@ import { useState, useTransition } from "react";
 export interface PanelVersions {
   car: string;
   gallery: string;
+  service: string;
+  contact: string;
   review: string;
   published: string;
 }

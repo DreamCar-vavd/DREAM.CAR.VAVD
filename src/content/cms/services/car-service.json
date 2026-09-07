@@ -1,0 +1,194 @@
+{
+  "id": "car-service",
+  "order": 20,
+  "status": "coming-soon",
+  "iconSrc": "/images/services/premium-3d/02-car-service-premium-3d.png",
+  "price": "",
+  "photos": [],
+  "uk": {
+    "title": "Автосервіс",
+    "shortDescription": "Ремонт та обслуговування автомобілів будь-якої складності.",
+    "longDescription": "Виконуємо технічне обслуговування та ремонт із використанням якісних матеріалів і комплектуючих. Перед початком робіт узгоджуємо обсяг та вартість, щоб не було несподіванок.",
+    "cardDescription": "",
+    "bullets": [
+      "Планове технічне обслуговування",
+      "Ремонт ходової, двигуна та трансмісії",
+      "Узгодження вартості до початку робіт",
+      "Якісні матеріали та комплектуючі"
+    ],
+    "modalLead": "Відкриваємо незабаром",
+    "modalDescription": "",
+    "modalSections": [
+      {
+        "heading": "Технічне обслуговування",
+        "items": [
+          "Планове ТО (проміжне, повне та велике) відповідно до регламенту виробника.",
+          "Заміна моторного масла та фільтрів: масляного, повітряного, салонного й паливного.",
+          "Заміна технічних рідин: гальмівної, охолоджувальної, трансмісійної та рідини гідропідсилювача керма.",
+          "Підготовка до MOT та усунення виявлених зауважень."
+        ]
+      },
+      {
+        "heading": "Комп'ютерна діагностика",
+        "items": [
+          "Зчитування та розшифрування помилок усіх систем.",
+          "Діагностика двигуна і системи керування (Check Engine), ABS та ESP.",
+          "SRS і подушки безпеки — діагностика та відновлення після ДТП.",
+          "Діагностика електрообладнання."
+        ]
+      },
+      {
+        "heading": "Ремонт ходової частини та гальмівної системи",
+        "items": [
+          "Амортизатори, стійки, важелі, сайлентблоки й опорні підшипники.",
+          "Кульові опори, рульові наконечники та стійки стабілізатора.",
+          "Гальмівні колодки, диски, супорти, шланги й гальмівна рідина."
+        ]
+      },
+      {
+        "heading": "Двигун і навісне обладнання",
+        "items": [
+          "Заміна ременя або ланцюга ГРМ, роликів і помпи.",
+          "Заміна свічок запалювання та розжарювання.",
+          "Усунення витоків масла й охолоджувальної рідини."
+        ]
+      },
+      {
+        "heading": "Додаткові послуги",
+        "items": [
+          "Зварювальні роботи.",
+          "Антикорозійна обробка та захист кузова. Очищаємо колісні арки, пороги й днище від іржі, наносимо ґрунт і захисний шар рідкої гуми (антигравій), а також обробляємо приховані порожнини консервувальним складом.",
+          "Діагностика та обслуговування акумулятора, генератора і стартера.",
+          "Діагностика автомобіля перед покупкою.",
+          "Автопідбір і пригон автомобіля під замовлення."
+        ]
+      }
+    ],
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "en": {
+    "title": "Car Servicing",
+    "shortDescription": "Repair and maintenance for cars of any complexity.",
+    "longDescription": "We carry out maintenance and repairs using quality parts and materials. Before any work begins, we agree the scope and cost with you, so there are no surprises.",
+    "cardDescription": "",
+    "bullets": [
+      "Scheduled maintenance",
+      "Suspension, engine and transmission repair",
+      "Cost agreed before work begins",
+      "Quality parts and materials"
+    ],
+    "modalLead": "Opening soon",
+    "modalDescription": "",
+    "modalSections": [
+      {
+        "heading": "Vehicle servicing",
+        "items": [
+          "Scheduled servicing (interim, full and major) in accordance with the manufacturer's service schedule.",
+          "Engine oil and filter replacement: oil, air, cabin and fuel filters.",
+          "Replacement of brake fluid, coolant, power-steering fluid and transmission fluid.",
+          "MOT preparation and rectification of identified issues."
+        ]
+      },
+      {
+        "heading": "Computer diagnostics",
+        "items": [
+          "Reading and interpretation of fault codes across all vehicle systems.",
+          "Engine and management-system diagnostics (Check Engine), ABS and ESP.",
+          "SRS and airbags — diagnostics and post-accident restoration.",
+          "Electrical-system diagnostics."
+        ]
+      },
+      {
+        "heading": "Suspension and brake repairs",
+        "items": [
+          "Shock absorbers, struts, control arms, bushes and top mounts.",
+          "Ball joints, track-rod ends and anti-roll-bar links.",
+          "Brake pads, discs, calipers, hoses and brake fluid."
+        ]
+      },
+      {
+        "heading": "Engine and auxiliary components",
+        "items": [
+          "Replacement of timing belts or chains, tensioners and water pumps.",
+          "Replacement of spark plugs and glow plugs.",
+          "Repair of engine-oil and coolant leaks."
+        ]
+      },
+      {
+        "heading": "Additional services",
+        "items": [
+          "Welding work.",
+          "Anti-corrosion treatment and body protection. We remove corrosion from wheel arches, sills and the underbody, apply primer and a protective liquid-rubber coating (stone-chip protection), and treat enclosed cavities with a protective preservative.",
+          "Battery, alternator and starter diagnostics and servicing.",
+          "Pre-purchase vehicle inspection.",
+          "Bespoke vehicle sourcing and delivery/import."
+        ]
+      }
+    ],
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "ru": {
+    "title": "Автосервис",
+    "shortDescription": "Ремонт и обслуживание автомобилей любой сложности.",
+    "longDescription": "Выполняем техническое обслуживание и ремонт с использованием качественных материалов и комплектующих. Перед началом работ согласовываем объём и стоимость, чтобы не было неожиданностей.",
+    "cardDescription": "",
+    "bullets": [
+      "Плановое техническое обслуживание",
+      "Ремонт ходовой, двигателя и трансмиссии",
+      "Согласование стоимости до начала работ",
+      "Качественные материалы и комплектующие"
+    ],
+    "modalLead": "Открытие в ближайшее время",
+    "modalDescription": "",
+    "modalSections": [
+      {
+        "heading": "Техническое обслуживание",
+        "items": [
+          "Плановое техническое обслуживание (промежуточное, полное и расширенное) согласно регламенту производителя.",
+          "Замена моторного масла и фильтров: масляного, воздушного, салонного и топливного.",
+          "Замена технических жидкостей: тормозной, охлаждающей, трансмиссионной и жидкости гидроусилителя руля.",
+          "Подготовка к MOT и устранение выявленных замечаний."
+        ]
+      },
+      {
+        "heading": "Компьютерная диагностика",
+        "items": [
+          "Считывание и расшифровка ошибок всех систем.",
+          "Диагностика двигателя и системы управления (Check Engine), ABS и ESP.",
+          "SRS и подушки безопасности — диагностика и восстановление после ДТП.",
+          "Диагностика электрооборудования."
+        ]
+      },
+      {
+        "heading": "Ремонт ходовой части и тормозной системы",
+        "items": [
+          "Амортизаторы, стойки, рычаги, сайлентблоки и опорные подшипники.",
+          "Шаровые опоры, рулевые наконечники и стойки стабилизатора.",
+          "Тормозные колодки, диски, суппорты, шланги и тормозная жидкость."
+        ]
+      },
+      {
+        "heading": "Двигатель и навесное оборудование",
+        "items": [
+          "Замена ремня или цепи ГРМ, роликов и помпы.",
+          "Замена свечей зажигания и накаливания.",
+          "Устранение утечек масла и охлаждающей жидкости."
+        ]
+      },
+      {
+        "heading": "Дополнительные услуги",
+        "items": [
+          "Сварочные работы.",
+          "Антикоррозийная обработка и защита кузова. Очищаем колёсные арки, пороги и днище от ржавчины, наносим грунт и защитный слой жидкой резины (антигравий), а также обрабатываем скрытые полости консервирующим составом.",
+          "Диагностика и обслуживание аккумулятора, генератора и стартера.",
+          "Диагностика автомобиля перед покупкой.",
+          "Подбор и доставка автомобиля под заказ."
+        ]
+      }
+    ],
+    "seoTitle": "",
+    "seoDescription": ""
+  }
+}

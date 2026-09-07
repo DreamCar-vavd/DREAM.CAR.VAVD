@@ -1,5 +1,7 @@
 import type { CmsCar } from "./carsGate";
 import type { CmsGalleryProject, CmsGalleryLanguage } from "./galleryGate";
+import type { CmsService, CmsServiceLanguage } from "./serviceGate";
+import type { CmsContact, CmsContactLanguage } from "./contactGate";
 
 const str = (v: unknown) => String(v ?? "");
 const strArr = (v: unknown) =>
@@ -73,5 +75,76 @@ export function coerceGalleryProject(
     uk: galleryLang(raw.uk),
     en: galleryLang(raw.en),
     ru: galleryLang(raw.ru),
+  };
+}
+
+function serviceLang(x: unknown): CmsServiceLanguage {
+  const o = (x ?? {}) as Record<string, unknown>;
+  return {
+    title: str(o.title),
+    shortDescription: str(o.shortDescription),
+    longDescription: str(o.longDescription),
+    cardDescription: str(o.cardDescription),
+    bullets: strArr(o.bullets),
+    modalLead: str(o.modalLead),
+    modalDescription: str(o.modalDescription),
+    modalSections: Array.isArray(o.modalSections)
+      ? (o.modalSections as Record<string, unknown>[]).map((s) => ({
+          heading: str(s?.heading),
+          items: strArr(s?.items),
+        }))
+      : [],
+    seoTitle: str(o.seoTitle),
+    seoDescription: str(o.seoDescription),
+  };
+}
+
+export function coerceService(id: string, raw: Record<string, unknown>): CmsService {
+  return {
+    id,
+    order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 100,
+    status: raw.status === "coming-soon" ? "coming-soon" : "available",
+    iconSrc: str(raw.iconSrc),
+    price: str(raw.price),
+    photos: Array.isArray(raw.photos)
+      ? (raw.photos as Record<string, unknown>[]).map((p) => ({
+          image: str(p?.image),
+          caption: str(p?.caption),
+        }))
+      : [],
+    uk: serviceLang(raw.uk),
+    en: serviceLang(raw.en),
+    ru: serviceLang(raw.ru),
+  };
+}
+
+function contactLang(x: unknown): CmsContactLanguage {
+  const o = (x ?? {}) as Record<string, unknown>;
+  return {
+    heading: str(o.heading),
+    subheading: str(o.subheading),
+    hoursLabel: str(o.hoursLabel),
+    addressLabel: str(o.addressLabel),
+  };
+}
+
+export function coerceContact(id: string, raw: Record<string, unknown>): CmsContact {
+  return {
+    id: id || "site",
+    order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 1,
+    phoneDisplay: str(raw.phoneDisplay),
+    phoneE164: str(raw.phoneE164),
+    email: str(raw.email),
+    whatsappNumber: str(raw.whatsappNumber),
+    telegramUrl: str(raw.telegramUrl),
+    instagramUrl: str(raw.instagramUrl),
+    facebookUrl: str(raw.facebookUrl),
+    youtubeUrl: str(raw.youtubeUrl),
+    addressText: str(raw.addressText),
+    mapsUrl: str(raw.mapsUrl),
+    hours: str(raw.hours),
+    uk: contactLang(raw.uk),
+    en: contactLang(raw.en),
+    ru: contactLang(raw.ru),
   };
 }

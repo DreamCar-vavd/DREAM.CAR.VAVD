@@ -152,8 +152,23 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
 
 function Group({ group, versions }: { group: PanelGroup; versions: PanelData["versions"] }) {
   return (
-    <div>
-      <h2 className="mt-8 text-lg font-bold">{group.label}</h2>
+    <div id={`group-${group.kind}`} className="scroll-mt-4">
+      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-bold">{group.label}</h2>
+        {group.createHref && (
+          <a
+            className="rounded border border-neutral-400 px-2 py-1 text-xs underline hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            href={group.createHref}
+          >
+            + Створити в Keystatic
+          </a>
+        )}
+      </div>
+      {group.singleEntry && (
+        <p className="mt-1 text-xs text-neutral-500">
+          Один запис на весь сайт. Дані вводяться раз, підписи — окремо трьома мовами.
+        </p>
+      )}
       <div className="mt-3 space-y-4">
         {group.rows.length === 0 && (
           <p className="text-sm text-neutral-500">Порожньо.</p>
@@ -162,6 +177,67 @@ function Group({ group, versions }: { group: PanelGroup; versions: PanelData["ve
           <Row key={row.id} row={row} kind={group.kind} versions={versions} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function PendingSummary({ groups }: { groups: PanelGroup[] }) {
+  const changed: string[] = [];
+  const blocked: string[] = [];
+  for (const g of groups) {
+    for (const row of g.rows) {
+      const isNew = !row.publishedExists;
+      const isModified = row.publishState === "modified";
+      if (!isNew && !isModified) continue;
+      const label = `${g.label} → ${row.title}`;
+      if (row.blockers.length > 0) {
+        const langs = LOCALES.filter((l) => row.langStatus[l] !== "reviewed").map(
+          (l) => LANG_LABEL[l],
+        );
+        blocked.push(
+          `${label}: ${row.blockers.length} пункт(и)${langs.length ? `, завершити мови: ${langs.join(", ")}` : ""}`,
+        );
+      } else {
+        changed.push(`${label} (${isNew ? "нова чернетка" : "є зміни"})`);
+      }
+    }
+  }
+
+  if (changed.length === 0 && blocked.length === 0) {
+    return (
+      <p className="mt-4 rounded border border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
+        Неопублікованих змін немає — сайт відповідає робочим карткам.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950">
+      <p className="font-semibold text-amber-900 dark:text-amber-200">Неопубліковані зміни</p>
+      {changed.length > 0 && (
+        <>
+          <p className="mt-2 text-xs font-semibold text-green-800 dark:text-green-400">
+            Готове до публікації (кнопка «Опублікувати зміни» публікує лише свою картку):
+          </p>
+          <ul className="list-disc pl-5 text-xs text-amber-900 dark:text-amber-200">
+            {changed.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {blocked.length > 0 && (
+        <>
+          <p className="mt-2 text-xs font-semibold text-red-800 dark:text-red-400">
+            Публікацію заблоковано (потрібно завершити):
+          </p>
+          <ul className="list-disc pl-5 text-xs text-red-800 dark:text-red-300">
+            {blocked.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
@@ -218,12 +294,27 @@ export default async function PanelPage() {
         </span>
       </p>
 
+      <nav className="mt-3 flex flex-wrap gap-2 text-xs">
+        {data.groups.map((g) => (
+          <a
+            key={g.kind}
+            href={`#group-${g.kind}`}
+            className="rounded-full border border-neutral-300 px-2.5 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          >
+            {g.label}
+          </a>
+        ))}
+      </nav>
+
       <DeployBanner deploy={data.deploy} mode={data.mode} />
       {data.publishedAt && (
         <p className="mt-1 text-xs text-neutral-500">
           Остання публікація: {new Date(data.publishedAt).toLocaleString("uk-UA")}
         </p>
       )}
+
+      <PendingSummary groups={data.groups} />
+
 
       {data.groups.map((group) => (
         <Group key={group.kind} group={group} versions={data.versions} />

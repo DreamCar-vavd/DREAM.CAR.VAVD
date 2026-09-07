@@ -13,7 +13,8 @@ interface Body {
   kind?: string;
   id?: string;
   locale?: string;
-  versions?: { car?: string; gallery?: string; review?: string; published?: string };
+  /** version token per kind ("car"/"gallery"/"service"/"contact") + "review" + "published" */
+  versions?: Record<string, string | undefined>;
 }
 
 export async function POST(request: Request) {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     return json({ ok: false, message: "Не вказано елемент." }, 400);
   }
   const v = body.versions ?? {};
-  const workingVersion = kind === "car" ? String(v.car ?? "") : String(v.gallery ?? "");
+  const workingVersion = String(v[kind] ?? "");
   const review = String(v.review ?? "");
   const published = String(v.published ?? "");
 

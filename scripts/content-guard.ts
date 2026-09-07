@@ -16,9 +16,11 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { coerceCar, coerceGalleryProject } from "../src/lib/content/coerce";
+import { coerceCar, coerceContact, coerceGalleryProject, coerceService } from "../src/lib/content/coerce";
 import { getPublishBlockers, describeFailure, type ReviewState } from "../src/lib/content/carsGate";
 import { getGalleryPublishBlockers } from "../src/lib/content/galleryGate";
+import { getServicePublishBlockers } from "../src/lib/content/serviceGate";
+import { getContactPublishBlockers } from "../src/lib/content/contactGate";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -34,7 +36,7 @@ const MEDIA_ROOT = arg("media-root", "public");
 /** Only these media roots + extensions may be referenced by a published item. */
 const MEDIA_PREFIX = "/images/cms/";
 const MEDIA_RE =
-  /^\/images\/cms\/(cars|gallery)\/[A-Za-z0-9][A-Za-z0-9._/-]*\.(jpe?g|png|webp|mp4|webm)$/;
+  /^\/images\/cms\/(cars|gallery|services)\/[A-Za-z0-9][A-Za-z0-9._/-]*\.(jpe?g|png|webp|mp4|webm)$/;
 
 const problems: string[] = [];
 const mediaPaths = new Set<string>();
@@ -51,7 +53,7 @@ function checkMedia(where: string, raw: unknown) {
     return;
   }
   if (!MEDIA_RE.test(p)) {
-    problems.push(`${where}: «${p}» не відповідає дозволеному формату (jpg/png/webp/mp4/webm під /images/cms/{cars,gallery}/)`);
+    problems.push(`${where}: «${p}» не відповідає дозволеному формату (jpg/png/webp/mp4/webm під /images/cms/{cars,gallery,services}/)`);
     return;
   }
   mediaPaths.add(p);
@@ -73,7 +75,13 @@ async function fileIsRegular(p: string): Promise<"ok" | "missing" | "not-regular
 }
 
 async function main() {
-  let snapshot: { publishedAt?: unknown; cars?: unknown; gallery?: unknown };
+  let snapshot: {
+    publishedAt?: unknown;
+    cars?: unknown;
+    gallery?: unknown;
+    services?: unknown;
+    contact?: unknown;
+  };
   try {
     snapshot = JSON.parse(await fs.readFile(PUBLISHED, "utf8"));
   } catch (err) {
@@ -87,8 +95,25 @@ async function main() {
   const gallery = Array.isArray(snapshot.gallery)
     ? (snapshot.gallery as Record<string, unknown>[])
     : null;
+  // services + contact are newer keys — absent is fine (older snapshots), but
+  // present-and-not-an-array is a problem.
+  const services =
+    snapshot.services === undefined
+      ? []
+      : Array.isArray(snapshot.services)
+        ? (snapshot.services as Record<string, unknown>[])
+        : null;
+  const contact =
+    snapshot.contact === undefined
+      ? []
+      : Array.isArray(snapshot.contact)
+        ? (snapshot.contact as Record<string, unknown>[])
+        : null;
   if (!cars) problems.push("published.json: cars не масив");
   if (!gallery) problems.push("published.json: gallery не масив");
+  if (!services) problems.push("published.json: services не масив");
+  if (!contact) problems.push("published.json: contact не масив");
+  if (contact && contact.length > 1) problems.push("published.json: більше одного запису contact");
 
   for (const raw of cars ?? []) {
     const car = coerceCar(String(raw.id ?? ""), raw);
@@ -112,6 +137,26 @@ async function main() {
     p.photos.forEach((ph, i) => checkMedia(`${w} фото ${i}`, ph.image));
   }
 
+  for (const raw of services ?? []) {
+    const s = coerceService(String(raw.id ?? ""), raw);
+    const w = `послуга «${s.id || "?"}»`;
+    if (!s.id) problems.push(`${w}: немає id`);
+    for (const b of getServicePublishBlockers(s, { review, sha256 })) {
+      problems.push(`${w}: ${describeFailure(b)}`);
+    }
+    // iconSrc is a pre-existing static asset (/images/services/…), not
+    // CMS-managed media — only editor-uploaded photos are guarded here.
+    s.photos.forEach((ph, i) => checkMedia(`${w} фото ${i}`, ph.image));
+  }
+
+  for (const raw of contact ?? []) {
+    const c = coerceContact(String(raw.id ?? "site"), raw);
+    const w = `контакти «${c.id || "?"}»`;
+    for (const b of getContactPublishBlockers(c, { review, sha256 })) {
+      problems.push(`${w}: ${describeFailure(b)}`);
+    }
+  }
+
   // Every referenced media file must exist as a real (non-symlink) file.
   for (const p of mediaPaths) {
     const state = await fileIsRegular(p);
@@ -126,7 +171,8 @@ async function main() {
   }
 
   console.log(
-    `✓ content-guard: ${(cars ?? []).length} авто + ${(gallery ?? []).length} робіт галереї, ` +
+    `✓ content-guard: ${(cars ?? []).length} авто + ${(gallery ?? []).length} робіт галереї + ` +
+      `${(services ?? []).length} послуг + ${(contact ?? []).length} запис(ів) контактів, ` +
       `${mediaPaths.size} медіафайлів — усі перевірені.`,
   );
 

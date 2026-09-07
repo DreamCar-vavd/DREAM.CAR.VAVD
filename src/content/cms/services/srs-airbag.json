@@ -1,0 +1,59 @@
+{
+  "id": "srs-airbag",
+  "order": 40,
+  "status": "available",
+  "iconSrc": "/images/services/premium-3d/04-srs-airbag-premium-3d.png",
+  "price": "",
+  "photos": [],
+  "uk": {
+    "title": "SRS AIRBAG",
+    "shortDescription": "Діагностика та відновлення систем безпеки SRS AIRBAG.",
+    "longDescription": "Працюємо з системами пасивної безпеки автомобіля: діагностуємо несправності подушок безпеки та переднапружувачів ременів, усуваємо причини появи помилок SRS.",
+    "cardDescription": "",
+    "bullets": [
+      "Діагностика системи SRS AIRBAG",
+      "Пошук причини появи помилок на панелі приладів",
+      "Відновлення працездатності системи безпеки",
+      "Перевірка після завершення робіт"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "en": {
+    "title": "SRS Airbag",
+    "shortDescription": "Diagnostics and repair of SRS airbag safety systems.",
+    "longDescription": "We work with passive safety systems: diagnosing airbag and seatbelt pretensioner faults and resolving the cause of SRS warning lights.",
+    "cardDescription": "",
+    "bullets": [
+      "SRS airbag system diagnostics",
+      "Identifying the cause of dashboard warning lights",
+      "Restoring the safety system to working order",
+      "Verification once work is complete"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "ru": {
+    "title": "SRS AIRBAG",
+    "shortDescription": "Диагностика и восстановление систем безопасности SRS AIRBAG.",
+    "longDescription": "Работаем с системами пассивной безопасности автомобиля: диагностируем неисправности подушек безопасности и преднатяжителей ремней, устраняем причины появления ошибок SRS.",
+    "cardDescription": "",
+    "bullets": [
+      "Диагностика системы SRS AIRBAG",
+      "Поиск причины появления ошибок на панели приборов",
+      "Восстановление работоспособности системы безопасности",
+      "Проверка после завершения работ"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "seoTitle": "",
+    "seoDescription": ""
+  }
+}

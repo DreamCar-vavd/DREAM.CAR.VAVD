@@ -238,7 +238,7 @@ test("getPanelData groups cars + gallery and reports modified vs in-sync + deplo
     JSON.stringify({ publishedAt: "t", cars: [JSON.parse(carJson())], gallery: [] }),
   );
   let d = await getPanelData(s);
-  assert.deepEqual(d.groups.map((g) => g.kind), ["car", "gallery"]);
+  assert.deepEqual(d.groups.map((g) => g.kind), ["car", "gallery", "service", "contact"]);
   assert.equal(d.groups[0].rows[0].publishState, "in-sync");
   assert.equal(d.groups[1].rows[0].publishState, "not-published");
   assert.equal(d.deploy.state, "ready");

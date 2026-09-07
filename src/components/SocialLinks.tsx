@@ -17,8 +17,21 @@ const icons: Record<SocialLink["name"], ComponentType<SVGProps<SVGSVGElement>>> 
   YouTube: YouTubeIcon,
 };
 
-export function SocialLinks({ className }: { className?: string }) {
-  const links = getSocialLinks();
+export function SocialLinks({
+  className,
+  links: from,
+}: {
+  className?: string;
+  /** effective social URLs (from dict.contact); falls back to env if omitted */
+  links?: {
+    whatsappUrl?: string;
+    telegramUrl?: string;
+    instagramUrl?: string;
+    facebookUrl?: string;
+    youtubeUrl?: string;
+  };
+}) {
+  const links = getSocialLinks(from);
 
   if (links.length === 0) return null;
 

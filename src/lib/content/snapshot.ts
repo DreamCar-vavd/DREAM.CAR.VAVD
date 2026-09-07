@@ -3,7 +3,9 @@ import { cache } from "react";
 import { promises as fs } from "node:fs";
 import { LOCALES, type CmsCar } from "./carsGate";
 import type { CmsGalleryProject } from "./galleryGate";
-import { coerceCar, coerceGalleryProject } from "./coerce";
+import type { CmsService } from "./serviceGate";
+import type { CmsContact } from "./contactGate";
+import { coerceCar, coerceContact, coerceGalleryProject, coerceService } from "./coerce";
 import { PUBLISHED_FILE } from "./paths";
 
 /**
@@ -12,7 +14,7 @@ import { PUBLISHED_FILE } from "./paths";
  * Build-time sanity assertions (report/34 §4): the panel only writes
  * publishable items, so these should never fire — but a hand-edited or
  * corrupted published.json FAILS `next build`, and Vercel keeps the previous
- * good deployment rather than shipping a broken page.
+ * good deployment.
  */
 
 function assertCarSane(car: CmsCar): void {
@@ -26,7 +28,6 @@ function assertCarSane(car: CmsCar): void {
     }
   }
 }
-
 function assertGallerySane(p: CmsGalleryProject): void {
   const w = `published.json → gallery "${p?.id ?? "?"}"`;
   if (!p?.id) throw new Error(`${w}: missing id`);
@@ -35,11 +36,37 @@ function assertGallerySane(p: CmsGalleryProject): void {
     if (!String(p[l]?.title ?? "").trim()) throw new Error(`${w}: ${l.toUpperCase()} title empty`);
   }
 }
+function assertServiceSane(s: CmsService): void {
+  const w = `published.json → service "${s?.id ?? "?"}"`;
+  if (!s?.id || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s.id)) throw new Error(`${w}: bad slug`);
+  for (const l of LOCALES) {
+    const lang = s[l];
+    if (
+      !String(lang?.title ?? "").trim() ||
+      !String(lang?.shortDescription ?? "").trim() ||
+      !String(lang?.longDescription ?? "").trim()
+    ) {
+      throw new Error(`${w}: ${l.toUpperCase()} required text empty`);
+    }
+  }
+}
+function assertContactSane(c: CmsContact): void {
+  const w = `published.json → contact "${c?.id ?? "?"}"`;
+  if (!c?.id) throw new Error(`${w}: missing id`);
+  for (const l of LOCALES) {
+    if (!String(c[l]?.heading ?? "").trim() || !String(c[l]?.subheading ?? "").trim()) {
+      throw new Error(`${w}: ${l.toUpperCase()} heading/subheading empty`);
+    }
+  }
+}
 
 export interface PublishedSnapshot {
   publishedAt: string;
   cars: CmsCar[];
   gallery: CmsGalleryProject[];
+  services: CmsService[];
+  /** 0 or 1 entry. */
+  contact: CmsContact[];
 }
 
 export const readPublishedSnapshot = cache(async (): Promise<PublishedSnapshot> => {
@@ -47,20 +74,23 @@ export const readPublishedSnapshot = cache(async (): Promise<PublishedSnapshot> 
   try {
     raw = await fs.readFile(PUBLISHED_FILE, "utf8");
   } catch {
-    return { publishedAt: "", cars: [], gallery: [] };
+    return { publishedAt: "", cars: [], gallery: [], services: [], contact: [] };
   }
-  const parsed = JSON.parse(raw) as {
-    publishedAt?: string;
-    cars?: Record<string, unknown>[];
-    gallery?: Record<string, unknown>[];
-  };
-  const cars = (parsed.cars ?? [])
+  const p = JSON.parse(raw) as Record<string, Record<string, unknown>[] | string>;
+  const list = (k: string) => (Array.isArray(p[k]) ? (p[k] as Record<string, unknown>[]) : []);
+  const cars = list("cars")
     .map((c) => coerceCar(String(c.id ?? ""), c))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
-  const gallery = (parsed.gallery ?? [])
+  const gallery = list("gallery")
     .map((g) => coerceGalleryProject(String(g.id ?? ""), g))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const services = list("services")
+    .map((s) => coerceService(String(s.id ?? ""), s))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const contact = list("contact").map((c) => coerceContact(String(c.id ?? "site"), c));
   cars.forEach(assertCarSane);
   gallery.forEach(assertGallerySane);
-  return { publishedAt: parsed.publishedAt ?? "", cars, gallery };
+  services.forEach(assertServiceSane);
+  contact.forEach(assertContactSane);
+  return { publishedAt: String(p.publishedAt ?? ""), cars, gallery, services, contact };
 });

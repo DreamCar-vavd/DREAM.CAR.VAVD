@@ -13,7 +13,12 @@
  */
 
 /** The only paths/dirs the panel is ever allowed to touch. */
-export const ALLOWED_DIRS = ["src/content/cms/cars", "src/content/cms/gallery"] as const;
+export const ALLOWED_DIRS = [
+  "src/content/cms/cars",
+  "src/content/cms/gallery",
+  "src/content/cms/services",
+  "src/content/cms/contact",
+] as const;
 export const ALLOWED_FILES = [
   "src/content/cms/published.json",
   "src/content/cms/review-state.json",

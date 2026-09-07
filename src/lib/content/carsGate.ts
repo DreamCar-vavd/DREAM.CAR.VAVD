@@ -142,10 +142,28 @@ export function isRenderable(car: Pick<CmsCar, "saleStatus">): boolean {
   return !HIDDEN_SALE_STATUSES.has(car.saleStatus as SaleStatus);
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  title: "назва",
+  specLine: "характеристики",
+  shortDescription: "короткий опис",
+  longDescription: "повний опис",
+  heading: "заголовок",
+  subheading: "підзаголовок",
+  slug: "ID / slug (лише малі літери, цифри, дефіс)",
+  phoneDisplay: "телефон (показ)",
+  phoneE164: "телефон (для tel:)",
+  email: "email",
+  telegramUrl: "посилання Telegram (недопустимий URL)",
+  instagramUrl: "посилання Instagram (недопустимий URL)",
+  facebookUrl: "посилання Facebook (недопустимий URL)",
+  youtubeUrl: "посилання YouTube (недопустимий URL)",
+  mapsUrl: "посилання на карту (недопустимий URL)",
+};
+
 export function describeFailure(f: GateFailure): string {
   switch (f.kind) {
     case "missing-field":
-      return `${f.locale.toUpperCase()}: не заповнено поле «${f.field === "title" ? "назва" : "характеристики"}»`;
+      return `${f.locale.toUpperCase()}: не заповнено / некоректне поле «${FIELD_LABELS[f.field] ?? f.field}»`;
     case "needs-review":
       return `${f.locale.toUpperCase()}: текст не позначено перевіреним (або змінено після перевірки)`;
     case "no-photos":

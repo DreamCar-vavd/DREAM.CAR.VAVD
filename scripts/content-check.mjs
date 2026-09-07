@@ -66,6 +66,32 @@ async function main() {
     }
   }
 
+  const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  for (const s of snapshot.services ?? []) {
+    const w = `published.json → послуга «${s?.id ?? "?"}»`;
+    if (!s?.id || !SLUG_RE.test(s.id)) errors.push(`${w}: некоректний slug`);
+    for (const l of LOCALES) {
+      const lang = s[l] ?? {};
+      if (
+        !String(lang.title ?? "").trim() ||
+        !String(lang.shortDescription ?? "").trim() ||
+        !String(lang.longDescription ?? "").trim()
+      ) {
+        errors.push(`${w}: ${l.toUpperCase()} обов'язковий текст порожній`);
+      }
+    }
+  }
+
+  for (const c of snapshot.contact ?? []) {
+    const w = `published.json → контакти «${c?.id ?? "?"}»`;
+    if (!c?.id) errors.push(`${w}: немає id`);
+    for (const l of LOCALES) {
+      if (!String(c[l]?.heading ?? "").trim() || !String(c[l]?.subheading ?? "").trim()) {
+        errors.push(`${w}: ${l.toUpperCase()} заголовок/підзаголовок порожні`);
+      }
+    }
+  }
+
   // Working cars: warn on stale / missing review.
   let workingFiles = [];
   try {
@@ -98,7 +124,9 @@ async function main() {
   }
   console.log(
     `\n✓ published.json: ${(snapshot.cars ?? []).length} авто + ` +
-      `${(snapshot.gallery ?? []).length} робіт галереї, усі придатні.` +
+      `${(snapshot.gallery ?? []).length} робіт галереї + ` +
+      `${(snapshot.services ?? []).length} послуг + ` +
+      `${(snapshot.contact ?? []).length} запис(ів) контактів, усі придатні.` +
       (warnings.length ? ` (${warnings.length} попереджень у робочих чернетках)` : ""),
   );
 }

@@ -55,6 +55,61 @@ const galleryLanguage = (label: string) =>
     { label },
   );
 
+const serviceSection = (label: string) =>
+  fields.array(
+    fields.object({
+      heading: fields.text({ label: "Заголовок блоку" }),
+      items: fields.array(fields.text({ label: "Пункт", multiline: true }), {
+        label: "Пункти",
+        itemLabel: (p) => p.value || "Пункт",
+      }),
+    }),
+    {
+      label: `${label} — структуровані блоки (модалка)`,
+      itemLabel: (p) => p.fields.heading.value || "Блок",
+    },
+  );
+
+const serviceLanguage = (label: string) =>
+  fields.object(
+    {
+      title: fields.text({ label: `${label} — назва послуги` }),
+      shortDescription: fields.text({ label: `${label} — короткий опис`, multiline: true }),
+      longDescription: fields.text({ label: `${label} — докладний опис`, multiline: true }),
+      cardDescription: fields.text({
+        label: `${label} — опис на картці (необов'язково)`,
+        multiline: true,
+      }),
+      bullets: fields.array(fields.text({ label: "Пункт" }), {
+        label: `${label} — короткі пункти`,
+        itemLabel: (p) => p.value || "Пункт",
+      }),
+      modalLead: fields.text({ label: `${label} — рядок над модалкою (необов'язково)` }),
+      modalDescription: fields.text({
+        label: `${label} — вступний абзац модалки (необов'язково)`,
+        multiline: true,
+      }),
+      modalSections: serviceSection(label),
+      seoTitle: fields.text({ label: `${label} — SEO title (необов'язково)` }),
+      seoDescription: fields.text({
+        label: `${label} — SEO description (необов'язково)`,
+        multiline: true,
+      }),
+    },
+    { label },
+  );
+
+const contactLanguage = (label: string) =>
+  fields.object(
+    {
+      heading: fields.text({ label: `${label} — заголовок розділу` }),
+      subheading: fields.text({ label: `${label} — підзаголовок`, multiline: true }),
+      hoursLabel: fields.text({ label: `${label} — підпис «Графік роботи» (необов'язково)` }),
+      addressLabel: fields.text({ label: `${label} — підпис «Адреса» (необов'язково)` }),
+    },
+    { label },
+  );
+
 const carLanguage = (label: string) =>
   fields.object(
     {
@@ -76,7 +131,8 @@ export default config({
   ui: {
     brand: { name: "DREAM.CAR.VAVD — панель" },
     navigation: {
-      Контент: ["cars", "galleryProjects"],
+      Контент: ["cars", "galleryProjects", "services"],
+      "Контакти й графік": ["siteContact"],
       Налаштування: ["siteSettings"],
     },
   },
@@ -238,6 +294,123 @@ export default config({
         uk: galleryLanguage("Українська"),
         en: galleryLanguage("English"),
         ru: galleryLanguage("Русский"),
+      },
+    }),
+
+    services: collection({
+      label: "Послуги",
+      slugField: "id",
+      path: "src/content/cms/services/*",
+      format: { data: "json" },
+      columns: ["id", "status", "order"],
+      schema: {
+        id: fields.slug({
+          name: {
+            label: "ID / адреса послуги",
+            description:
+              "Використовується в адресі сторінки /services/<id> та у формі зворотного зв'язку. Лише малі латинські літери, цифри й дефіси. Не змінюйте у наявних послуг.",
+            validation: { isRequired: true },
+          },
+        }),
+        order: fields.integer({
+          label: "Порядок показу",
+          description: "Менше число — вище у списку.",
+          defaultValue: 100,
+          validation: { isRequired: true },
+        }),
+        status: fields.select({
+          label: "Доступність",
+          description:
+            "«Незабаром» показує послугу з позначкою й лишає її сторінку доступною. Не змінює фактичну доступність без потреби.",
+          options: [
+            { label: "Доступно", value: "available" },
+            { label: "Незабаром", value: "coming-soon" },
+          ],
+          defaultValue: "available",
+        }),
+        iconSrc: fields.text({
+          label: "Іконка (шлях до файлу)",
+          description: "Напр. /images/services/premium-3d/01-car-selection-premium-3d.png",
+        }),
+        price: fields.text({
+          label: "Ціна (необов'язково)",
+          description: 'Напр. «від £60» або «за домовленістю». Порожньо — ціна не показується.',
+        }),
+        photos: fields.array(
+          fields.object({
+            image: fields.image({
+              label: "Фото",
+              directory: "public/images/cms/services",
+              publicPath: "/images/cms/services",
+              validation: { isRequired: true },
+            }),
+            caption: fields.text({ label: "Підпис / alt (необов'язково)" }),
+          }),
+          {
+            label: "Фотографії (необов'язково)",
+            itemLabel: (props) => props.fields.caption.value || "Фото",
+          },
+        ),
+        uk: serviceLanguage("Українська"),
+        en: serviceLanguage("English"),
+        ru: serviceLanguage("Русский"),
+      },
+    }),
+
+    siteContact: collection({
+      label: "Контакти й графік",
+      slugField: "id",
+      path: "src/content/cms/contact/*",
+      format: { data: "json" },
+      columns: ["id"],
+      schema: {
+        id: fields.slug({
+          name: {
+            label: "ID запису",
+            description:
+              "Завжди «site». Це єдиний запис контактів — не створюйте другий.",
+            validation: { isRequired: true },
+          },
+        }),
+        order: fields.integer({ label: "Порядок", defaultValue: 1 }),
+
+        // ---- Спільні факти (вводяться один раз, застосовуються до всіх мов) ----
+        phoneDisplay: fields.text({
+          label: "Телефон (як показувати)",
+          description: "Напр. «+44 7706 054203».",
+        }),
+        phoneE164: fields.text({
+          label: "Телефон для посилання (E.164)",
+          description: "Лише + і цифри, напр. «+447706054203». Формує посилання tel:.",
+        }),
+        email: fields.text({
+          label: "Публічний email",
+          description:
+            "Показується на сайті. НЕ впливає на адресу, куди надходять заявки з форми (це технічне налаштування).",
+        }),
+        whatsappNumber: fields.text({
+          label: "Номер WhatsApp",
+          description: "Лише цифри, напр. «447706054203». Формує посилання wa.me.",
+        }),
+        telegramUrl: fields.text({ label: "Telegram (посилання, необов'язково)" }),
+        instagramUrl: fields.text({ label: "Instagram (посилання, необов'язково)" }),
+        facebookUrl: fields.text({ label: "Facebook (посилання, необов'язково)" }),
+        youtubeUrl: fields.text({ label: "YouTube (посилання, необов'язково)" }),
+        addressText: fields.text({
+          label: "Адреса (необов'язково)",
+          description: "Якщо адреси немає — залиште порожнім, блок не показуватиметься.",
+          multiline: true,
+        }),
+        mapsUrl: fields.text({ label: "Посилання на карту (Google Maps, необов'язково)" }),
+        hours: fields.text({
+          label: "Графік роботи (необов'язково)",
+          description: "Вільний текст, напр. «Пн–Пт 9:00–18:00». Порожньо — блок прихований.",
+          multiline: true,
+        }),
+
+        uk: contactLanguage("Українська"),
+        en: contactLanguage("English"),
+        ru: contactLanguage("Русский"),
       },
     }),
   },

@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/i18n/config";
 import { DreamLogo } from "./DreamLogo";
 import { GoldLink } from "./GoldButton";
 import { WhatsAppIcon } from "./icons/SocialIcons";
-import { whatsappUrl } from "@/lib/social";
+
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 import { isModifiedClick } from "@/lib/isModifiedClick";
 import { focusContactsHeading } from "@/lib/focusContactsHeading";
@@ -188,7 +188,7 @@ export function GalleryProjectModal({
                 {dict.common.consultationCta}
               </GoldLink>
               <GoldLink
-                href={whatsappUrl}
+                href={dict.contact.whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="outline"

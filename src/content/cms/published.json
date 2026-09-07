@@ -10,34 +10,44 @@
       "mileageValue": 47170,
       "photos": [
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/0/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/0/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/1/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/1/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/2/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/2/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/3/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/3/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/4/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/4/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/5/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/5/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/6/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/6/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/7/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/7/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/8/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/8/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/9/image.jpg"
+          "image": "/images/cms/cars/suzuki-sx4-s-cross/photos/9/image.jpg",
+          "caption": ""
         }
       ],
       "video": {
@@ -73,31 +83,40 @@
       "mileageValue": 6150,
       "photos": [
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/0/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/0/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/1/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/1/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/2/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/2/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/3/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/3/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/4/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/4/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/5/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/5/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/6/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/6/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/7/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/7/image.jpg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-2022/photos/8/image.jpg"
+          "image": "/images/cms/cars/dacia-sandero-2022/photos/8/image.jpg",
+          "caption": ""
         }
       ],
       "video": {
@@ -133,37 +152,48 @@
       "mileageValue": 42488,
       "photos": [
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/1/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/1/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/2/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/2/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/3/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/3/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/4/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/4/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/5/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/5/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/6/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/6/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/7/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/7/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/8/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/8/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/9/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/9/image.jpeg",
+          "caption": ""
         },
         {
-          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/10/image.jpeg"
+          "image": "/images/cms/cars/dacia-sandero-comfort-2019/photos/10/image.jpeg",
+          "caption": ""
         }
       ],
       "video": {
@@ -610,6 +640,473 @@
           "Информация уточняется"
         ],
         "result": "Информация уточняется."
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "car-selection",
+      "order": 10,
+      "status": "available",
+      "iconSrc": "/images/services/premium-3d/01-car-selection-premium-3d.png",
+      "price": "",
+      "photos": [],
+      "uk": {
+        "title": "Автопідбір",
+        "shortDescription": "Підбір автомобіля під ключ з перевіркою технічного стану та історії.",
+        "longDescription": "Ми допомагаємо підібрати автомобіль, який відповідає вашим потребам і бюджету. Кожен варіант перевіряється технічно та юридично, щоб ви ухвалювали рішення на основі перевірених фактів, а не лише оголошення.",
+        "cardDescription": "",
+        "bullets": [
+          "Пошук варіантів за вашими критеріями",
+          "Технічний огляд та перевірка історії авто",
+          "Супровід на переговорах та оформленні",
+          "Прозорий звіт про стан автомобіля"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "Car Sourcing",
+        "shortDescription": "Turnkey car sourcing with a full technical and history check.",
+        "longDescription": "We help you find a car that matches your needs and budget. Every option is checked technically and legally, so your decision is based on verified facts rather than the listing alone.",
+        "cardDescription": "",
+        "bullets": [
+          "Search for options matching your criteria",
+          "Technical inspection and history check",
+          "Support during negotiation and paperwork",
+          "A transparent report on the car's condition"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "Автоподбор",
+        "shortDescription": "Подбор автомобиля под ключ с проверкой технического состояния и истории.",
+        "longDescription": "Мы помогаем подобрать автомобиль, который соответствует вашим потребностям и бюджету. Каждый вариант проверяется технически и юридически, чтобы решение основывалось на проверенных фактах, а не только на объявлении.",
+        "cardDescription": "",
+        "bullets": [
+          "Поиск вариантов по вашим критериям",
+          "Технический осмотр и проверка истории автомобиля",
+          "Сопровождение на переговорах и оформлении",
+          "Прозрачный отчёт о состоянии автомобиля"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "car-service",
+      "order": 20,
+      "status": "coming-soon",
+      "iconSrc": "/images/services/premium-3d/02-car-service-premium-3d.png",
+      "price": "",
+      "photos": [],
+      "uk": {
+        "title": "Автосервіс",
+        "shortDescription": "Ремонт та обслуговування автомобілів будь-якої складності.",
+        "longDescription": "Виконуємо технічне обслуговування та ремонт із використанням якісних матеріалів і комплектуючих. Перед початком робіт узгоджуємо обсяг та вартість, щоб не було несподіванок.",
+        "cardDescription": "",
+        "bullets": [
+          "Планове технічне обслуговування",
+          "Ремонт ходової, двигуна та трансмісії",
+          "Узгодження вартості до початку робіт",
+          "Якісні матеріали та комплектуючі"
+        ],
+        "modalLead": "Відкриваємо незабаром",
+        "modalDescription": "",
+        "modalSections": [
+          {
+            "heading": "Технічне обслуговування",
+            "items": [
+              "Планове ТО (проміжне, повне та велике) відповідно до регламенту виробника.",
+              "Заміна моторного масла та фільтрів: масляного, повітряного, салонного й паливного.",
+              "Заміна технічних рідин: гальмівної, охолоджувальної, трансмісійної та рідини гідропідсилювача керма.",
+              "Підготовка до MOT та усунення виявлених зауважень."
+            ]
+          },
+          {
+            "heading": "Комп'ютерна діагностика",
+            "items": [
+              "Зчитування та розшифрування помилок усіх систем.",
+              "Діагностика двигуна і системи керування (Check Engine), ABS та ESP.",
+              "SRS і подушки безпеки — діагностика та відновлення після ДТП.",
+              "Діагностика електрообладнання."
+            ]
+          },
+          {
+            "heading": "Ремонт ходової частини та гальмівної системи",
+            "items": [
+              "Амортизатори, стійки, важелі, сайлентблоки й опорні підшипники.",
+              "Кульові опори, рульові наконечники та стійки стабілізатора.",
+              "Гальмівні колодки, диски, супорти, шланги й гальмівна рідина."
+            ]
+          },
+          {
+            "heading": "Двигун і навісне обладнання",
+            "items": [
+              "Заміна ременя або ланцюга ГРМ, роликів і помпи.",
+              "Заміна свічок запалювання та розжарювання.",
+              "Усунення витоків масла й охолоджувальної рідини."
+            ]
+          },
+          {
+            "heading": "Додаткові послуги",
+            "items": [
+              "Зварювальні роботи.",
+              "Антикорозійна обробка та захист кузова. Очищаємо колісні арки, пороги й днище від іржі, наносимо ґрунт і захисний шар рідкої гуми (антигравій), а також обробляємо приховані порожнини консервувальним складом.",
+              "Діагностика та обслуговування акумулятора, генератора і стартера.",
+              "Діагностика автомобіля перед покупкою.",
+              "Автопідбір і пригон автомобіля під замовлення."
+            ]
+          }
+        ],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "Car Servicing",
+        "shortDescription": "Repair and maintenance for cars of any complexity.",
+        "longDescription": "We carry out maintenance and repairs using quality parts and materials. Before any work begins, we agree the scope and cost with you, so there are no surprises.",
+        "cardDescription": "",
+        "bullets": [
+          "Scheduled maintenance",
+          "Suspension, engine and transmission repair",
+          "Cost agreed before work begins",
+          "Quality parts and materials"
+        ],
+        "modalLead": "Opening soon",
+        "modalDescription": "",
+        "modalSections": [
+          {
+            "heading": "Vehicle servicing",
+            "items": [
+              "Scheduled servicing (interim, full and major) in accordance with the manufacturer's service schedule.",
+              "Engine oil and filter replacement: oil, air, cabin and fuel filters.",
+              "Replacement of brake fluid, coolant, power-steering fluid and transmission fluid.",
+              "MOT preparation and rectification of identified issues."
+            ]
+          },
+          {
+            "heading": "Computer diagnostics",
+            "items": [
+              "Reading and interpretation of fault codes across all vehicle systems.",
+              "Engine and management-system diagnostics (Check Engine), ABS and ESP.",
+              "SRS and airbags — diagnostics and post-accident restoration.",
+              "Electrical-system diagnostics."
+            ]
+          },
+          {
+            "heading": "Suspension and brake repairs",
+            "items": [
+              "Shock absorbers, struts, control arms, bushes and top mounts.",
+              "Ball joints, track-rod ends and anti-roll-bar links.",
+              "Brake pads, discs, calipers, hoses and brake fluid."
+            ]
+          },
+          {
+            "heading": "Engine and auxiliary components",
+            "items": [
+              "Replacement of timing belts or chains, tensioners and water pumps.",
+              "Replacement of spark plugs and glow plugs.",
+              "Repair of engine-oil and coolant leaks."
+            ]
+          },
+          {
+            "heading": "Additional services",
+            "items": [
+              "Welding work.",
+              "Anti-corrosion treatment and body protection. We remove corrosion from wheel arches, sills and the underbody, apply primer and a protective liquid-rubber coating (stone-chip protection), and treat enclosed cavities with a protective preservative.",
+              "Battery, alternator and starter diagnostics and servicing.",
+              "Pre-purchase vehicle inspection.",
+              "Bespoke vehicle sourcing and delivery/import."
+            ]
+          }
+        ],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "Автосервис",
+        "shortDescription": "Ремонт и обслуживание автомобилей любой сложности.",
+        "longDescription": "Выполняем техническое обслуживание и ремонт с использованием качественных материалов и комплектующих. Перед началом работ согласовываем объём и стоимость, чтобы не было неожиданностей.",
+        "cardDescription": "",
+        "bullets": [
+          "Плановое техническое обслуживание",
+          "Ремонт ходовой, двигателя и трансмиссии",
+          "Согласование стоимости до начала работ",
+          "Качественные материалы и комплектующие"
+        ],
+        "modalLead": "Открытие в ближайшее время",
+        "modalDescription": "",
+        "modalSections": [
+          {
+            "heading": "Техническое обслуживание",
+            "items": [
+              "Плановое техническое обслуживание (промежуточное, полное и расширенное) согласно регламенту производителя.",
+              "Замена моторного масла и фильтров: масляного, воздушного, салонного и топливного.",
+              "Замена технических жидкостей: тормозной, охлаждающей, трансмиссионной и жидкости гидроусилителя руля.",
+              "Подготовка к MOT и устранение выявленных замечаний."
+            ]
+          },
+          {
+            "heading": "Компьютерная диагностика",
+            "items": [
+              "Считывание и расшифровка ошибок всех систем.",
+              "Диагностика двигателя и системы управления (Check Engine), ABS и ESP.",
+              "SRS и подушки безопасности — диагностика и восстановление после ДТП.",
+              "Диагностика электрооборудования."
+            ]
+          },
+          {
+            "heading": "Ремонт ходовой части и тормозной системы",
+            "items": [
+              "Амортизаторы, стойки, рычаги, сайлентблоки и опорные подшипники.",
+              "Шаровые опоры, рулевые наконечники и стойки стабилизатора.",
+              "Тормозные колодки, диски, суппорты, шланги и тормозная жидкость."
+            ]
+          },
+          {
+            "heading": "Двигатель и навесное оборудование",
+            "items": [
+              "Замена ремня или цепи ГРМ, роликов и помпы.",
+              "Замена свечей зажигания и накаливания.",
+              "Устранение утечек масла и охлаждающей жидкости."
+            ]
+          },
+          {
+            "heading": "Дополнительные услуги",
+            "items": [
+              "Сварочные работы.",
+              "Антикоррозийная обработка и защита кузова. Очищаем колёсные арки, пороги и днище от ржавчины, наносим грунт и защитный слой жидкой резины (антигравий), а также обрабатываем скрытые полости консервирующим составом.",
+              "Диагностика и обслуживание аккумулятора, генератора и стартера.",
+              "Диагностика автомобиля перед покупкой.",
+              "Подбор и доставка автомобиля под заказ."
+            ]
+          }
+        ],
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "diagnostics",
+      "order": 30,
+      "status": "available",
+      "iconSrc": "/images/services/premium-3d/03-computer-diagnostics-premium-3d.png",
+      "price": "",
+      "photos": [],
+      "uk": {
+        "title": "Комп'ютерна діагностика",
+        "shortDescription": "Точна комп'ютерна діагностика для виявлення несправностей.",
+        "longDescription": "Використовуємо сучасне діагностичне обладнання, щоб швидко та точно визначити причину несправності та запропонувати обґрунтоване рішення.",
+        "cardDescription": "",
+        "bullets": [
+          "Повна комп'ютерна діагностика систем автомобіля",
+          "Читання та розшифрування кодів помилок",
+          "Перевірка датчиків та електронних блоків",
+          "Детальний висновок за результатами діагностики"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "Computer Diagnostics",
+        "shortDescription": "Accurate computer diagnostics to identify faults.",
+        "longDescription": "We use modern diagnostic equipment to quickly and accurately identify the cause of a fault and propose a well-founded solution.",
+        "cardDescription": "",
+        "bullets": [
+          "Full computer diagnostics of vehicle systems",
+          "Reading and interpreting fault codes",
+          "Checking sensors and control units",
+          "A detailed report following diagnostics"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "Компьютерная диагностика",
+        "shortDescription": "Точная компьютерная диагностика для выявления неисправностей.",
+        "longDescription": "Используем современное диагностическое оборудование, чтобы быстро и точно определить причину неисправности и предложить обоснованное решение.",
+        "cardDescription": "",
+        "bullets": [
+          "Полная компьютерная диагностика систем автомобиля",
+          "Чтение и расшифровка кодов ошибок",
+          "Проверка датчиков и электронных блоков",
+          "Подробное заключение по результатам диагностики"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "srs-airbag",
+      "order": 40,
+      "status": "available",
+      "iconSrc": "/images/services/premium-3d/04-srs-airbag-premium-3d.png",
+      "price": "",
+      "photos": [],
+      "uk": {
+        "title": "SRS AIRBAG",
+        "shortDescription": "Діагностика та відновлення систем безпеки SRS AIRBAG.",
+        "longDescription": "Працюємо з системами пасивної безпеки автомобіля: діагностуємо несправності подушок безпеки та переднапружувачів ременів, усуваємо причини появи помилок SRS.",
+        "cardDescription": "",
+        "bullets": [
+          "Діагностика системи SRS AIRBAG",
+          "Пошук причини появи помилок на панелі приладів",
+          "Відновлення працездатності системи безпеки",
+          "Перевірка після завершення робіт"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "SRS Airbag",
+        "shortDescription": "Diagnostics and repair of SRS airbag safety systems.",
+        "longDescription": "We work with passive safety systems: diagnosing airbag and seatbelt pretensioner faults and resolving the cause of SRS warning lights.",
+        "cardDescription": "",
+        "bullets": [
+          "SRS airbag system diagnostics",
+          "Identifying the cause of dashboard warning lights",
+          "Restoring the safety system to working order",
+          "Verification once work is complete"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "SRS AIRBAG",
+        "shortDescription": "Диагностика и восстановление систем безопасности SRS AIRBAG.",
+        "longDescription": "Работаем с системами пассивной безопасности автомобиля: диагностируем неисправности подушек безопасности и преднатяжителей ремней, устраняем причины появления ошибок SRS.",
+        "cardDescription": "",
+        "bullets": [
+          "Диагностика системы SRS AIRBAG",
+          "Поиск причины появления ошибок на панели приборов",
+          "Восстановление работоспособности системы безопасности",
+          "Проверка после завершения работ"
+        ],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "detailing",
+      "order": 50,
+      "status": "coming-soon",
+      "iconSrc": "/images/services/premium-3d/05-detailing-polishing-premium-3d.png",
+      "price": "",
+      "photos": [],
+      "uk": {
+        "title": "Детейлінг і полірування",
+        "shortDescription": "Полірування кузова та професійний догляд за автомобілем.",
+        "longDescription": "Повертаємо кузову автомобіля доглянутий вигляд: усуваємо дрібні дефекти лакофарбового покриття та виконуємо професійне полірування із захисним ефектом.",
+        "cardDescription": "Полірування. Хімчистка. Детейлінг. Захисні покриття. Усе в одному пакеті.",
+        "bullets": [
+          "Полірування кузова",
+          "Усунення дрібних подряпин та потертостей",
+          "Догляд за салоном",
+          "Захисне покриття після полірування"
+        ],
+        "modalLead": "Відкриваємося вже зовсім скоро",
+        "modalDescription": "Комплексний догляд за кузовом і салоном: полірування, хімчистка, детейлінг та захисні покриття. Результат — бездоганний вигляд і надійний захист лакофарбового покриття.",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "Detailing & Polishing",
+        "shortDescription": "Bodywork polishing and professional car care.",
+        "longDescription": "We restore a well-kept appearance to the bodywork: removing minor paintwork defects and carrying out professional polishing with a protective finish.",
+        "cardDescription": "Polishing. Interior deep cleaning. Detailing. Protective coatings. Everything in one package.",
+        "bullets": [
+          "Bodywork polishing",
+          "Removal of minor scratches and swirl marks",
+          "Interior care",
+          "Protective coating after polishing"
+        ],
+        "modalLead": "Opening very soon",
+        "modalDescription": "Complete care for your vehicle's exterior and interior: polishing, deep cleaning, detailing and protective coatings. The result — an immaculate appearance and reliable protection for the paintwork.",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "Детейлинг и полировка",
+        "shortDescription": "Полировка кузова и профессиональный уход за автомобилем.",
+        "longDescription": "Возвращаем кузову автомобиля ухоженный вид: устраняем мелкие дефекты лакокрасочного покрытия и выполняем профессиональную полировку с защитным эффектом.",
+        "cardDescription": "Полировка. Химчистка. Детейлинг. Защитные покрытия. Всё в одном пакете.",
+        "bullets": [
+          "Полировка кузова",
+          "Устранение мелких царапин и потёртостей",
+          "Уход за салоном",
+          "Защитное покрытие после полировки"
+        ],
+        "modalLead": "Открываемся уже совсем скоро",
+        "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+        "modalSections": [],
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    }
+  ],
+  "contact": [
+    {
+      "id": "site",
+      "order": 1,
+      "phoneDisplay": "+44 7706 054203",
+      "phoneE164": "+447706054203",
+      "email": "dream.car.vavd@gmail.com",
+      "whatsappNumber": "447706054203",
+      "telegramUrl": "",
+      "instagramUrl": "",
+      "facebookUrl": "",
+      "youtubeUrl": "",
+      "addressText": "",
+      "mapsUrl": "",
+      "hours": "",
+      "uk": {
+        "heading": "Контакти",
+        "subheading": "Залишились питання? Зв'яжіться з нами будь-яким зручним способом",
+        "hoursLabel": "",
+        "addressLabel": ""
+      },
+      "en": {
+        "heading": "Contact",
+        "subheading": "Any questions? Get in touch in whichever way suits you",
+        "hoursLabel": "",
+        "addressLabel": ""
+      },
+      "ru": {
+        "heading": "Контакты",
+        "subheading": "Остались вопросы? Свяжитесь с нами любым удобным способом",
+        "hoursLabel": "",
+        "addressLabel": ""
       }
     }
   ]

@@ -8,7 +8,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { locales, isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { siteUrl } from "@/lib/site";
-import { phoneDisplay, emailDisplay } from "@/lib/social";
+
 import { getSocialLinks } from "@/lib/social";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -85,7 +85,7 @@ export default async function LocaleLayout({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
-  const social = getSocialLinks();
+  const social = getSocialLinks(dict.contact);
   const inDraftMode = (await draftMode()).isEnabled;
   const site = inDraftMode ? await readSiteContent() : null;
 
@@ -95,12 +95,10 @@ export default async function LocaleLayout({
     name: dict.meta.siteName,
     url: `${siteUrl}/${locale}`,
     image: `${siteUrl}/images/dream-car-logo.png`,
-    telephone: phoneDisplay,
-    email: emailDisplay,
+    telephone: dict.contact.phone,
+    email: dict.contact.email,
     areaServed: "GB",
-    ...(process.env.NEXT_PUBLIC_BUSINESS_ADDRESS
-      ? { address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS }
-      : {}),
+    ...(dict.contact.addressText ? { address: dict.contact.addressText } : {}),
     ...(social.length > 0 ? { sameAs: social.map((s) => s.url) } : {}),
   };
 

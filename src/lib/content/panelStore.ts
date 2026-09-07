@@ -6,17 +6,23 @@ import {
   type LangReviewStatus,
   type ReviewState,
 } from "./carsGate";
-import { KINDS, type ContentKind, type KindKey } from "./kinds";
-import {
-  ConflictError,
-  type DeployStatus,
-  type PanelStorage,
-} from "./store/adapter";
+import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
+import { ConflictError, type DeployStatus, type PanelStorage } from "./store/adapter";
 
 export const sha256 = (input: string) => createHash("sha256").update(input).digest("hex");
 
 const PUBLISHED = "src/content/cms/published.json" as const;
 const REVIEW = "src/content/cms/review-state.json" as const;
+
+/** keys inside published.json, one per kind, in a fixed order. */
+const SNAPSHOT_KEYS = ["cars", "gallery", "services", "contact"] as const;
+type SnapshotKey = (typeof SNAPSHOT_KEYS)[number];
+const KEY_FOR_KIND: Record<KindKey, SnapshotKey> = {
+  car: "cars",
+  gallery: "gallery",
+  service: "services",
+  contact: "contact",
+};
 
 // deep, key-sorted JSON so "modified" detection sees nested text edits
 function stable(value: unknown): string {
@@ -34,18 +40,13 @@ function stable(value: unknown): string {
 // snapshot / review parsing
 // ---------------------------------------------------------------------------
 
-export interface Snapshot {
-  publishedAt: string;
-  cars: unknown[];
-  gallery: unknown[];
-}
+export type Snapshot = { publishedAt: string } & Record<SnapshotKey, unknown[]>;
+
 function parseSnapshot(text: string | null): Snapshot {
-  const o = (text ? JSON.parse(text) : {}) as Partial<Snapshot>;
-  return {
-    publishedAt: String(o.publishedAt ?? ""),
-    cars: Array.isArray(o.cars) ? o.cars : [],
-    gallery: Array.isArray(o.gallery) ? o.gallery : [],
-  };
+  const o = (text ? JSON.parse(text) : {}) as Record<string, unknown>;
+  const out = { publishedAt: String(o.publishedAt ?? "") } as Snapshot;
+  for (const k of SNAPSHOT_KEYS) out[k] = Array.isArray(o[k]) ? (o[k] as unknown[]) : [];
+  return out;
 }
 function parseReview(text: string | null): ReviewState {
   return text ? (JSON.parse(text) as ReviewState) : {};
@@ -68,6 +69,22 @@ function coerceSnapshotList<W extends { id: string; order: number }>(
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
+/** Rebuild published.json replacing exactly one kind's list. */
+function rebuildSnapshot(prev: Snapshot, kindKey: KindKey, nextList: unknown[]): Snapshot {
+  const next = { publishedAt: new Date().toISOString() } as Snapshot;
+  for (const k of SNAPSHOT_KEYS) {
+    if (k === KEY_FOR_KIND[kindKey]) {
+      next[k] = nextList;
+    } else {
+      const kind = KINDS[
+        (Object.keys(KEY_FOR_KIND) as KindKey[]).find((kk) => KEY_FOR_KIND[kk] === k)!
+      ];
+      next[k] = coerceSnapshotList(kind, prev[k]) as unknown[];
+    }
+  }
+  return next;
+}
+
 // ---------------------------------------------------------------------------
 // dashboard model
 // ---------------------------------------------------------------------------
@@ -88,31 +105,36 @@ export interface PanelRow {
 export interface PanelGroup {
   kind: KindKey;
   label: string;
+  singleEntry: boolean;
+  createHref: string | null;
   rows: PanelRow[];
 }
+export type Versions = Record<KindKey, string> & { review: string; published: string };
 export interface PanelData {
   groups: PanelGroup[];
   publishedAt: string;
   deploy: DeployStatus;
   mode: "local" | "github";
-  versions: { car: string; gallery: string; review: string; published: string };
+  versions: Versions;
 }
 
+const COLLECTION_SLUG: Record<KindKey, string> = {
+  car: "cars",
+  gallery: "galleryProjects",
+  service: "services",
+  contact: "siteContact",
+};
 function subtitleFor(kind: KindKey, item: { id: string; order: number } & Record<string, unknown>) {
-  return kind === "car"
-    ? `${item.id} · ${item.price ?? ""} · порядок ${item.order}`
-    : `${item.id} · порядок ${item.order}`;
+  if (kind === "car") return `${item.id} · ${item.price ?? ""} · порядок ${item.order}`;
+  if (kind === "contact") return "телефон, email, соцмережі, графік — трьома мовами";
+  return `${item.id} · порядок ${item.order}`;
 }
-function editHrefFor(kind: KindKey, id: string) {
-  return kind === "car"
-    ? `/keystatic/collection/cars/item/${id}`
-    : `/keystatic/collection/galleryProjects/item/${id}`;
-}
+const editHrefFor = (kind: KindKey, id: string) =>
+  `/keystatic/collection/${COLLECTION_SLUG[kind]}/item/${id}`;
 
 export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
-  const [carsDir, galleryDir, publishedF, reviewF, deploy] = await Promise.all([
-    storage.readDir(KINDS.car.dir),
-    storage.readDir(KINDS.gallery.dir),
+  const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
+  const [publishedF, reviewF, deploy] = await Promise.all([
     storage.readFile(PUBLISHED),
     storage.readFile(REVIEW),
     storage.deployStatus(),
@@ -121,51 +143,47 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   const review = parseReview(reviewF.data);
   const ctx = { review, sha256 };
 
-  const groups: PanelGroup[] = ([KINDS.car, KINDS.gallery] as ContentKind<{ id: string; order: number }>[]).map(
-    (kind) => {
-      const working = coerceList(kind, (kind.key === "car" ? carsDir : galleryDir).data);
-      const publishedById = new Map(
-        coerceSnapshotList(kind, kind.key === "car" ? snapshot.cars : snapshot.gallery).map((p) => [
-          p.id,
-          p,
-        ]),
-      );
+  const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i) => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    const working = coerceList(kind, dirs[i].data);
+    const publishedById = new Map(
+      coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]).map((p) => [p.id, p]),
+    );
 
-      const rows = working.map((item): PanelRow => {
-        const pub = publishedById.get(item.id);
-        const langStatus = Object.fromEntries(
-          LOCALES.map((l) => [l, kind.langStatus(item, l, ctx)]),
-        ) as Record<ContentLocale, LangReviewStatus>;
-        let publishState: ItemPublishState = "not-published";
-        if (pub) publishState = stable(pub) === stable(item) ? "in-sync" : "modified";
-        return {
-          id: item.id,
-          title: kind.displayTitle(item),
-          subtitle: subtitleFor(kind.key, item as never),
-          editHref: editHrefFor(kind.key, item.id),
-          langStatus,
-          blockers: kind.publishBlockers(item, ctx),
-          publishState,
-          publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
-          publishedExists: Boolean(pub),
-        };
-      });
-      return { kind: kind.key, label: kind.label, rows };
-    },
-  );
+    const rows = working.map((item): PanelRow => {
+      const pub = publishedById.get(item.id);
+      const langStatus = Object.fromEntries(
+        LOCALES.map((l) => [l, kind.langStatus(item, l, ctx)]),
+      ) as Record<ContentLocale, LangReviewStatus>;
+      let publishState: ItemPublishState = "not-published";
+      if (pub) publishState = stable(pub) === stable(item) ? "in-sync" : "modified";
+      return {
+        id: item.id,
+        title: kind.displayTitle(item),
+        subtitle: subtitleFor(kindKey, item as never),
+        editHref: editHrefFor(kindKey, item.id),
+        langStatus,
+        blockers: kind.publishBlockers(item, ctx),
+        publishState,
+        publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
+        publishedExists: Boolean(pub),
+      };
+    });
+    return {
+      kind: kindKey,
+      label: kind.label,
+      singleEntry: Boolean(kind.singleEntry),
+      createHref: kind.singleEntry ? null : `/keystatic/collection/${COLLECTION_SLUG[kindKey]}/create`,
+      rows,
+    };
+  });
 
-  return {
-    groups,
-    publishedAt: snapshot.publishedAt,
-    deploy,
-    mode: storage.mode,
-    versions: {
-      car: carsDir.version,
-      gallery: galleryDir.version,
-      review: reviewF.version,
-      published: publishedF.version,
-    },
-  };
+  const versions = { review: reviewF.version, published: publishedF.version } as Versions;
+  KIND_ORDER.forEach((k, i) => {
+    versions[k] = dirs[i].version;
+  });
+
+  return { groups, publishedAt: snapshot.publishedAt, deploy, mode: storage.mode, versions };
 }
 
 // ---------------------------------------------------------------------------
@@ -180,11 +198,8 @@ export type ActionResult =
 const asConflict = (err: unknown): ActionResult | null =>
   err instanceof ConflictError ? { ok: false, message: err.message, conflict: true } : null;
 
-async function loadKind<W extends { id: string; order: number }>(
-  storage: PanelStorage,
-  kindKey: KindKey,
-) {
-  const kind = KINDS[kindKey] as ContentKind<W>;
+async function loadKind(storage: PanelStorage, kindKey: KindKey) {
+  const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
   const [dir, reviewF] = await Promise.all([storage.readDir(kind.dir), storage.readFile(REVIEW)]);
   return {
     kind,
@@ -246,8 +261,7 @@ export async function publishItem(
   }
 
   const snapshot = parseSnapshot(publishedF.data);
-  const listRaw = kind.snapshotKey === "cars" ? snapshot.cars : snapshot.gallery;
-  const current = coerceSnapshotList(kind, listRaw);
+  const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
   const existing = current.find((p) => p.id === id);
   if (existing && stable(existing) === stable(item)) {
     return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
@@ -256,32 +270,17 @@ export async function publishItem(
   const nextList = [...current.filter((p) => p.id !== id), item].sort(
     (a, b) => a.order - b.order || a.id.localeCompare(b.id),
   );
-  const nextSnapshot: Snapshot = {
-    publishedAt: new Date().toISOString(),
-    cars: kind.snapshotKey === "cars" ? nextList : coerceSnapshotList(KINDS.car, snapshot.cars),
-    gallery:
-      kind.snapshotKey === "gallery"
-        ? nextList
-        : coerceSnapshotList(KINDS.gallery, snapshot.gallery),
-  };
+  const nextSnapshot = rebuildSnapshot(snapshot, kindKey, nextList as unknown[]);
 
-  // Close the read→verify→write TOCTOU window: re-read the working set and
-  // review right before committing and abort if either moved (a parallel
-  // Keystatic save / another panel confirm). The blob-SHA guard on
-  // published.json covers a parallel publish; this covers the source data
-  // the snapshot was built from. Whole-group atomicity across files would
-  // need a single file or a lock — see report/36 §7.
+  // Close the read→verify→write TOCTOU window: re-read working + review right
+  // before committing; abort on any drift (parallel Keystatic save / confirm).
   const recheck = await loadKind(storage, kindKey);
   if (recheck.workingVersion !== expected.working || recheck.reviewVersion !== expected.review) {
     return { ok: false, conflict: true, message: new ConflictError("контент").message };
   }
 
   try {
-    await storage.writeFile(
-      PUBLISHED,
-      `${JSON.stringify(nextSnapshot, null, 2)}\n`,
-      expected.published,
-    );
+    await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
   } catch (err) {
     return asConflict(err) ?? { ok: false, message: `Публікація не вдалася: ${(err as Error).message}` };
   }
@@ -291,9 +290,7 @@ export async function publishItem(
       : " Зміни на сайті.";
   return {
     ok: true,
-    message: kind.isRenderable(item)
-      ? `Опубліковано.${tail}`
-      : `Опубліковано. «${id}» приховане публічно, картка збережена.`,
+    message: kind.isRenderable(item) ? `Опубліковано.${tail}` : `Опубліковано. «${id}» приховане публічно.`,
   };
 }
 
@@ -303,32 +300,23 @@ export async function unpublishItem(
   id: string,
   expected: { published: string },
 ): Promise<ActionResult> {
-  const kind = KINDS[kindKey];
+  const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
   const publishedF = await storage.readFile(PUBLISHED);
   if (publishedF.version !== expected.published) {
     return { ok: false, conflict: true, message: new ConflictError("знімок").message };
   }
   const snapshot = parseSnapshot(publishedF.data);
-  const listRaw = kind.snapshotKey === "cars" ? snapshot.cars : snapshot.gallery;
-  const current = coerceSnapshotList(kind, listRaw);
+  const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
   if (!current.some((p) => p.id === id)) {
     return { ok: false, message: `«${id}» і так не опубліковане.` };
   }
-  const nextList = current.filter((p) => p.id !== id);
-  const nextSnapshot: Snapshot = {
-    publishedAt: new Date().toISOString(),
-    cars: kind.snapshotKey === "cars" ? nextList : coerceSnapshotList(KINDS.car, snapshot.cars),
-    gallery:
-      kind.snapshotKey === "gallery"
-        ? nextList
-        : coerceSnapshotList(KINDS.gallery, snapshot.gallery),
-  };
+  const nextSnapshot = rebuildSnapshot(
+    snapshot,
+    kindKey,
+    current.filter((p) => p.id !== id) as unknown[],
+  );
   try {
-    await storage.writeFile(
-      PUBLISHED,
-      `${JSON.stringify(nextSnapshot, null, 2)}\n`,
-      expected.published,
-    );
+    await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
   } catch (err) {
     return asConflict(err) ?? { ok: false, message: `Не вдалося: ${(err as Error).message}` };
   }
