@@ -86,9 +86,10 @@ Keystatic комітить фото в гілку контенту разом і
 | Команда | Призначення |
 |---|---|
 | `npm run dev` → `/keystatic`, `/panel` | панель локально |
-| `npm run content:check` | `published.json` придатний (авто + галерея) |
-| `npm run content:guard` | повна валідація знімка + медіа-маніфест (перед merge) |
-| `npm run content:migrate` | (одноразово) перенести наявний контент — вже виконано |
+| `npm run content:check` | `published.json` придатний (авто + галерея + послуги + контакти + банери/акції/новини) |
+| `npm run content:guard` | повна валідація знімка + медіа-маніфест (структура, мови, review-хеші, тип медіа за magic bytes, розмір) — перед merge |
+| `npm run content:migrate` | (одноразово) авто + галерея — вже виконано |
+| `npx tsx scripts/migrate-services-contact.ts` | (одноразово, повторюване) послуги + контакти — вже виконано |
 
 ## Перегляд чернетки (hosted)
 
@@ -96,11 +97,16 @@ Keystatic комітить фото в гілку контенту разом і
 **з GitHub API**, перевіряючи GitHub-сесію **на кожному рендері** (відкликаний
 доступ одразу перестає показувати чернетки). Банер показує версію чернетки.
 
-## Увімкнення hosted-панелі (дії власника — report/35 §12)
+## Увімкнення hosted-панелі (дії власника)
+
+> Повна картка підключення (тип App, callback, дозволи, env, перевірка двох
+> користувачів, відкликання доступу) і **точна схема погодження публікації**
+> (успішний check ≠ approving review) — у `docs/PANEL-hosting-and-approvals.md`.
 
 1. **GitHub App** — Contents R/W, Pull requests R/W, **Deployments: Read**,
    Metadata: Read; install тільки на цей репозиторій.
-   Callback: `https://dream-car-vavd.com/api/keystatic/github/oauth/callback`.
+   Callback: `https://<домен>/api/keystatic/github/oauth/callback`
+   (+ `http://127.0.0.1:3000/…` для локальної розробки).
 2. Vercel env (Production + Preview): `KEYSTATIC_STORAGE_KIND=github`,
    `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
    `KEYSTATIC_SECRET`, `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`,
