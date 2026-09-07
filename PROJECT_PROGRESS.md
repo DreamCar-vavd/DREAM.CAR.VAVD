@@ -2120,3 +2120,238 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
 Перед публікацією значення звірено напряму з DOM (`document.querySelector(...).value`), оскільки поля Vercel-форми не відображали введений текст візуально при незмінному реальному значенні — підтверджено: `seconds="60"`, `requests="10"`, IP-чекбокс позначено, "Then" = "Log". Опубліковано через Review Changes → Publish; тост "Your Firewall changes have been applied successfully"; Overview → "Custom Rules: 1 active"; Audit Log → "You published version #1 with 1 change — You created and enabled Contact form rate limit — Just now". Платних підказок/запитів на оновлення тарифу не з'являлось. Штучний трафік для спрацювання ліміту не генерувався. Код, GitHub, Formspree, домен і deployment — **не змінювались**.
 
 **Наступний крок (потребує окремого дозволу власника):** через 3–7 днів переглянути статистику Firewall → Traffic/Overview і, якщо немає легітимних спрацювань, перемкнути дію з Log на `Default (429)`.
+
+---
+
+# Панель керування контентом DREAM.CAR.VAVD — стан і handoff (оновлено 2026-09-07)
+
+> Розділ веде передачу в нову сесію Claude Code у цій самій папці.
+> Детальний журнал по пунктах — `docs/PANEL-progress.md` (один на гілку).
+> Опис для власника — `docs/PANEL.md`. Секретів у цих файлах немає.
+
+## 1. Поточний стан
+
+- **Робоча копія:** `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`
+  (ізольована; **не** `/Users/apple/Projects/DREAM.CAR.VAVD`, не Desktop-копії).
+- **Гілка:** `codex/admin-panel-spike` · **PR #26** — draft, не змерджено.
+- **Head:** `920e5637e211b118d5b3fa94ecc5f7ddbbfb5caf` (`git log -1`).
+- **`main`:** `ce1977af` — **не чіпається**, гілка від нього попереду на 37 комітів.
+- **`git status`:** чисто (усе закомічено й запушено; `origin/codex/admin-panel-spike` = HEAD).
+- **CI `Verify`:** зелений на `2e83ece`; для `fd1158a` / `920e563` — очікується (перевірити `gh pr checks 26` на початку нової сесії).
+- **Локальні перевірки на Head:** `tsc` 0 · `eslint` 0 · `npm test` **242 pass** · `npm run build` OK · `content:check` OK · `content:guard` OK.
+- **Preview (Vercel):** публічні сторінки сайту — 200; **`/panel` і `/keystatic` — 404** доти, доки власник не додасть github-env (див. Б1).
+- **Локальний dev-сервер:** якщо запущений — це `next dev` на `http://localhost:3000` з цієї копії, файловий режим (без `.env.local`). Стан треба перевіряти (`lsof -i :3000`), чужий процес не зупиняти.
+
+## 2. Що зроблено повністю (код готовий, покрито тестами)
+
+Уся панель — окрема гілка, у `main` нічого з цього немає.
+
+| Область | Стан | Ключові файли |
+|---|---|---|
+| Модель чернетка/публікація | ✅ робоча копія → перегляд по мовах → публікація → знімок | `src/lib/content/panelStore.ts`, `snapshot.ts`, `siteContent.ts` |
+| Розділ «Автомобілі» | ✅ Keystatic-модель + гейт публікації + 3 мови | `carsGate.ts`, `keystatic.config.ts` |
+| Розділ «Галерея робіт» (фото + тексти) | ✅ той самий пайплайн, медіа через Keystatic | `galleryGate.ts`, `publishedGallery.ts` |
+| Розділ «Послуги» | ✅ пайплайн; ціна = спільна сума+валюта + `priceNote` по мовах (у review-хеші лише note) | `serviceGate.ts` |
+| Розділ «Контакти й графік» | ✅ **singleton** (один запис), серверне enforcement `id === "site"` | `contactGate.ts`, `publishedContact.ts` |
+| Розділ «Банери, акції, новини» | ✅ без запланованої публікації; порожньо = нічого не показано; без вигаданих акцій | `promoGate.ts`, `publishedPromos.ts`, `PromoSection.tsx` |
+| Storage-адаптер | ✅ local (файли, атомарно) + github (GitHub API токеном користувача, оптимістична конкурентність 409) | `src/lib/content/store/*` |
+| Перегляд чернетки на сайті (Draft Mode) | ✅ авторизований користувач бачить робочу версію з банером; сесія перевіряється щорендеру | `siteContent.ts`, `/api/panel/preview` |
+| `content-guard` | ✅ валідує знімок + media-маніфест + magic-bytes; валить `next build` на непридатному знімку | `scripts/content-guard.ts`, `mediaSniff.ts` |
+| Заявки (leads) — читання | ✅ демо-перегляд `/panel/leads`; hosted без БД → «Сховище заявок не налаштоване», НЕ авто-демо | `src/lib/leads/store.ts` |
+| Заявки — запис у Postgres | ✅ адаптер `createPgLeadsStore(db)`, keyset-пагінація, boundary-safe idempotency (`{current, previous}` бакети по 10 хв), `ON CONFLICT DO NOTHING` | `src/lib/leads/postgres.ts`, `schema.sql`, `scripts/leads-migrate.mjs` |
+| Відео — локально | ✅ завантаження, прогрес, скасування, повтор, перегляд, прив'язка до матеріалу | `src/lib/media/videoStore.ts`, `VideoUploader.tsx` |
+| Відео — hosted (Vercel Blob) | ✅ код: client-upload (`@vercel/blob` `upload()` + `handleUpload`, `multipart` > 90 МБ); `del/head/list` | `videoStore.ts` (`BlobVideoStore`), `/api/panel/video/route.ts` |
+| Локалізація панелі | ✅ власні сторінки повністю укр.; Keystatic `locale: "uk-UA"` (часткова, див. §7) | `keystatic.config.ts` |
+| GitHub App setup page | ✅ `/keystatic/setup` відкривається, кнопка «Create GitHub App» веде на GitHub (App НЕ створювався) | `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND` |
+| Тач-цілі, порожні стани, зрозумілі назви | ✅ кнопки 34–36px; «Матеріалів ще немає» + дія; `/panel` — людський огляд назв і статусів | `src/app/panel/page.tsx` |
+| Документи | ✅ `docs/PANEL*.md` (hosting-and-approvals, leads-db, video-hosting, costs, hosted-verification, backup-restore, keystatic-app-setup.env) |
+
+**Повний перелік змінених файлів гілки:** `git diff --stat main...HEAD`
+(185 файлів, +15936/−1144; включно з видаленням мертвого `gallery-project-overrides` та старих `gallery.ts`/`galleryProjects.ts`).
+
+## 3. Що зроблено саме в останньому робочому блоці (П15, коміти `fd1158a`, `920e563`)
+
+Мета: зробити інтерфейс зрозумілим за фотографіями власника + єдиний запис контактів.
+
+- `keystatic.config.ts`: додано верхньорівневий `locale: "uk-UA"`.
+- Прибрано дубльований стовпець «ID» у списках cars/gallery/services/promos
+  (Keystatic 0.6.9 показує лише сире значення верхньорівневого поля).
+- `galleryProjects` label: «Галерея (тексти)» → «Галерея робіт (фото + тексти)».
+- Видалено сінглтон-заглушку «Налаштування сайту» (`siteSettings`) — усі обіцяні
+  в ній розділи вже існують реально.
+- **`siteContact`: `collection` → `singleton`.** Один запис, без кнопки «Add».
+  Файл лишається `src/content/cms/contact/site.json`. Серверне enforcement:
+  - `contactGate.getContactPublishBlockers` блокує публікацію при `id !== "site"`;
+  - `snapshot.readPublishedSnapshot` кидає при >1 записі contact;
+  - `snapshot.assertContactSane` кидає під час `next build` при `id !== "site"`;
+  - `publishedContact.ts` / `siteContent.ts` читають саме запис `site`.
+- `/panel`: порожній стан → «Матеріалів ще немає» + посилання на створення.
+- +3 тести (242 разом): другий запис contact / перейменований id — відхиляються.
+- `docs/PANEL.md` рядок 3 + `docs/PANEL-progress.md` (П15) + `PROJECT_CURRENT_STATUS.md`
+  (позначка «у роботі на гілці») оновлено.
+
+Файли останнього блоку: `keystatic.config.ts`, `scripts/content-guard.test.ts`,
+`src/app/panel/page.tsx`, `src/lib/content/carsGate.ts`,
+`src/lib/content/contactGate.ts`, `src/lib/content/contactGate.test.ts`,
+`src/lib/content/panelStore.ts`, `src/lib/content/publishedContact.ts`,
+`src/lib/content/siteContent.ts`, `src/lib/content/snapshot.ts`,
+`docs/PANEL.md`, `docs/PANEL-progress.md`, `PROJECT_CURRENT_STATUS.md`,
+`PROJECT_PROGRESS.md`.
+
+Раніші блоки цієї гілки (П1–П14) — у `docs/PANEL-progress.md`, звіти `report/33`–`40`.
+
+## 4. Важливі технічні рішення
+
+- **`/panel` — головна зрозуміла сторінка, не списки Keystatic.** Keystatic 0.6.9
+  у списках колекцій рендерить `val = item.data?.[column] + ''` — лише
+  верхньорівневі ключі, сира стрічка (без підписів select, без вкладеного
+  `uk.title`). Тому людські назви/статуси показуємо на `/panel`, а Keystatic —
+  редактор полів за ним. Форк бібліотеки заради вигляду списків **відхилено**.
+- **Контакти — singleton, не collection.** Один запис на сайт; singleton прибирає
+  кнопку «Add», а сервер додатково не дає опублікувати/зібрати другий запис.
+  Міграцію зроблено після перевірки reader / storage / review-state / знімка;
+  фізичний шлях файлу не змінювався (`contact/site.json`).
+- **`NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND`** (а не `KEYSTATIC_STORAGE_KIND`):
+  `keystatic.config.ts` імпортується і клієнтом; без префікса змінна на клієнті
+  `undefined` → клієнт «local», сервер «github» → `/keystatic/setup` 404.
+- **Ціна послуги:** числова сума + валюта — спільні, не в review-хеші; вільний
+  текст («за домовленістю») — це `priceNote` по мовах, у review-хеші.
+- **Заявки idempotency:** ключ рахується у двох 10-хв бакетах `{current, previous}`,
+  адаптер робить `SELECT ... WHERE idempotency_key IN ($1,$2)` перед `INSERT
+  ON CONFLICT DO NOTHING` — повтор на межі бакета не дублює. Гарантію «лист рівно
+  один раз» **не декларуємо** (лише «не більше одного запису на бакет»).
+- **Відео hosted = client-uploads.** Serverless body-limit 4.5 МБ → браузер стрімить
+  напряму в Blob після обміну токеном (`handleUpload`). `del()` безкоштовний;
+  `head`/`list` — advanced ops.
+- **`resolveLeadsMode()`**: URL БД → `database`; інакше `LEADS_DEMO_MODE=1` або
+  не-production → `demo`; інакше `not-configured`. Hosted без БД **не** падає в демо.
+- **`content-guard`** переносить `published.json` у `main` окремим workflow
+  (`.github/workflows-proposed/content-guard.yml`), а не прямим пушем.
+
+## 5. Відхилені варіанти / рішення, які НЕ приймаються
+
+- Форк або патч `@keystatic/core` заради перекладу системного UI чи вигляду
+  списків — **ні**. Використовуємо штатний `locale` + `/panel`.
+- Підміна текстів Keystatic через DOM-скрипти на клієнті — **ні**.
+- Автоматичний перехід у демо-режим заявок на hosted без БД — **ні** (показуємо
+  «Сховище заявок не налаштоване»).
+- Використання того самого connection string для Preview і Production згодом — **ні**
+  (тестова БД / ізольована гілка лише для Preview).
+- Запланована публікація банерів/акцій за датою — **ні** (дата не тригерить показ).
+- Наповнення списків вигаданими акціями/новинами заради «непорожнього» вигляду — **ні**.
+- Видалення всього `.env.local` як інструкція власнику після setup — **ні**
+  (перевірити значення без друку секретів, зберегти попередню конфігурацію,
+  відокремити тимчасові setup-параметри, запропонувати безпечне повернення).
+- Публічна доступність відео-чернеток за URL — **компроміс, ще не погоджений
+  власником**; приватні матеріали не завантажувати.
+- `del` Neon-проєкту / Blob-store як «звичайна» дія скасування — **ні**.
+
+## 6. Знайдені й виправлені помилки (ця серія)
+
+- `/keystatic/setup` 404 → перейменування на `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND`
+  у `keystatic.config.ts`, `keystaticEnabled.ts`, `store/index.ts`, `.env.example`, docs.
+- `.env.local` з `...=github` ламав `npm run build` (production кидає «Missing
+  required config») → build/dev панелі тестуємо **без** `.env.local`; github-режим
+  лише на Vercel Preview.
+- `ui.locale` — TS-помилка: `locale` живе на `CommonConfig` верхнього рівня, не в `ui`.
+- NUL-байт у роздільнику ключа в `src/lib/leads/store.ts` (файл став binary у git)
+  → `.join(" ")` + `.gitattributes` (`*.ts text`).
+- Кілька тестів переписано під нові сигнатури: `store.test.ts` (немає fallback у
+  демо), `postgres.test.ts` (`{current, previous}`), `idempotency.test.ts`
+  (нормалізація пробілів у fake-db), `videoStore.test.ts` (токен читається у момент
+  виклику, не в конструкторі), `content-guard.test.ts` (`--media-root` абсолютний).
+- `services/[slug]/page.tsx` build fail (`draftMode()` у `generateStaticParams`) →
+  `getPublishedServiceSlugs()` читає `readPublishedSnapshot()` напряму.
+
+## 7. Відомі обмеження / ризики
+
+- **Keystatic 0.6.9 uk-UA — часткова.** НЕ перекладаються штатно: «No results»,
+  «Unsaved», «Slug» (заголовок стовпця), «N entries», деякі тексти діалогів і
+  порожніх станів. Це hard-coded English у бібліотеці. Задокументовано коментарем
+  у `keystatic.config.ts` і в `docs/PANEL-progress.md` (П15).
+- **Списки колекцій Keystatic** показують slug і сирі значення, не людські назви й
+  не підписи статусів. Зрозумілий огляд — `/panel`.
+- **Hosted-панель = 404 на Preview**, доки немає github-env (Б1).
+- **Адаптери Postgres і Blob — код готовий, жива перевірка не робилась.**
+  Не називати це «живою перевіркою БД/Blob». Потрібні URL/токен від власника.
+- **`.git` цієї копії — у `/Users/apple/Projects/`** (не iCloud) — це добре;
+  стара Desktop-копія лишається резервною, її не чіпати.
+- **Preview-захист vs OAuth callback:** з порожнім Deployed App URL маніфест
+  створює callback на `${origin}/api/keystatic/github/oauth/callback` та
+  `http://127.0.0.1/...` (без порту). Для hosted-входу потрібна стабільна
+  branch-адреса Preview і, ймовірно, вимкнений Vercel Preview Protection на цьому
+  домені або bypass — уточнити при виконанні Б1.
+
+## 8. Що не завершено — лише зовнішні підключення (дії власника)
+
+Усі **кодові** блокери закриті. Залишились Б1–Б4 — дії/рішення власника:
+
+| # | Блокер | Що потрібно від власника | Документ |
+|---|---|---|---|
+| Б1 | Hosted Keystatic (github-режим) | «Create GitHub App» **локально** → env у Vercel Preview (scope = гілка) → redeploy → протокол перевірки | `docs/PANEL-hosting-and-approvals.md` §3, `docs/PANEL-hosted-verification.md` |
+| Б2 | Реальний Vercel Blob для відео | Vercel → Storage → Blob → `BLOB_READ_WRITE_TOKEN` → redeploy → жива перевірка | `docs/PANEL-video-hosting.md` |
+| Б3 | Реальна БД заявок (Neon) | створити БД + роль `leads_app` (мінімальні права), окремо міграційна роль; TLS; `LEADS_DATABASE_URL` у Preview; пароль не в shell-історію | `docs/PANEL-leads-db.md` |
+| Б4 | `content-guard` workflow у `main` | code-PR з `.github/workflows/content-guard.yml` + ruleset; scope `workflow` | `docs/PANEL-hosting-and-approvals.md` §1.5 |
+| Б5 | Джерела трафіку в панелі | рішення: referrer уже в дашборді Vercel; API/UTM = Vercel Pro (+Plus для UTM) | `docs/PANEL-costs.md` |
+| Б7 | Приватність відео-чернеток | рішення власника щодо `access:"public"` компромісу | `docs/PANEL-video-hosting.md` |
+
+## 9. Пріоритети й точні наступні кроки для нової сесії
+
+1. **Звірити стан:** `git -C /Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906 status`,
+   `git log -1`, `gh pr view 26`, `gh pr checks 26`. Прочитати `docs/PANEL-progress.md`.
+2. **Дочекатись CI** для `fd1158a` / `920e563` (має бути success + Vercel success).
+   Якщо червоний — розібратись перед будь-чим іншим.
+3. **Підготувати ОДИН запит власнику — Б1 (GitHub App)** у форматі «ЗАПИТ ДЛЯ
+   ПЕРЕДАЧІ АСИСТЕНТУ»: що зробити → навіщо → точне посилання (`/keystatic/setup`
+   на локальному сервері) → які дозволи (contents: write, metadata: read,
+   pull_requests; додати deployments: read вручну) → як перевірити результат.
+   Не об'єднувати App + БД + Blob в один список. App і його дозволи не
+   погоджувати без власника. Секретів у чаті не просити.
+   Уточнити в коді/маніфесті точні callback URL при порожньому Deployed App URL
+   і що саме додати для hosted-входу; не наказувати видаляти весь `.env.local`.
+   За потреби — окремий порт + відповідний callback, щоб не переривати перегляд
+   власника на поточному сервері.
+4. Після Б1 — прогін `docs/PANEL-hosted-verification.md` на Preview.
+5. Тоді Б2 і Б3 — паралельно; для кожного після видачі токена/URL — **жива
+   перевірка** (адаптери вже написані, новий код наосліп не писати).
+6. **Не створювати нових задач заради продовження роботи.** Якщо лишились лише
+   Б1–Б4 (зовнішні підключення) — так і повідомити власнику.
+
+## 10. Обмеження, які не можна порушувати
+
+- `main`, Production, DNS, доступи, тарифи, видимість репозиторію — **не змінювати**.
+- PR #26 — **залишити draft. Без merge. Без force-push.**
+- Працювати лише в `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`.
+- Не надсилати справжніх заявок/листів/запрошень. Секретів у чаті не просити;
+  секрети — тільки в налаштуваннях сервісів, не в Git/чаті/звіті.
+- Не комітити секрети й тестові дані в реальний `published.json`.
+- Git-коміт ≠ публікація; збереження/push ≠ дозвіл на merge/deploy.
+- Не зупиняти чужі процеси; не чистити браузерні чернетки власника.
+- Не редагувати `node_modules`; не форкати бібліотеку заради перекладу.
+- Не робити міграцію, якщо достатньо меншої коректної зміни.
+- Не вважати відсутність відповіді власника погодженням.
+- Спілкування в чаті — українською.
+
+## 11. Команди
+
+```
+# з кореня робочої копії панелі:
+cd /Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906
+
+npm install                 # (одноразово; є package-lock)
+npm run dev                  # next dev (Turbopack) → http://localhost:3000  [файловий режим]
+npm run build                # next build (production; валідує знімок через content-guard)
+npm run lint                 # eslint
+npx tsc --noEmit             # типи
+npm test                     # node --test: src/**/*.test.ts + scripts/**/*.test.ts  (242)
+npm run content:check        # швидка перевірка published.json
+npm run content:guard        # повна перевірка знімка + media + magic-bytes
+npm run content:export       # експорт контенту
+npm run leads:migrate        # міграція схеми заявок (потрібен LEADS_DATABASE_URL)
+
+gh pr view 26 --repo DreamCar-vavd/DREAM.CAR.VAVD
+gh pr checks 26 --repo DreamCar-vavd/DREAM.CAR.VAVD
+```
+
+Панель у github-режимі локально **не** тестувати (build падає) — лише файловий
+режим без `.env.local`. github-режим — на Vercel Preview після Б1.
