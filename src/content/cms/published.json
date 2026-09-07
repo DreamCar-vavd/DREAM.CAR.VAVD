@@ -649,7 +649,8 @@
       "order": 10,
       "status": "available",
       "iconSrc": "/images/services/premium-3d/01-car-selection-premium-3d.png",
-      "price": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
       "photos": [],
       "uk": {
         "title": "Автопідбір",
@@ -665,6 +666,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -682,6 +684,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -699,6 +702,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       }
@@ -708,7 +712,8 @@
       "order": 20,
       "status": "coming-soon",
       "iconSrc": "/images/services/premium-3d/02-car-service-premium-3d.png",
-      "price": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
       "photos": [],
       "uk": {
         "title": "Автосервіс",
@@ -769,6 +774,7 @@
             ]
           }
         ],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -831,6 +837,7 @@
             ]
           }
         ],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -893,6 +900,7 @@
             ]
           }
         ],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       }
@@ -902,7 +910,8 @@
       "order": 30,
       "status": "available",
       "iconSrc": "/images/services/premium-3d/03-computer-diagnostics-premium-3d.png",
-      "price": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
       "photos": [],
       "uk": {
         "title": "Комп'ютерна діагностика",
@@ -918,6 +927,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -935,6 +945,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -952,6 +963,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       }
@@ -961,7 +973,8 @@
       "order": 40,
       "status": "available",
       "iconSrc": "/images/services/premium-3d/04-srs-airbag-premium-3d.png",
-      "price": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
       "photos": [],
       "uk": {
         "title": "SRS AIRBAG",
@@ -977,6 +990,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -994,6 +1008,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -1011,6 +1026,7 @@
         "modalLead": "",
         "modalDescription": "",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       }
@@ -1020,7 +1036,8 @@
       "order": 50,
       "status": "coming-soon",
       "iconSrc": "/images/services/premium-3d/05-detailing-polishing-premium-3d.png",
-      "price": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
       "photos": [],
       "uk": {
         "title": "Детейлінг і полірування",
@@ -1036,6 +1053,7 @@
         "modalLead": "Відкриваємося вже зовсім скоро",
         "modalDescription": "Комплексний догляд за кузовом і салоном: полірування, хімчистка, детейлінг та захисні покриття. Результат — бездоганний вигляд і надійний захист лакофарбового покриття.",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -1053,6 +1071,7 @@
         "modalLead": "Opening very soon",
         "modalDescription": "Complete care for your vehicle's exterior and interior: polishing, deep cleaning, detailing and protective coatings. The result — an immaculate appearance and reliable protection for the paintwork.",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       },
@@ -1070,6 +1089,7 @@
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
         "modalSections": [],
+        "priceNote": "",
         "seoTitle": "",
         "seoDescription": ""
       }

@@ -70,6 +70,8 @@ function serviceLang(raw: Record<string, unknown>): CmsServiceLanguage {
           items: arr(s.items),
         }))
       : [],
+    // No per-language price text existed pre-panel — not invented.
+    priceNote: "",
     seoTitle: "",
     seoDescription: "",
   };
@@ -88,7 +90,9 @@ async function main() {
       order: (i + 1) * 10,
       status: COMING_SOON.has(slug) ? "coming-soon" : "available",
       iconSrc: ICONS[slug],
-      price: "",
+      // No prices existed pre-panel — amount empty, currency defaulted to £.
+      priceAmount: "",
+      priceCurrency: "£",
       photos: [],
       uk: serviceLang(
         (ukDict.services as unknown as Record<string, Record<string, unknown>>)[slug],

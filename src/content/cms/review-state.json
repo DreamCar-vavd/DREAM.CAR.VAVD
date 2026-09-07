@@ -155,71 +155,71 @@
   },
   "car-selection": {
     "uk": {
-      "hash": "05f6b6d5429fe2b61cf083fd8299a910a05a32515161d904b561ba35a60898a7",
+      "hash": "2edb50b83cd0ca185e56dbc440bedc6b0741928eaf159bd7a7773190b5178fae",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "en": {
-      "hash": "742b46017b68f35089befbaf91c27c87eccf3c3fd9b41039c863bce802e3a530",
+      "hash": "a756584e9add95659174089711bf58de5d8d3bb802835eb90b976a78a5c518db",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "ru": {
-      "hash": "440a1268e5a3ccffbfa9d7b575e6176733ae3fb9655fa217e517a282a203efb7",
+      "hash": "f1c32b80cb8d28409f58818c011e5dd9dbe2b3ffd2476d3e044730b08464f464",
       "at": "2026-09-06T00:00:00.000Z"
     }
   },
   "car-service": {
     "uk": {
-      "hash": "1df48f77fa4a220e7ff9c4714a2f80b9039d74d31be17330bb8befec262d95f6",
+      "hash": "5bbbc9d2453b0762486eb4b7ed3eded2db1e2d204d9b43897cb5dd3a790401f6",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "en": {
-      "hash": "09c180d3cd83f98d15c649599db7876733d5cb198fdc0c30211e533a629f790c",
+      "hash": "6429058f60e7214329f375793291e3520c5f830b314c7bb0d83ffbf08a50cd1a",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "ru": {
-      "hash": "c752789db2a81f6bac0d794c545c5c496cc6db88627331add5db40d770e1aa71",
+      "hash": "f8ee319dc1a02330c863ef2b26594af99449683bbc54578694730c0737290903",
       "at": "2026-09-06T00:00:00.000Z"
     }
   },
   "diagnostics": {
     "uk": {
-      "hash": "a4da952813e80e07581ae53dd3414a31205583d76801add33482f4f5f08514ae",
+      "hash": "9b2abc2dd8a1d4cb6990d89d01ba05077c23a28d916fd5be4d39f6bcdfb316c1",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "en": {
-      "hash": "902b6c620feb109a587a41bd202b73c5805773782eb6ca0c0e0f2ec11b2e95eb",
+      "hash": "a805e38c89c20449e9a9d48e8086c39b11e0af737d035c044d5a0413cbd6e5e1",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "ru": {
-      "hash": "7224696d806fb6b5b0c84dab33ae5656fc829163cbd1dd8f1b926b16075f599e",
+      "hash": "e632c155a018c58c54de8e72115e3f7b70b4f3e5286f1baa067368ff7fd2e814",
       "at": "2026-09-06T00:00:00.000Z"
     }
   },
   "srs-airbag": {
     "uk": {
-      "hash": "0a03a407475b4bf542545de110c1fd9ae091a7974ec3c80a0c583a0fd268eeb2",
+      "hash": "ad2ef587e32785414c0328a2671674377726c9ed1d48b8f14a79100ff55041a4",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "en": {
-      "hash": "0e1e714092c86d930710911497a327e061d85145b1f838fc43ed4fe7ca21be80",
+      "hash": "ead77be83069748c506096578ddaab27dc99594b5afbd3fdbb433d545749c54d",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "ru": {
-      "hash": "83a80dfab476c91c158b451fec4771404291c7fe9e9b647771276f437923ff86",
+      "hash": "6be0fd64aba67dee0e6302472f0bb84c774364d59d1527ab7b35508bf2056e76",
       "at": "2026-09-06T00:00:00.000Z"
     }
   },
   "detailing": {
     "uk": {
-      "hash": "f09d1bd2b7eee7c79c092c3f1891bfb4b9ca0b70adb44554d2a352e69506407b",
+      "hash": "67c44d8f5b62b23641183e25d9dd839a2e5f1bee31023778092c48db065ca185",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "en": {
-      "hash": "abb5368bc6805312bb824f3dd7b30f881042b889b8aea92e48c686253689d262",
+      "hash": "734a442402312f1475238a93cfdfe2853786b56d605c9c56dddf15ba27d47c91",
       "at": "2026-09-06T00:00:00.000Z"
     },
     "ru": {
-      "hash": "12dbb6ae460a4141a23794899ce0da921ae1d85441e2061f32e1157e04bd9a31",
+      "hash": "c8fb335ad542733fa5808cafdbb6f3b53ac36cb7b85a11501819e81f7a5eb16b",
       "at": "2026-09-06T00:00:00.000Z"
     }
   },

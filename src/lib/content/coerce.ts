@@ -94,6 +94,7 @@ function serviceLang(x: unknown): CmsServiceLanguage {
           items: strArr(s?.items),
         }))
       : [],
+    priceNote: str(o.priceNote),
     seoTitle: str(o.seoTitle),
     seoDescription: str(o.seoDescription),
   };
@@ -105,7 +106,8 @@ export function coerceService(id: string, raw: Record<string, unknown>): CmsServ
     order: Number.isFinite(Number(raw.order)) ? Number(raw.order) : 100,
     status: raw.status === "coming-soon" ? "coming-soon" : "available",
     iconSrc: str(raw.iconSrc),
-    price: str(raw.price),
+    priceAmount: str(raw.priceAmount),
+    priceCurrency: raw.priceCurrency == null ? "£" : str(raw.priceCurrency),
     photos: Array.isArray(raw.photos)
       ? (raw.photos as Record<string, unknown>[]).map((p) => ({
           image: str(p?.image),

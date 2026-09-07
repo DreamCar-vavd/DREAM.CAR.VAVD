@@ -25,6 +25,12 @@ export interface CmsServiceLanguage {
   modalLead: string;
   modalDescription: string;
   modalSections: CmsServiceSection[];
+  /**
+   * Free-text price for THIS language, e.g. «за домовленістю» / «on request» /
+   * «от £60». A shared number cannot express these, so this one is per-locale
+   * and IS part of the review hash — editing it re-opens the language review.
+   */
+  priceNote: string;
   seoTitle: string;
   seoDescription: string;
 }
@@ -33,11 +39,34 @@ export interface CmsService {
   order: number;
   status: ServiceStatus;
   iconSrc: string;
-  price: string;
+  /**
+   * A plain numeric amount + currency symbol. Language-independent, so it is
+   * NOT part of the review hash — changing the number never forces a
+   * re-translation. Empty amount = no numeric price; the per-language
+   * `priceNote` (if any) is shown instead.
+   */
+  priceAmount: string;
+  priceCurrency: string;
   photos: { image: string; caption: string }[];
   uk: CmsServiceLanguage;
   en: CmsServiceLanguage;
   ru: CmsServiceLanguage;
+}
+
+/** `/^\d+(\.\d{1,2})?$/` or empty. */
+export function isValidPriceAmount(v: string): boolean {
+  const t = (v ?? "").trim();
+  return t === "" || /^\d+(\.\d{1,2})?$/.test(t);
+}
+
+/** The price string to display for one locale (number wins over note). */
+export function servicePriceForLocale(s: CmsService, locale: ContentLocale): string {
+  const amount = (s.priceAmount ?? "").trim();
+  if (amount) {
+    const cur = (s.priceCurrency ?? "").trim();
+    return cur ? `${cur}${amount}` : amount;
+  }
+  return (s[locale]?.priceNote ?? "").trim();
 }
 
 const REQUIRED = ["title", "shortDescription", "longDescription"] as const;
@@ -56,6 +85,7 @@ export function serviceConfirmedText(l: CmsServiceLanguage): string {
       heading: (s.heading ?? "").trim(),
       items: (s.items ?? []).map((i) => i.trim()).filter(Boolean),
     })),
+    priceNote: (l?.priceNote ?? "").trim(),
     seoTitle: (l?.seoTitle ?? "").trim(),
     seoDescription: (l?.seoDescription ?? "").trim(),
   });
@@ -81,6 +111,9 @@ export function getServicePublishBlockers(
   const failures: GateFailure[] = [];
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(service.id)) {
     failures.push({ kind: "missing-field", locale: "uk", field: "slug" });
+  }
+  if (!isValidPriceAmount(service.priceAmount)) {
+    failures.push({ kind: "missing-field", locale: "uk", field: "priceAmount" });
   }
   for (const locale of LOCALES) {
     const l = service[locale];

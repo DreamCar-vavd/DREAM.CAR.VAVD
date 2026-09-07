@@ -3,7 +3,8 @@
   "order": 40,
   "status": "available",
   "iconSrc": "/images/services/premium-3d/04-srs-airbag-premium-3d.png",
-  "price": "",
+  "priceAmount": "",
+  "priceCurrency": "£",
   "photos": [],
   "uk": {
     "title": "SRS AIRBAG",
@@ -19,6 +20,7 @@
     "modalLead": "",
     "modalDescription": "",
     "modalSections": [],
+    "priceNote": "",
     "seoTitle": "",
     "seoDescription": ""
   },
@@ -36,6 +38,7 @@
     "modalLead": "",
     "modalDescription": "",
     "modalSections": [],
+    "priceNote": "",
     "seoTitle": "",
     "seoDescription": ""
   },
@@ -53,6 +56,7 @@
     "modalLead": "",
     "modalDescription": "",
     "modalSections": [],
+    "priceNote": "",
     "seoTitle": "",
     "seoDescription": ""
   }

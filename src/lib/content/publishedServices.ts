@@ -4,6 +4,7 @@ import type { ServiceCopy } from "@/content/types";
 import type { ServiceStatus } from "./serviceGate";
 import { readSiteContent } from "./siteContent";
 import { readPublishedSnapshot } from "./snapshot";
+import { servicePriceForLocale } from "./serviceGate";
 import { imageSize } from "./imageSize";
 
 export interface ServiceMetaEntry {
@@ -55,7 +56,7 @@ export async function getServicesMeta(locale: ContentLocale): Promise<ServiceMet
       order: s.order,
       status: s.status,
       iconSrc: s.iconSrc,
-      price: s.price,
+      price: servicePriceForLocale(s, locale),
       photos,
       seoTitle: s[locale].seoTitle,
       seoDescription: s[locale].seoDescription,

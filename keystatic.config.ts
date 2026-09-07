@@ -90,6 +90,11 @@ const serviceLanguage = (label: string) =>
         multiline: true,
       }),
       modalSections: serviceSection(label),
+      priceNote: fields.text({
+        label: `${label} — ціна текстом (необов'язково)`,
+        description:
+          'Для НЕчислової ціни цією мовою: «за домовленістю» / «on request» / «от £60». Якщо задано числову суму вище — вона має пріоритет.',
+      }),
       seoTitle: fields.text({ label: `${label} — SEO title (необов'язково)` }),
       seoDescription: fields.text({
         label: `${label} — SEO description (необов'язково)`,
@@ -332,9 +337,14 @@ export default config({
           label: "Іконка (шлях до файлу)",
           description: "Напр. /images/services/premium-3d/01-car-selection-premium-3d.png",
         }),
-        price: fields.text({
-          label: "Ціна (необов'язково)",
-          description: 'Напр. «від £60» або «за домовленістю». Порожньо — ціна не показується.',
+        priceAmount: fields.text({
+          label: "Ціна — сума (необов'язково)",
+          description:
+            'Лише число, напр. «60» або «60.00». Одна на всі мови. Порожньо — числова ціна не показується (тоді бере текст ціни з мовного блоку).',
+        }),
+        priceCurrency: fields.text({
+          label: "Ціна — валюта",
+          description: 'Символ перед сумою, напр. «£». Одна на всі мови.',
         }),
         photos: fields.array(
           fields.object({

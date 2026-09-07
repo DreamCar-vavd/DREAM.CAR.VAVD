@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { confirmedText } from "./carsGate";
 import { galleryConfirmedText } from "./galleryGate";
+import { serviceConfirmedText } from "./serviceGate";
 import {
   ConflictError,
   assertAllowedDir,
@@ -96,6 +97,41 @@ class FakeStorage implements PanelStorage {
     return this.deploy;
   }
 }
+
+const SVC_L = {
+  title: "T",
+  shortDescription: "S",
+  longDescription: "L",
+  cardDescription: "",
+  bullets: [],
+  modalLead: "",
+  modalDescription: "",
+  modalSections: [],
+  priceNote: "",
+  seoTitle: "",
+  seoDescription: "",
+};
+const svcJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    id: "s1",
+    order: 10,
+    status: "available",
+    iconSrc: "/images/services/premium-3d/01-car-selection-premium-3d.png",
+    priceAmount: "",
+    priceCurrency: "£",
+    photos: [],
+    uk: SVC_L,
+    en: SVC_L,
+    ru: SVC_L,
+    ...over,
+  });
+const svcReviewAll = {
+  s1: {
+    uk: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+    en: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+    ru: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+  },
+};
 
 function baseStore() {
   const s = new FakeStorage();
@@ -246,4 +282,202 @@ test("getPanelData groups cars + gallery and reports modified vs in-sync + deplo
   s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ price: "£999" }) }]);
   d = await getPanelData(s);
   assert.equal(d.groups[0].rows[0].publishState, "modified");
+});
+
+// ---------------------------------------------------------------------------
+// Services through the shared pipeline
+// ---------------------------------------------------------------------------
+
+test("a new service: appears in its group, is gated, then publishes to the snapshot", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
+
+  // Unreviewed -> shows up but is blocked.
+  const d = await getPanelData(s);
+  const grp = d.groups.find((g) => g.kind === "service")!;
+  assert.equal(grp.rows[0].id, "s1");
+  assert.equal(grp.rows[0].editHref, "/keystatic/collection/services/item/s1");
+  assert.ok(grp.rows[0].blockers.length > 0);
+  assert.equal(grp.createHref, "/keystatic/collection/services/create");
+
+  // Reviewed -> publishes; lands only in services[].
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(svcReviewAll));
+  const v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, true);
+  const snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(snap.services.map((x: { id: string }) => x.id), ["s1"]);
+  assert.deepEqual(snap.cars, []);
+});
+
+test("a bad service slug blocks publish and never writes the snapshot", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [{ name: "Bad_Slug.json", text: svcJson({ id: "Bad_Slug" }) }]);
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      Bad_Slug: {
+        uk: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        en: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        ru: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+      },
+    }),
+  );
+  const v = await versions(s);
+  const r = await publishItem(s, "service", "Bad_Slug", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, false);
+  assert.ok((r as { blockers?: { field?: string }[] }).blockers!.some((b) => b.field === "slug"));
+  assert.equal(s.files.has("src/content/cms/published.json"), false);
+});
+
+test("changing only a shared service price does not require re-confirming any language", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(svcReviewAll));
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+
+  // Editor sets a shared numeric price. No text changed.
+  s.seedDir("src/content/cms/services", [
+    { name: "s1.json", text: svcJson({ priceAmount: "60", priceCurrency: "£" }) },
+  ]);
+  const d = await getPanelData(s);
+  const row = d.groups.find((g) => g.kind === "service")!.rows[0];
+  assert.equal(row.publishState, "modified");
+  assert.deepEqual(row.blockers, []); // still publishable — no re-review
+  assert.ok(row.langStatus.uk === "reviewed" && row.langStatus.en === "reviewed");
+
+  v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, true);
+  assert.equal(
+    JSON.parse(s.files.get("src/content/cms/published.json")!).services[0].priceAmount,
+    "60",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Two-editor simulation (no real GitHub accounts — the version-token contract)
+// ---------------------------------------------------------------------------
+
+test("two editors, same version: the first save wins, the second gets a conflict — not a silent overwrite", async () => {
+  const s = baseStore(); // no review-state.json yet
+
+  // Both open the dashboard and read the same version tokens.
+  const vA = await versions(s);
+  const vB = await versions(s);
+  assert.deepEqual(vA, vB);
+  assert.equal(vA.review, "");
+
+  // Editor A confirms UK — this creates review-state.json (version moves).
+  const rA = await confirmLocale(s, "car", "c1", "uk", { working: vA.car, review: vA.review });
+  assert.equal(rA.ok, true);
+
+  // Editor B, still holding the stale (empty) review token, tries to confirm EN.
+  const rB = await confirmLocale(s, "car", "c1", "en", { working: vB.car, review: vB.review });
+  assert.equal((rB as { conflict?: boolean }).conflict, true);
+  assert.match(rB.message, /онов|заново|перезавантаж/i); // message points at recovery
+
+  // A's write survived; B's did not clobber it.
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.ok(review.c1.uk.hash);
+  assert.equal(review.c1.en, undefined);
+});
+
+test("two editors publishing DIFFERENT items: both land, neither drops the other's work", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ ...carReviewAll, ...svcReviewAll }),
+  );
+
+  let v = await versions(s);
+  const rCar = await publishItem(s, "car", "c1", {
+    working: v.car,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(rCar.ok, true);
+
+  // Second editor refreshes (new published token) then publishes the service.
+  v = await versions(s);
+  const rSvc = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(rSvc.ok, true);
+
+  const snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(snap.cars.map((x: { id: string }) => x.id), ["c1"]);
+  assert.deepEqual(snap.services.map((x: { id: string }) => x.id), ["s1"]);
+});
+
+test("editor B publishes against a snapshot editor A already moved: conflict, no write", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const vB = await versions(s); // B loads
+
+  // A publishes first (bumps the published token).
+  const vA = await versions(s);
+  await publishItem(s, "car", "c1", { working: vA.car, review: vA.review, published: vA.published });
+
+  // B, holding the stale published token, publishes the same card.
+  const rB = await publishItem(s, "car", "c1", {
+    working: vB.car,
+    review: vB.review,
+    published: vB.published,
+  });
+  // Either a clean "already published in this version" no-op, or a conflict —
+  // never a lossy overwrite. Here the content is identical => no-op success.
+  assert.equal(rB.ok, true);
+  assert.match(rB.message, /вже опубліков/);
+});
+
+test("retry after a lost response: the repeated publish is an idempotent no-op success", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  let v = await versions(s);
+  const first = await publishItem(s, "car", "c1", {
+    working: v.car,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(first.ok, true);
+
+  // Client never saw the response and retries with a refreshed token.
+  v = await versions(s);
+  const retry = await publishItem(s, "car", "c1", {
+    working: v.car,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(retry.ok, true);
+  assert.match(retry.message, /вже опубліков/);
+  assert.equal(JSON.parse(s.files.get("src/content/cms/published.json")!).cars.length, 1);
+});
+
+test("one editor viewing (getPanelData) never blocks or loses another's concurrent write", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const viewer = await getPanelData(s); // viewer holds a snapshot of state
+  const v = await versions(s);
+  const w = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+  assert.equal(w.ok, true);
+  // Viewer's in-memory data is simply stale; a refresh shows the write.
+  const after = await getPanelData(s);
+  assert.notEqual(viewer.versions.review, after.versions.review);
 });

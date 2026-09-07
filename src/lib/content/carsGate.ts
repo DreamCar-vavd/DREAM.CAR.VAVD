@@ -150,6 +150,7 @@ const FIELD_LABELS: Record<string, string> = {
   heading: "заголовок",
   subheading: "підзаголовок",
   slug: "ID / slug (лише малі літери, цифри, дефіс)",
+  priceAmount: "ціна — сума (лише число, напр. 60 або 60.00)",
   phoneDisplay: "телефон (показ)",
   phoneE164: "телефон (для tel:)",
   email: "email",

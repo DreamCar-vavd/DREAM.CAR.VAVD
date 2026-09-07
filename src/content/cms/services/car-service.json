@@ -3,7 +3,8 @@
   "order": 20,
   "status": "coming-soon",
   "iconSrc": "/images/services/premium-3d/02-car-service-premium-3d.png",
-  "price": "",
+  "priceAmount": "",
+  "priceCurrency": "£",
   "photos": [],
   "uk": {
     "title": "Автосервіс",
@@ -64,6 +65,7 @@
         ]
       }
     ],
+    "priceNote": "",
     "seoTitle": "",
     "seoDescription": ""
   },
@@ -126,6 +128,7 @@
         ]
       }
     ],
+    "priceNote": "",
     "seoTitle": "",
     "seoDescription": ""
   },
@@ -188,6 +191,7 @@
         ]
       }
     ],
+    "priceNote": "",
     "seoTitle": "",
     "seoDescription": ""
   }
