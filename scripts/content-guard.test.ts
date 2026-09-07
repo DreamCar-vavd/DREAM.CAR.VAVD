@@ -70,3 +70,45 @@ test("content-guard rejects a media file that is not in the target tree", async 
   assert.equal(r.ok, false);
   assert.match(r.out, /відсутній у цільовому середовищі/);
 });
+
+test("content-guard rejects a real file whose bytes do not match its extension", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "guard-mb-"));
+  const pub = path.join(dir, "published.json");
+  const mediaRoot = path.join(dir, "public");
+  const fake = path.join(mediaRoot, "images/cms/gallery/mismatch/photos/0/image.jpg");
+  await fs.mkdir(path.dirname(fake), { recursive: true });
+  await fs.writeFile(fake, "<!doctype html><script>alert(1)</script>".padEnd(200, " "));
+
+  const bad = structuredClone(realSnapshot) as typeof realSnapshot & {
+    services?: unknown[];
+    contact?: unknown[];
+  };
+  bad.gallery = [
+    {
+      id: "mismatch",
+      order: 1,
+      kind: "album",
+      year: "",
+      photos: [{ image: "/images/cms/gallery/mismatch/photos/0/image.jpg", caption: "" }],
+      videoUrl: "",
+      showContactCta: false,
+      uk: { title: "T", shortDescription: "", longDescription: "", service: "", clientRequest: "", completedItems: [], result: "" },
+      en: { title: "T", shortDescription: "", longDescription: "", service: "", clientRequest: "", completedItems: [], result: "" },
+      ru: { title: "T", shortDescription: "", longDescription: "", service: "", clientRequest: "", completedItems: [], result: "" },
+    } as never,
+  ];
+  bad.cars = [];
+  await fs.writeFile(pub, JSON.stringify(bad));
+
+  try {
+    await run(
+      "node",
+      ["--import", "tsx", "scripts/content-guard.ts", "--published", pub, "--media-root", mediaRoot, "--review", path.join(dir, "none.json")],
+      { cwd: ROOT },
+    );
+    assert.fail("guard should have exited non-zero");
+  } catch (err) {
+    const e = err as { stdout: string; stderr: string };
+    assert.match(e.stdout + e.stderr, /вміст не розпізнано|вміст — /);
+  }
+});

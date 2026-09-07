@@ -21,6 +21,7 @@ import { getPublishBlockers, describeFailure, type ReviewState } from "../src/li
 import { getGalleryPublishBlockers } from "../src/lib/content/galleryGate";
 import { getServicePublishBlockers } from "../src/lib/content/serviceGate";
 import { getContactPublishBlockers } from "../src/lib/content/contactGate";
+import { sniffMedia } from "../src/lib/content/mediaSniff";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -31,7 +32,9 @@ function arg(name: string, fallback: string): string {
 
 const PUBLISHED = arg("published", "src/content/cms/published.json");
 const REVIEW = arg("review", "src/content/cms/review-state.json");
-const MEDIA_ROOT = arg("media-root", "public");
+// Absolute, so an absolute --media-root (e.g. a test temp dir) is honoured
+// rather than being re-joined under the cwd.
+const MEDIA_ROOT = path.resolve(process.cwd(), arg("media-root", "public"));
 
 /** Only these media roots + extensions may be referenced by a published item. */
 const MEDIA_PREFIX = "/images/cms/";
@@ -59,19 +62,42 @@ function checkMedia(where: string, raw: unknown) {
   mediaPaths.add(p);
 }
 
-async function fileIsRegular(p: string): Promise<"ok" | "missing" | "not-regular"> {
-  const abs = path.join(process.cwd(), MEDIA_ROOT, p.replace(/^\//, ""));
+async function checkMediaFile(p: string): Promise<string[]> {
+  const errs: string[] = [];
+  const abs = path.join(MEDIA_ROOT, p.replace(/^\//, ""));
   // Reject anything that escapes the media root after normalisation.
-  const rootAbs = path.join(process.cwd(), MEDIA_ROOT, "images/cms");
-  if (!path.resolve(abs).startsWith(path.resolve(rootAbs) + path.sep)) return "not-regular";
-  try {
-    const st = await fs.lstat(abs);
-    if (st.isSymbolicLink()) return "not-regular";
-    if (!st.isFile()) return "not-regular";
-    return "ok";
-  } catch {
-    return "missing";
+  const rootAbs = path.join(MEDIA_ROOT, "images/cms");
+  if (!path.resolve(abs).startsWith(path.resolve(rootAbs) + path.sep)) {
+    return [`медіа «${p}»: шлях виходить за межі public/images/cms`];
   }
+  let st;
+  try {
+    st = await fs.lstat(abs);
+  } catch {
+    return [`медіа «${p}»: файл відсутній у цільовому середовищі`];
+  }
+  if (st.isSymbolicLink()) return [`медіа «${p}»: symlink — заборонено`];
+  if (!st.isFile()) return [`медіа «${p}»: не звичайний файл`];
+
+  // Magic-byte sniff: extension must match the actual container, size within
+  // bounds, and JPEG/PNG must parse to real dimensions.
+  const ext = path.extname(abs).slice(1).toLowerCase();
+  let head: Buffer;
+  try {
+    const fd = await fs.open(abs, "r");
+    try {
+      const b = Buffer.alloc(65536);
+      const { bytesRead } = await fd.read(b, 0, b.length, 0);
+      head = b.subarray(0, bytesRead);
+    } finally {
+      await fd.close();
+    }
+  } catch (err) {
+    return [`медіа «${p}»: не вдалося прочитати (${(err as Error).message})`];
+  }
+  const r = sniffMedia(head, st.size, ext);
+  if (!r.ok) errs.push(`медіа «${p}»: ${r.reason}`);
+  return errs;
 }
 
 async function main() {
@@ -157,11 +183,9 @@ async function main() {
     }
   }
 
-  // Every referenced media file must exist as a real (non-symlink) file.
+  // Every referenced media file: real file, right type (magic bytes), sane size.
   for (const p of mediaPaths) {
-    const state = await fileIsRegular(p);
-    if (state === "missing") problems.push(`медіа «${p}»: файл відсутній у цільовому середовищі`);
-    if (state === "not-regular") problems.push(`медіа «${p}»: не звичайний файл (symlink / поза коренем)`);
+    problems.push(...(await checkMediaFile(p)));
   }
 
   if (problems.length > 0) {
