@@ -70,6 +70,9 @@ export function VideoUploader({ mode }: { mode: "local" | "blob" }) {
       handleUploadUrl: "/api/panel/video",
       contentType: f.type,
       abortSignal: ctrl.signal,
+      // Split larger files into parallel parts with per-part retry — Vercel
+      // recommends this above ~100 MB.
+      multipart: f.size > 90 * 1024 * 1024,
       onUploadProgress: (p) => setProgress(Math.round(p.percentage)),
     });
     abortRef.current = null;
