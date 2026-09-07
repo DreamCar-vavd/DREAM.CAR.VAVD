@@ -16,13 +16,13 @@
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
 - **Head:** `caa3f17` (docs-коміти поверх `87fe84a`) — PR #26 head звірено 2026-09-07
 - **CI `Verify`:** success · Vercel Preview — success (`gh pr checks 26`)
-- **Б1 статус (2026-09-07 13:0x):** очікує дії власника. Перевірено доступним
-  способом — GitHub App «DreamCar-vavd Keystatic» ще **не створено**
-  (`/apps/dreamcar-vavd-keystatic` → 404; `…-panel-setup-verify/.env` відсутній;
-  enumerate створених App через user-token API неможливо — точну перевірку
-  робить власник на `github.com/settings/apps`). Setup-сервер запущений і
-  чекає; уся перевірка після дії власника — розписана в
-  `docs/PANEL-owner-request-B1.md`.
+- **Б1 статус (2026-09-07):** очікує дії власника. Формулювання точне:
+  **за перевіреними адресами App не знайдено; повний список створених App ще не
+  перевірено** (`/apps/dreamcar-vavd-keystatic` та кілька варіантів слага → 404;
+  `…-panel-setup-verify/.env` відсутній). Enumerate створених App через
+  user-token API неможливо; сторінка `github.com/settings/apps` доступна лише у
+  браузері власника (асистент її відкрити не може — не його сесія). Setup-сервер
+  запущений і чекає; перевірка після дії власника — в `docs/PANEL-owner-request-B1.md`.
 - **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
