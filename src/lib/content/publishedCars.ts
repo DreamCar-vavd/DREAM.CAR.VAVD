@@ -53,7 +53,9 @@ export async function getPublicCarMedia(): Promise<CarMedia[]> {
     photos: car.photos.filter((p) => p.image).map((p) => ({ src: toPublicImagePath(p.image) })),
     video:
       car.video &&
-      (car.video.mode === "legacy-file" || car.video.mode === "external-link") &&
+      (car.video.mode === "legacy-file" ||
+        car.video.mode === "external-link" ||
+        car.video.mode === "hosted-file") &&
       car.video.src
         ? { src: car.video.src, posterSrc: toPublicImagePath(car.video.posterSrc) }
         : null,

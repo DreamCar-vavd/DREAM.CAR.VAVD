@@ -61,3 +61,6 @@ next-env.d.ts
 
 # backup files
 *.bak
+
+# panel: uploaded videos live outside Git (external storage in hosted mode)
+/public/uploads/

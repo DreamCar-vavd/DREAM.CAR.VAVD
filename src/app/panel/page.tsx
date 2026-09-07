@@ -300,6 +300,14 @@ export default async function PanelPage() {
         </Link>{" "}
         <span className="text-xs text-neutral-500">(перегляд; база ще не підключена — демо-дані)</span>
       </p>
+      <p className="mt-1 text-sm">
+        <Link className="underline" href="/panel/video">
+          Відео авто →
+        </Link>{" "}
+        <span className="text-xs text-neutral-500">
+          (завантаження відеофайлів — локально; на хостингу потрібне зовнішнє сховище)
+        </span>
+      </p>
 
       <nav className="mt-3 flex flex-wrap gap-2 text-xs">
         {data.groups.map((g) => (

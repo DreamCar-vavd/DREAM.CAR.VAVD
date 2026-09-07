@@ -23,7 +23,12 @@ import {
   coercePromo,
   coerceService,
 } from "../src/lib/content/coerce";
-import { getPublishBlockers, describeFailure, type ReviewState } from "../src/lib/content/carsGate";
+import {
+  getPublishBlockers,
+  describeFailure,
+  isPlayableVideoSrc,
+  type ReviewState,
+} from "../src/lib/content/carsGate";
 import { getGalleryPublishBlockers } from "../src/lib/content/galleryGate";
 import { getServicePublishBlockers } from "../src/lib/content/serviceGate";
 import { getContactPublishBlockers } from "../src/lib/content/contactGate";
@@ -164,7 +169,20 @@ async function main() {
       problems.push(`${w}: ${describeFailure(b)}`);
     }
     car.photos.forEach((ph, i) => checkMedia(`${w} фото ${i}`, ph.image));
+    // legacy-file lives in the repo -> goes in the manifest. hosted-file /
+    // external-link src is an external URL (Blob) or a git-ignored /uploads
+    // path -> it must NOT enter the git manifest; just sanity-check it.
     if (car.video?.mode === "legacy-file") checkMedia(`${w} відео`, car.video.src);
+    if (
+      (car.video?.mode === "hosted-file" || car.video?.mode === "external-link") &&
+      String(car.video.src ?? "").trim() &&
+      !isPlayableVideoSrc(car.video.src)
+    ) {
+      problems.push(`${w}: посилання на відео «${car.video.src}» не https і не /uploads/`);
+    }
+    if (car.video?.mode === "uploaded-file") {
+      problems.push(`${w}: відео у режимі «завантажений файл — не підключено»`);
+    }
     if (car.video?.posterSrc && car.video.mode !== "none") checkMedia(`${w} постер`, car.video.posterSrc);
   }
 

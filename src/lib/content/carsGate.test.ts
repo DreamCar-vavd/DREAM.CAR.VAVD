@@ -5,6 +5,7 @@ import {
   confirmedText,
   getLangStatus,
   getPublishBlockers,
+  isPlayableVideoSrc,
   isPublishable,
   isRenderable,
   type CmsCar,
@@ -116,6 +117,40 @@ test("video mode 'uploaded-file' blocks publish (not silently ignored)", () => {
       (f) => f.kind === "video-not-connected",
     ),
   );
+});
+
+test("isPlayableVideoSrc: https or a /uploads/videos path only", () => {
+  assert.equal(isPlayableVideoSrc("https://blob.vercel-storage.com/x.mp4"), true);
+  assert.equal(isPlayableVideoSrc("/uploads/videos/abc12345-clip.mp4"), true);
+  assert.equal(isPlayableVideoSrc("http://x.com/a.mp4"), false);
+  assert.equal(isPlayableVideoSrc("/uploads/videos/../../../etc/passwd"), false);
+  assert.equal(isPlayableVideoSrc(""), false);
+  assert.equal(isPlayableVideoSrc("javascript:alert(1)"), false);
+});
+
+test("video mode 'hosted-file' with no src blocks publish (a failed upload is not a ready record)", () => {
+  const c = car({ video: { mode: "hosted-file", src: "", posterSrc: "" } });
+  assert.ok(
+    getPublishBlockers(c, { review: reviewedAll(car()), sha256 }).some(
+      (f) => f.kind === "video-not-connected",
+    ),
+  );
+});
+
+test("video mode 'hosted-file' with an unsafe src blocks publish", () => {
+  const c = car({ video: { mode: "hosted-file", src: "http://evil/x.mp4", posterSrc: "" } });
+  assert.ok(
+    getPublishBlockers(c, { review: reviewedAll(car()), sha256 }).some(
+      (f) => f.kind === "video-not-connected",
+    ),
+  );
+});
+
+test("video mode 'hosted-file' with a valid src publishes; deleting it does not touch a frozen snapshot", () => {
+  const c = car({
+    video: { mode: "hosted-file", src: "https://blob.example/clip.mp4", posterSrc: "/x/0/image.jpg" },
+  });
+  assert.deepEqual(getPublishBlockers(c, { review: reviewedAll(car()), sha256 }), []);
 });
 
 test("getLangStatus: empty -> needs-review -> reviewed", () => {

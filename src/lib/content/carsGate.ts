@@ -16,7 +16,24 @@
  */
 
 export type SaleStatus = "preparing" | "for-sale" | "reserved" | "sold";
-export type VideoMode = "none" | "legacy-file" | "external-link" | "uploaded-file";
+export type VideoMode =
+  | "none"
+  | "legacy-file"
+  | "external-link"
+  | "hosted-file" // uploaded via /panel/video to external storage; src is its URL
+  | "uploaded-file"; // legacy placeholder for the not-yet-connected mode — a blocker
+
+/** A hosted-file / external-link src must be https, or (dev) a /uploads/ path. */
+export function isPlayableVideoSrc(src: string): boolean {
+  const s = (src ?? "").trim();
+  if (!s) return false;
+  if (s.startsWith("/uploads/videos/") && !s.includes("..")) return true;
+  try {
+    return new URL(s).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 export const LOCALES = ["uk", "en", "ru"] as const;
 export type ContentLocale = (typeof LOCALES)[number];
 
@@ -111,6 +128,18 @@ export function getPublishBlockers(car: CmsCar, ctx: GateContext = {}): GateFail
   if (realPhotos.length === 0) failures.push({ kind: "no-photos" });
 
   if (car.video?.mode === "uploaded-file") failures.push({ kind: "video-not-connected" });
+  // A "hosted-file" whose upload never finished (no usable src) must not
+  // publish as if it were ready.
+  if (
+    (car.video?.mode === "hosted-file" || car.video?.mode === "external-link") &&
+    car.video.src?.trim() &&
+    !isPlayableVideoSrc(car.video.src)
+  ) {
+    failures.push({ kind: "video-not-connected" });
+  }
+  if (car.video?.mode === "hosted-file" && !car.video.src?.trim()) {
+    failures.push({ kind: "video-not-connected" });
+  }
 
   for (const locale of LOCALES) {
     const lang = car[locale];

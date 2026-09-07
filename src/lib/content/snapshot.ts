@@ -23,6 +23,9 @@ function assertCarSane(car: CmsCar): void {
   if (!car?.id) throw new Error(`${w}: missing id`);
   if (!car.photos?.filter((p) => p?.image?.trim()).length) throw new Error(`${w}: no photos`);
   if (car.video?.mode === "uploaded-file") throw new Error(`${w}: video "uploaded-file" not connected`);
+  if (car.video?.mode === "hosted-file" && !String(car.video.src ?? "").trim()) {
+    throw new Error(`${w}: video "hosted-file" has no src`);
+  }
   for (const l of LOCALES) {
     if (!String(car[l]?.title ?? "").trim() || !String(car[l]?.specLine ?? "").trim()) {
       throw new Error(`${w}: ${l.toUpperCase()} title/specLine empty`);
