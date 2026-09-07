@@ -2134,15 +2134,23 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
 - **Робоча копія:** `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`
   (ізольована; **не** `/Users/apple/Projects/DREAM.CAR.VAVD`, не Desktop-копії).
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** — draft, не змерджено.
-- **Head:** `87fe84a77ba318436f3d8bb017ac4423a25fec58` (`git log -1`) —
-  плюс коміт цієї сесії з оновленими docs (Б1-запит + звірка стану).
-- **`main`:** `ce1977af` — **не чіпається**, гілка від нього попереду на 38 комітів.
-- **`git status`:** чисто (усе закомічено й запушено; `origin/codex/admin-panel-spike` = HEAD).
-- **CI `Verify`:** зелений на `87fe84a`; Vercel Preview — success
-  (`gh pr checks 26`, звірено 2026-09-07).
-- **Локальні перевірки на Head:** `tsc` 0 · `eslint` 0 · `npm test` **242 pass** · `npm run build` OK · `content:check` OK · `content:guard` OK.
-- **Preview (Vercel):** публічні сторінки сайту — 200; **`/panel` і `/keystatic` — 404** доти, доки власник не додасть github-env (див. Б1).
-- **Локальний dev-сервер:** якщо запущений — це `next dev` на `http://localhost:3000` з цієї копії, файловий режим (без `.env.local`). Стан треба перевіряти (`lsof -i :3000`), чужий процес не зупиняти.
+- **Head:** `2b4d9f3` (`87fe84a` + docs-коміт минулої сесії) плюс docs-коміт
+  цієї сесії (готове середовище Б1). PR #26 head звірено 2026-09-07.
+- **`main`:** `ce1977af` — **не чіпається**, гілка від нього попереду на ~39 комітів.
+- **`git status`:** чисто; `origin/codex/admin-panel-spike` = HEAD.
+- **CI `Verify`:** зелений; Vercel Preview — success (`gh pr checks 26`, 2026-09-07).
+- **Локальні перевірки:** `tsc` 0 · `eslint` 0 · **242 pass** · `build` OK ·
+  `content:check`/`guard` OK (без змін коду повторно не ганяти).
+- **Preview (Vercel):** публічні сторінки — 200; **`/panel` + `/keystatic` — 404** доки немає github-env (Б1).
+- **Локальні dev-сервери:**
+  - `:3000` — `next dev` власника з цієї копії, файловий режим. Не зупиняти.
+  - `:3010` (loopback) — підготовлений `next dev` з worktree
+    `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` для СПРАВЖНЬОГО
+    створення GitHub App власником (`docs/PANEL-owner-request-B1.md`).
+    `.env.local` (3 несекретні рядки) на місці; секрети після дії власника
+    підуть у `…-panel-setup-verify/.env` (git-ignored). Worktree й `.env` **не
+    видаляти** до перенесення у Vercel + hosted-перевірки. Зупиняти сервер —
+    конкретним `kill <pid>` (pid у `…-panel-setup-verify/setup-server.log`).
 
 ## 2. Що зроблено повністю (код готовий, покрито тестами)
 

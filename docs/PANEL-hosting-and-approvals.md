@@ -131,47 +131,61 @@ GitHub Pages з цього репо немає (не використовуєт�
 
 ## 3. Покрокова інструкція власнику (hosted-логін для Preview)
 
-Порядок важливий. Production, DNS, гілки, тарифи — не чіпаються.
-**Перевірено локально на цьому Mac** (2026-09-07): сторінка створення App
-відкривається, кнопка працює, форма веде на GitHub. Сам App не створювався.
+Порядок важливий. Production, DNS, гілки, тарифи, **Vercel Deployment
+Protection** — на цьому кроці **не** чіпаються (питання захисту Preview — §3.5,
+окремо, після створення App).
+**Перевірено наживо на цьому Mac** (2026-09-07): у підготовленій ізольованій
+копії сторінка `/keystatic/setup` відкривається, кнопка веде на
+`POST github.com/settings/apps/new`, маніфест сформовано правильно. App не
+створювався, дозволи не підтверджувались.
 
 ### 3.1. Локально створити App (не на Vercel — там FS read-only, крок падає 500)
 
-1. У корені проєкту `…/DREAM.CAR.VAVD-admin-panel-20260906` створити файл
-   **`.env.local`** (він у `.gitignore`, в Git не потрапляє) з таким вмістом:
+**Асистент уже підготував це середовище** (див. `docs/PANEL-owner-request-B1.md`):
+окремий `git worktree` `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify`
+з `.env.local` (3 несекретні рядки) і запущеним `next dev` на
+`http://127.0.0.1:3010`. Власнику достатньо кроків 2–6. Якщо середовище треба
+відтворити з нуля:
+
+1. У корені ізольованої копії створити **`.env.local`** (у `.gitignore`) з
+   умістом `docs/keystatic-app-setup.env`:
    ```
    NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github
    KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd
    KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD
    ```
-   (Готовий шаблон: `docs/keystatic-app-setup.env` — скопіювати в `.env.local`.)
-2. `npm run dev` → відкрити **`http://localhost:3000/keystatic/setup`**
-   (саме `localhost`, НЕ `127.0.0.1` — щоб callback у маніфесті збігся з тим,
-   з чого йде вхід; не чергувати ці два хости). Має відкритися екран
+   і підняти `npx next dev -H 127.0.0.1 -p <вільний-порт>` (loopback).
+2. Відкрити **`http://127.0.0.1:3010/keystatic/setup`** (той самий хост і порт
+   протягом усього входу — не чергувати `127.0.0.1` і `localhost`). Екран
    **«Keystatic Setup»** із полями «Deployed App URL», «GitHub organization»
-   і синьою кнопкою **«Create GitHub App»**.
+   і кнопкою **«Create GitHub App»**.
 3. Поля лишити **порожніми** (акаунт `DreamCar-vavd` — це користувач, не
    організація; Deployed App URL можна додати в App пізніше) → натиснути
    **«Create GitHub App»**. Форма робить `POST https://github.com/settings/apps/new`
    з готовим маніфестом (name `DreamCar-vavd Keystatic`, callback
-   `http://localhost:3000/api/keystatic/github/oauth/callback` +
+   `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` +
    `http://127.0.0.1/api/keystatic/github/oauth/callback`, permissions
-   `contents: write`, `metadata: read`, `pull_requests`).
+   `contents: write`, `metadata: read`, `pull_requests: read`).
 4. На GitHub натиснути **Create GitHub App** → GitHub редіректить назад на
-   `/api/keystatic/github/created-app`, і Keystatic **сам дописує** в
-   локальний `.env` (файл `.env`, не `.env.local`) три значення:
-   `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
-   `KEYSTATIC_SECRET`. **Це секрети.**
+   `http://127.0.0.1:3010/api/keystatic/github/created-app`, і Keystatic
+   **сам дописує** у файл **`.env`** цієї копії (не `.env.local`;
+   CWD dev-сервера) три значення: `KEYSTATIC_GITHUB_CLIENT_ID`,
+   `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`. **Це секрети** —
+   у підготовленому середовищі це
+   `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`.
 5. GitHub → Settings → Developer settings → GitHub Apps → `<новий App>` →
    **Permissions & events**: додати **Deployments: Read** (маніфест Keystatic
    його не просить, а банер стану збірки в `/panel` його потребує; без нього
    банер показуватиме «стан невідомий» — не критично). Webhook → **Active off**.
 6. Той самий App → **Install App** → акаунт `DreamCar-vavd` → **Only select
    repositories** → `DREAM.CAR.VAVD` → Install.
-7. Зупинити `npm run dev`. **Видалити `.env.local`** (інакше локальні
-   `npm run dev` / `npm run build` йтимуть у github-режим без токенів і
-   падатимуть). Секрети з `.env` перенести у Vercel (крок 3.2), потім `.env`
-   теж можна очистити.
+7. Зупинити підготовлений dev-сервер конкретним процесом (`kill <pid>` того
+   самого `next dev`, не за широким шаблоном). **`.env.local` і `.env` не
+   видаляти** — `.env` тримає єдину копію секретів до перенесення у Vercel, а
+   `.env.local` (3 несекретні рядки) потрібен для повторного локального входу.
+   Ця копія — окремий worktree, тож `.env.local` у ній не заважає ні основній
+   копії, ні `npm run build` десь інде. Прибрати worktree разом з `.env` можна
+   **лише** після кроку 3.2 і успішної hosted-перевірки (§3.4).
 
 ### 3.2. Vercel env (лише Preview потрібної гілки)
 
@@ -208,13 +222,10 @@ Vercel є **стабільний branch-аліас** виду
 - GitHub App приймає **кілька** Callback URLs і їх можна редагувати будь-коли —
   переіменування гілки чи новий піддомен **не потрібні**.
 
-**Захист Preview + OAuth:** якщо ввімкнено Vercel Deployment Protection для
-Preview, редірект GitHub назад на `/api/keystatic/github/oauth/callback`
-впирається у challenge Vercel і код авторизації може не дійти. Варіанти:
-(а) на час налаштування й перевірки **вимкнути** захист Preview, потім
-увімкнути; (б) або обидва користувачі — члени команди Vercel, чия SSO-cookie
-проходить захист автоматично (тоді помічнику потрібен доступ до Vercel).
-Рекомендація — (а).
+Захист Preview на цей крок (створення App локально) **не впливає** —
+локальний вхід іде на `127.0.0.1`, не на Vercel. Взаємодія hosted-OAuth із
+Vercel Deployment Protection — окремо, §3.5, і лише якщо реальна перевірка
+покаже проблему.
 
 ### 3.4. Redeploy і перевірка
 
@@ -228,6 +239,25 @@ Preview, редірект GitHub назад на `/api/keystatic/github/oauth/ca
 користувачів, відмова сторонньому, публікація за SHA, конфлікт, відкликання).
 
 **Після підготовки — окреме погодження на конкретне підключення.**
+
+### 3.5. Hosted-вхід і захист Preview (оцінювати окремо, після створення App)
+
+**Не робити наперед.** Тільки якщо крок 3.4 (реальний вхід на branch-аліасі)
+покаже, що редірект GitHub на `/api/keystatic/github/oauth/callback` не
+завершується:
+
+1. Спершу зібрати доказ: який саме крок падає (URL, код відповіді, чи дійшов
+   `?code=` до callback, чи це саме Vercel-challenge, а не помилка App).
+2. Мінімальна зміна під конкретну причину, у такому порядку переваги:
+   - додати branch-аліас у **Protection Bypass for Automation** / OPTIONS
+     allowlist, якщо проблема лише в OAuth-редіректі;
+   - або тимчасове звуження захисту саме для цього branch-аліаса на час
+     перевірки, з поверненням одразу після;
+   - глобально Deployment Protection для Preview **не** вимикати.
+3. Зафіксувати в `docs/PANEL-hosted-verification.md`, що саме змінювали й що
+   повернули.
+
+Production і його захист — не чіпати за жодного зі сценаріїв.
 
 ---
 

@@ -14,11 +14,16 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head:** `87fe84a77ba318436f3d8bb017ac4423a25fec58` (+ цей журнал наступним комітом)
-- **CI `Verify`:** `87fe84a` — success · Vercel Preview — success (звірено `gh pr checks 26` 2026-09-07)
-- **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (на `87fe84a`; повторно без змін не ганяти)
+- **Head:** `2b4d9f3` (+ коміт цієї сесії з docs) — PR #26 head звірено 2026-09-07
+- **CI `Verify`:** `2b4d9f3`/`87fe84a` — success · Vercel Preview — success (`gh pr checks 26`)
+- **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
-- **Незакомічених змін немає** (стан зафіксовано для передачі в нову сесію)
+- **Setup GitHub App готовий до дії власника:** ізольований worktree
+  `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` @ `2b4d9f3`,
+  `.env.local` (3 несекретні рядки) на місці, `next dev` на `http://127.0.0.1:3010`.
+  Одна дія власника — `docs/PANEL-owner-request-B1.md`. Секрети після створення App
+  запишуться у `…-panel-setup-verify/.env` (git-ignored). Worktree **не видаляти**.
+- **Незакомічених змін у гілці немає**
 
 ### Що НЕ перевірено наживо (важливо для приймання)
 
@@ -34,6 +39,47 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 
 ## Завершені пункти (новіші зверху)
 
+### П17 — GitHub App: готове середовище + один запит власнику
+- **Мета:** одне перевірене посилання для СПРАВЖНЬОГО створення App власником,
+  без ручного налаштування сервера й без нового кола звітів.
+- **Persistent worktree:** `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify`
+  переведено з `87fe84a` на `2b4d9f3`; створено `.env.local` (3 несекретні рядки);
+  `next dev --webpack -H 127.0.0.1 -p 3010` (webpack — бо Turbopack не бере
+  symlink `node_modules`). Ізоляція перевірена: окремий `.next` (різний inode),
+  окремий порт, окремий процес (`next dev` PID у `setup-server.log`), node_modules
+  read-only symlink; сервер власника на `:3000` і його `node_modules` не чіпані.
+- **Одна адреса:** `http://127.0.0.1:3010/keystatic/setup`. Жодних паралельних
+  3000/3100 у запиті. Секрети після «Create GitHub App» → `…-panel-setup-verify/.env`
+  (Keystatic пише в `.env`, не `.env.local`, у CWD — звірено в
+  `keystatic-core-api-generic.node.js`).
+- **Маніфест (фактичний, без шаблонів):** name `DreamCar-vavd Keystatic`,
+  `redirect_url` `http://127.0.0.1:3010/api/keystatic/github/created-app`,
+  `callback_urls` `http://127.0.0.1:3010/…/oauth/callback` +
+  `http://127.0.0.1/…/oauth/callback`, `default_permissions`
+  `{contents:write, metadata:read, pull_requests:read}`.
+- **Права розмежовано:** зараз потрібні — Contents RW, Metadata R (вхід +
+  адаптер), Deployments R (банер, додати вручну). `pull_requests:read` — з
+  типового маніфесту, наш конвеєр прямих комітів його не використовує (у коді
+  `createPullRequest` — лише рядки перекладу UI Keystatic; наш `GitHubStorage`
+  робить тільки `/contents` + `/deployments`). Майбутній `content-guard`→`main`
+  (Б4) — це GitHub Actions workflow, не цей App. Зайвих прав не просимо.
+- **Витрати:** створення/встановлення GitHub App не тарифікується, платного
+  плану не потребує (GitHub Free → приватні репо; джерела в §2). Безлімітність
+  Actions не стверджуємо — Б1 їх не використовує.
+- **Інструкції виправлено:** з локального порядку setup прибрано вимкнення
+  Vercel Deployment Protection (нова `docs/PANEL-hosting-and-approvals.md` §3.5 —
+  окремо, після створення App, з доказом і мінімальною зміною); `.env.local`
+  не видаляти; «зупинити сервер» = конкретний `kill <pid>`, не широкий шаблон і
+  не `worktree remove --force`; відокремлено Suspend/Uninstall встановлення від
+  Delete GitHub App.
+- **Перевірка після дії власника** описана в запиті (лише імена змінних +
+  «наявна/відсутня», без значень; при збої повернення — спершу перевірити, чи
+  App уже створено, не робити дубль).
+- Файли: `docs/PANEL-owner-request-B1.md` (переписано), `docs/PANEL-hosting-and-approvals.md`
+  §3, `docs/PANEL-progress.md`, `PROJECT_PROGRESS.md`.
+- **Наступне — дія власника (Б1).** Перенесення `.env`→Vercel і redeploy цим
+  кроком не робиться.
+
 ### П16 — звірка стану + запит власнику Б1 (GitHub App)
 - **Історичне vs поточне:** записи П1–П15 нижче — журнал зробленого; актуальний
   стан і незроблене — блок «Поточний стан» вище. Нову велику доповідь не писали.
@@ -48,8 +94,9 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
   `http://127.0.0.1/api/keystatic/github/oauth/callback`,
   `redirect_url` = `<origin>/api/keystatic/github/created-app`. `<origin>` береться
   з адреси сторінки → **вільний порт годиться**. App НЕ створювався. Чужий
-  файловий dev-сервер на `:3000` не чіпали. Worktree прибрати після сесії:
-  `git worktree remove /Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify`.
+  файловий dev-сервер на `:3000` не чіпали.
+  (У П17 цей worktree зроблено persistent і придатним для справжнього setup —
+  не видаляти.)
 - **Запит власнику Б1** оформлено у форматі «ЗАПИТ ДЛЯ ПЕРЕДАЧІ АСИСТЕНТУ»:
   `docs/PANEL-owner-request-B1.md` (лише крок створення App локально; Vercel env /
   redeploy / hosted-перевірка — окремий наступний запит).
