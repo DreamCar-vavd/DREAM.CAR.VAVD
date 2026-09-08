@@ -1,6 +1,9 @@
 import {
   ConflictError,
   StorageAuthError,
+  StorageBackendError,
+  StorageForbiddenError,
+  StorageRateLimitedError,
   StorageUnavailableError,
   WriteUncertainError,
   assertAllowedDir,
@@ -80,7 +83,10 @@ export class GitHubStorage implements PanelStorage {
    * connection) throws `StorageUnavailableError`; a real HTTP status — 4xx/5xx
    * included — is returned for the caller to interpret.
    */
-  private async gh(url: string, init?: RequestInit): Promise<{ status: number; body: unknown }> {
+  private async gh(
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ status: number; body: unknown; headers: Headers }> {
     const remaining = this.deadline - Date.now();
     if (remaining <= 0) {
       throw new StorageUnavailableError("перевищено загальний ліміт часу на звернення до GitHub");
@@ -109,7 +115,11 @@ export class GitHubStorage implements PanelStorage {
     } finally {
       clearTimeout(timer);
     }
-    return { status: res.status, body: text ? JSON.parse(text) : null };
+    return {
+      status: res.status,
+      body: text ? JSON.parse(text) : null,
+      headers: res.headers ?? new Headers(),
+    };
   }
 
   private ref() {
@@ -121,17 +131,43 @@ export class GitHubStorage implements PanelStorage {
     return this.deadline - Date.now();
   }
 
-  /** 401/403 with a token present = auth is gone, not a transient blip. */
-  private static rejectIfUnauthorized(status: number): void {
-    if (status === 401 || status === 403) throw new StorageAuthError();
+  /**
+   * Classify a 401/403 by GitHub's documented signals and throw the matching
+   * error. Never forwards the raw body. No-op for any other status.
+   *  - 401                         -> StorageAuthError    (sign in again)
+   *  - 403 + rate-limit signal     -> StorageRateLimitedError (wait, retry)
+   *  - 403 + "not accessible"/perm -> StorageForbiddenError (access changed)
+   *  - 403, nothing conclusive     -> StorageForbiddenError, neutral wording
+   * (429 is treated like a rate-limited 403.)
+   */
+  private static rejectIfUnauthorized(
+    status: number,
+    headers: Headers,
+    body: unknown,
+  ): void {
+    if (status === 401) throw new StorageAuthError();
+    if (status !== 403 && status !== 429) return;
+
+    const msg = String((body as { message?: unknown })?.message ?? "").toLowerCase();
+    const rateLimited =
+      status === 429 ||
+      headers.get("x-ratelimit-remaining") === "0" ||
+      headers.has("retry-after") ||
+      /\brate limit\b|secondary rate|abuse/.test(msg);
+    if (rateLimited) throw new StorageRateLimitedError();
+
+    if (/not accessible|must have|permission|forbidden|denied/.test(msg)) {
+      throw new StorageForbiddenError("недостатньо прав доступу");
+    }
+    throw new StorageForbiddenError("доступ відхилено (403)");
   }
 
   private async getContent(repoPath: string): Promise<{ text: string | null; sha: string }> {
-    const { status, body } = await this.gh(
+    const { status, body, headers } = await this.gh(
       this.repoUrl(`/contents/${repoPath}?ref=${this.ref()}`),
     );
     if (status === 404) return { text: null, sha: "" };
-    GitHubStorage.rejectIfUnauthorized(status);
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200) throw new Error(`GitHub read ${repoPath} failed (${status})`);
     const f = body as { content: string; sha: string; encoding: string };
     return { text: f.encoding === "base64" ? b64decode(f.content) : f.content, sha: f.sha };
@@ -139,9 +175,11 @@ export class GitHubStorage implements PanelStorage {
 
   async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
     assertAllowedDir(dir);
-    const { status, body } = await this.gh(this.repoUrl(`/contents/${dir}?ref=${this.ref()}`));
+    const { status, body, headers } = await this.gh(
+      this.repoUrl(`/contents/${dir}?ref=${this.ref()}`),
+    );
     if (status === 404) return { data: [], version: "" };
-    GitHubStorage.rejectIfUnauthorized(status);
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200) throw new Error(`GitHub list ${dir} failed (${status})`);
     const files = (body as { name: string; sha: string; type: string }[])
       .filter((e) => e.type === "file" && e.name.endsWith(".json") && !e.name.startsWith("."))
@@ -183,8 +221,9 @@ export class GitHubStorage implements PanelStorage {
 
     let status: number;
     let body: unknown;
+    let headers: Headers;
     try {
-      ({ status, body } = await this.gh(this.repoUrl(`/contents/${file}`), {
+      ({ status, body, headers } = await this.gh(this.repoUrl(`/contents/${file}`), {
         method: "PUT",
         body: JSON.stringify(payload),
       }));
@@ -200,7 +239,9 @@ export class GitHubStorage implements PanelStorage {
     if (status === 409 || (status === 422 && expectedVersion)) {
       throw new ConflictError(what);
     }
-    GitHubStorage.rejectIfUnauthorized(status);
+    // GitHub answered with a definite refusal — the commit did NOT happen, so
+    // this is auth/permission/rate-limit, not "write uncertain".
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200 && status !== 201) throw new Error(`GitHub write ${file} failed (${status})`);
     return { data: text, version: (body as { content: { sha: string } }).content.sha };
   }
@@ -215,10 +256,12 @@ export class GitHubStorage implements PanelStorage {
     try {
       return await this.deployStatusInner(isTest);
     } catch (err) {
-      // A build-status probe that can't reach GitHub must not blank the whole
-      // dashboard — the content already loaded. Report it separately.
-      if (err instanceof StorageUnavailableError) {
-        return { state: "unknown", reason: "не вдалося перевірити стан збірки — GitHub не відповів", isTest };
+      // A build-status probe that can't get a usable answer from GitHub
+      // (unreachable, timed out, or refused) must not blank the whole
+      // dashboard — the content already loaded. Report it separately as
+      // "unknown"; it is never rendered as a successful build.
+      if (err instanceof StorageBackendError) {
+        return { state: "unknown", reason: "не вдалося перевірити стан збірки", isTest };
       }
       throw err;
     }

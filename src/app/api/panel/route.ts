@@ -67,9 +67,10 @@ export async function POST(request: Request) {
   }
   if (r.ok) return json(r, 200);
   if ("conflict" in r && r.conflict) return json(r, 409);
-  if ("auth" in r && r.auth) return json(r, 401); // session ended / access revoked
-  // `transient` = GitHub unreachable / write outcome unknown; the message
-  // itself tells the user to reload and check before retrying.
+  if ("auth" in r && r.auth) return json(r, 401); // 401 — session ended
+  if ("forbidden" in r && r.forbidden) return json(r, 403); // 403 — access refused
+  // `transient` = GitHub unreachable / rate-limited / write outcome unknown;
+  // the message itself tells the user to reload and check before retrying.
   if ("transient" in r && r.transient) return json(r, 503);
   return json(r, 400);
 }

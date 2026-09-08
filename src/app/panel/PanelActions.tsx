@@ -53,11 +53,14 @@ export function PanelButton({
         message: string;
         conflict?: boolean;
         transient?: boolean;
+        auth?: boolean;
+        forbidden?: boolean;
         blockers?: { kind: string }[];
       };
       const extra = data.blockers?.length ? ` (${data.blockers.length} пункт(и))` : "";
-      // A conflict or a transient backend failure both mean "reload and check
-      // before acting again" — same amber treatment + refresh affordance.
+      // Conflict or a transient backend failure -> "reload and check before
+      // acting again": amber + a refresh affordance. auth / forbidden -> a plain
+      // error: the message already says what to do and a refresh won't help.
       setMsg({
         kind: data.ok ? "ok" : data.conflict || data.transient ? "conflict" : "err",
         text: data.message + extra,

@@ -60,12 +60,25 @@ export class ConflictError extends Error {
 }
 
 /**
- * The storage backend could not be reached, or did not answer within the
- * adapter's time budget. A READ that fails this way must surface as an error —
- * never as an empty list that looks like real "nothing here" data. Retrying a
- * read is safe.
+ * Base for "the storage backend gave us no usable answer" — unreachable, timed
+ * out, or refused (401/403/429). A content READ that fails this way must
+ * surface as an error, never as an empty list; a non-critical probe
+ * (deployStatus) may safely degrade to "unknown".
+ *
+ * `retriable` = the same request could succeed a bit later (network blip, rate
+ * limit). `false` = the caller must do something first (sign in, get access).
  */
-export class StorageUnavailableError extends Error {
+export abstract class StorageBackendError extends Error {
+  /** Same request may succeed shortly (blip / rate limit) vs needs user action. */
+  abstract readonly retriable: boolean;
+}
+
+/**
+ * The backend could not be reached, or did not answer within the adapter's
+ * time budget. Retrying a read is safe.
+ */
+export class StorageUnavailableError extends StorageBackendError {
+  readonly retriable = true;
   constructor(what: string) {
     super(
       `Не вдалося отримати дані з GitHub (${what}). Мережа або GitHub тимчасово ` +
@@ -76,17 +89,49 @@ export class StorageUnavailableError extends Error {
 }
 
 /**
- * GitHub refused the request with 401/403 while a token was present — the
- * sign-in session ended, the App's authorisation was revoked, or repo access
- * was lost. Retrying the same call will not help; the user must sign in again.
+ * GitHub answered **401** — the credentials are no longer valid: the sign-in
+ * session ended or the token was revoked. Signing in again fixes it.
  */
-export class StorageAuthError extends Error {
+export class StorageAuthError extends StorageBackendError {
+  readonly retriable = false;
   constructor() {
     super(
-      "Немає доступу до репозиторію на GitHub. Найімовірніше, сесію завершено або " +
-        "доступ застосунку відкликано. Відкрийте /keystatic й увійдіть знову.",
+      "Сесію GitHub завершено або відкликано. Відкрийте /keystatic й увійдіть знову.",
     );
     this.name = "StorageAuthError";
+  }
+}
+
+/**
+ * GitHub answered **403** and it is NOT a rate limit — most often the App's
+ * permissions were narrowed or repo access was removed. Signing in again will
+ * NOT grant a permission the token never had; the repo owner has to restore
+ * access. `what` is a short, non-sensitive hint ("недостатньо прав" or a
+ * neutral phrase for an unclassified 403) — never a raw GitHub body.
+ */
+export class StorageForbiddenError extends StorageBackendError {
+  readonly retriable = false;
+  constructor(what: string) {
+    super(
+      `GitHub відхилив запит: ${what}. Оновіть сторінку; якщо повторюється — ` +
+        `перевірте з власником репозиторію права доступу застосунку.`,
+    );
+    this.name = "StorageForbiddenError";
+  }
+}
+
+/**
+ * GitHub is rate-limiting this token (primary `x-ratelimit-remaining: 0`, or a
+ * secondary/abuse limit). Nothing is wrong with the session — just wait.
+ */
+export class StorageRateLimitedError extends StorageBackendError {
+  readonly retriable = true;
+  constructor() {
+    super(
+      "GitHub тимчасово обмежив частоту запитів. Зачекайте близько хвилини й " +
+        "оновіть сторінку.",
+    );
+    this.name = "StorageRateLimitedError";
   }
 }
 

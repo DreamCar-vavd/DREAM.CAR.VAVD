@@ -4,6 +4,8 @@ import { GitHubStorage } from "./github";
 import {
   ConflictError,
   StorageAuthError,
+  StorageForbiddenError,
+  StorageRateLimitedError,
   StorageUnavailableError,
   WriteUncertainError,
 } from "./adapter";
@@ -11,7 +13,12 @@ import {
 const CFG = { owner: "DreamCar-vavd", repo: "DREAM.CAR.VAVD", branch: "codex/test", token: "tok_abc" };
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
 
-function fakeGitHub(routes: Record<string, (init?: RequestInit) => { status: number; body: unknown }>) {
+function fakeGitHub(
+  routes: Record<
+    string,
+    (init?: RequestInit) => { status: number; body: unknown; headers?: Record<string, string> }
+  >,
+) {
   const calls: { url: string; method: string; body: unknown }[] = [];
   const impl: typeof fetch = async (input, init) => {
     const url = String(input);
@@ -22,7 +29,10 @@ function fakeGitHub(routes: Record<string, (init?: RequestInit) => { status: num
     });
     const key = Object.keys(routes).find((k) => url.includes(k));
     const res = key ? routes[key](init) : { status: 404, body: { message: "not found" } };
-    return new Response(res.body === null ? "" : JSON.stringify(res.body), { status: res.status });
+    return new Response(res.body === null ? "" : JSON.stringify(res.body), {
+      status: res.status,
+      headers: res.headers,
+    });
   };
   return { impl, calls };
 }
@@ -293,7 +303,7 @@ test("401 on a read = the session is gone -> StorageAuthError", async () => {
   await assert.rejects(() => gh.readFile("src/content/cms/published.json"), StorageAuthError);
 });
 
-test("403 on a read = access revoked -> StorageAuthError, not a generic 'failed (403)'", async () => {
+test("403 'Resource not accessible' = permission narrowed -> StorageForbiddenError (NOT a re-login prompt)", async () => {
   const { impl } = fakeGitHub({
     "/contents/src/content/cms/cars?ref=": () => ({
       status: 403,
@@ -301,7 +311,54 @@ test("403 on a read = access revoked -> StorageAuthError, not a generic 'failed 
     }),
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
-  await assert.rejects(() => gh.readDir("src/content/cms/cars"), StorageAuthError);
+  await assert.rejects(() => gh.readDir("src/content/cms/cars"), (e: Error) => {
+    assert.ok(e instanceof StorageForbiddenError);
+    assert.ok(!(e instanceof StorageAuthError));
+    assert.doesNotMatch(e.message, /Resource not accessible|Bearer|integration/); // no raw body
+    return true;
+  });
+});
+
+test("403 with x-ratelimit-remaining: 0 = rate limited -> StorageRateLimitedError (retriable)", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({
+      status: 403,
+      body: { message: "API rate limit exceeded for installation" },
+      headers: { "x-ratelimit-remaining": "0" },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readFile("src/content/cms/published.json"), (e: Error) => {
+    assert.ok(e instanceof StorageRateLimitedError);
+    assert.equal((e as StorageRateLimitedError).retriable, true);
+    return true;
+  });
+});
+
+test("a 403 with no conclusive signal -> StorageForbiddenError with neutral wording (no invented cause)", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({ status: 403, body: {} }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readFile("src/content/cms/published.json"), (e: Error) => {
+    assert.ok(e instanceof StorageForbiddenError);
+    assert.doesNotMatch(e.message, /сесі|увійд|rate limit/i); // doesn't claim session-ended or rate-limit
+    return true;
+  });
+});
+
+test("secondary rate limit (body text, no header) -> StorageRateLimitedError", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({
+      status: 403,
+      body: { message: "You have exceeded a secondary rate limit" },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(
+    () => gh.readFile("src/content/cms/published.json"),
+    StorageRateLimitedError,
+  );
 });
 
 test("budget already spent before a write: the PUT is never sent -> StorageUnavailableError (NOT WriteUncertain)", async () => {

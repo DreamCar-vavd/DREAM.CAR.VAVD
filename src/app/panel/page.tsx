@@ -1,9 +1,14 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, describeFailure, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError, type DeployStatus } from "@/lib/content/store";
-import { StorageAuthError, StorageUnavailableError } from "@/lib/content/store/adapter";
+import {
+  StorageAuthError,
+  StorageBackendError,
+  StorageForbiddenError,
+} from "@/lib/content/store/adapter";
 import { getPanelData, type PanelData, type PanelGroup, type PanelRow } from "@/lib/content/panelStore";
 import { PanelButton, RefreshButton } from "./PanelActions";
 
@@ -15,6 +20,16 @@ const LANG_BADGE = {
   "needs-review": { text: "Потребує перевірки", cls: "bg-amber-100 text-amber-900 border-amber-300" },
   reviewed: { text: "Перевірено", cls: "bg-green-100 text-green-800 border-green-300" },
 } as const;
+
+/** Shared shell for the pre-dashboard error screens. */
+function ErrorMain({ children }: { children: ReactNode }) {
+  return (
+    <main className="mx-auto max-w-2xl px-4 py-10">
+      <h1 className="text-xl font-bold">Панель публікації</h1>
+      {children}
+    </main>
+  );
+}
 
 function DeployBanner({
   deploy,
@@ -309,34 +324,46 @@ export default async function PanelPage() {
     data = await getPanelData(await getStorage());
   } catch (err) {
     if (err instanceof NotConnectedError || err instanceof StorageAuthError) {
-      // Not signed in, or the session ended / the App's access was revoked —
-      // both recover the same way: sign in again.
+      // Not signed in, or the 401 session ended — both recover by signing in.
       return (
-        <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-xl font-bold">Панель публікації</h1>
-          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+        <ErrorMain>
+          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
             {err.message}
           </p>
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- separate app tree */}
           <a className="mt-3 inline-block underline" href="/keystatic">
             Відкрити Keystatic і увійти →
           </a>
-        </main>
+        </ErrorMain>
       );
     }
-    if (err instanceof StorageUnavailableError) {
-      // Data could not be loaded — do NOT render an empty dashboard as if the
-      // site had no content. Say what happened and offer a retry.
+    if (err instanceof StorageForbiddenError) {
+      // 403 — access was refused; a fresh sign-in will not restore a permission
+      // the token never had. Offer /keystatic anyway (harmless) but do not
+      // promise it fixes anything.
       return (
-        <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-xl font-bold">Панель публікації</h1>
+        <ErrorMain>
+          <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+            {err.message}
+          </p>
+          <p className="mt-3">
+            <RefreshButton />
+          </p>
+        </ErrorMain>
+      );
+    }
+    if (err instanceof StorageBackendError && err.retriable) {
+      // Unreachable or rate-limited — the content is NOT lost and NOT empty;
+      // say what happened and offer a retry (never a blank dashboard).
+      return (
+        <ErrorMain>
           <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
             {err.message}
           </p>
           <p className="mt-3">
             <RefreshButton />
           </p>
-        </main>
+        </ErrorMain>
       );
     }
     throw err;

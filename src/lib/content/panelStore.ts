@@ -10,7 +10,8 @@ import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
 import {
   ConflictError,
   StorageAuthError,
-  StorageUnavailableError,
+  StorageBackendError,
+  StorageForbiddenError,
   WriteUncertainError,
   type DeployStatus,
   type PanelStorage,
@@ -167,16 +168,18 @@ const createHrefFor = (kind: KindKey, branch: string | null) =>
   `${keystaticBase(branch)}/collection/${COLLECTION_SLUG[kind]}/create`;
 
 export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
-  // Content reads must succeed — a failure here rejects (the page shows a
-  // retry state), never a blank dashboard. The deploy-status probe is
-  // best-effort: if it can't reach the backend the content still renders and
-  // the banner says the build state is unknown.
+  // Content reads (readDir / readFile) are NOT wrapped: a failure there must
+  // reject so the page shows a retry state — it is never turned into an empty
+  // dashboard. ONLY the deploy-status probe is caught here: it is
+  // non-essential, so if the backend gives no usable answer the content still
+  // renders and the banner shows "unknown" (which the banner never styles as a
+  // successful build).
   const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
   const [publishedF, reviewF, deploy] = await Promise.all([
     storage.readFile(PUBLISHED),
     storage.readFile(REVIEW),
     storage.deployStatus().catch((err): DeployStatus => {
-      if (err instanceof StorageUnavailableError || err instanceof StorageAuthError) {
+      if (err instanceof StorageBackendError) {
         return { state: "unknown", reason: "не вдалося перевірити стан збірки" };
       }
       throw err;
@@ -275,12 +278,14 @@ export type ActionResult =
       message: string;
       blockers?: GateFailure[];
       conflict?: boolean;
-      /** GitHub was unreachable / a write's outcome is unknown — a transient
-       *  backend problem, not bad input. */
+      /** GitHub unreachable / rate-limited / a write's outcome is unknown — a
+       *  transient backend problem, not bad input. Trying again later is fine. */
       transient?: boolean;
-      /** The GitHub session ended / access was revoked — the user must sign in
-       *  again; retrying the same request will not help. */
+      /** 401 — the GitHub session ended; the user must sign in again. */
       auth?: boolean;
+      /** 403 — access was refused (permissions narrowed / repo access lost);
+       *  signing in again will not fix it. */
+      forbidden?: boolean;
     };
 
 const asConflict = (err: unknown): ActionResult | null =>
@@ -289,20 +294,25 @@ const asConflict = (err: unknown): ActionResult | null =>
 /**
  * Turn any storage error into a user-facing ActionResult. Never leaks a token,
  * a raw GitHub body or a stack trace — only the error's own message text.
- *  - ConflictError        -> {conflict:true}, offer refresh
- *  - StorageAuthError     -> session ended / access revoked; message says sign in again
- *  - WriteUncertainError  -> outcome unknown; message tells the user to reload
- *                            and check BEFORE retrying (no auto-retry here)
- *  - StorageUnavailableError -> GitHub unreachable; safe to try again later
- *  - anything else        -> generic failure with the message prefixed
+ *  - ConflictError         -> {conflict:true}, offer refresh
+ *  - StorageAuthError (401) -> {auth:true}; message says sign in again
+ *  - StorageForbiddenError (403) -> {forbidden:true}; access changed, re-login won't help
+ *  - StorageRateLimitedError / StorageUnavailableError / WriteUncertainError
+ *      -> {transient:true}; safe to try again (write-uncertain: reload & check first)
+ *  - anything else         -> generic failure with the message prefixed
  */
 function toActionError(err: unknown, prefix: string): ActionResult {
   const conflict = asConflict(err);
   if (conflict) return conflict;
-  if (err instanceof StorageAuthError) {
-    return { ok: false, message: err.message, auth: true };
+  if (err instanceof StorageAuthError) return { ok: false, message: err.message, auth: true };
+  if (err instanceof StorageForbiddenError) {
+    return { ok: false, message: err.message, forbidden: true };
   }
-  if (err instanceof WriteUncertainError || err instanceof StorageUnavailableError) {
+  if (err instanceof WriteUncertainError) {
+    return { ok: false, message: err.message, transient: true };
+  }
+  if (err instanceof StorageBackendError) {
+    // StorageUnavailableError / StorageRateLimitedError — both retriable.
     return { ok: false, message: err.message, transient: true };
   }
   return { ok: false, message: `${prefix}: ${(err as Error).message}` };

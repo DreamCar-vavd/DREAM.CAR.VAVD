@@ -7,6 +7,8 @@ import { serviceConfirmedText } from "./serviceGate";
 import {
   ConflictError,
   StorageAuthError,
+  StorageForbiddenError,
+  StorageRateLimitedError,
   StorageUnavailableError,
   WriteUncertainError,
   assertAllowedDir,
@@ -524,6 +526,69 @@ test("a panel action surfaces a sign-in-again message (auth flag) when access is
   // No token / raw body / stack trace leaked — just the guidance text.
   assert.doesNotMatch(r.message, /Bearer|token|\bat \/|\.ts:\d+/i);
 });
+
+test("a panel action distinguishes 403-forbidden (no retry) from 429-rate-limit (retry ok)", async () => {
+  const forbidden = baseStore();
+  forbidden.readDir = async () => {
+    throw new StorageForbiddenError("недостатньо прав доступу");
+  };
+  const rf = await confirmLocale(forbidden, "car", "c1", "uk", { working: "x", review: "y" });
+  assert.equal((rf as { forbidden?: boolean }).forbidden, true);
+  assert.notEqual((rf as { transient?: boolean }).transient, true); // retrying won't help
+
+  const limited = baseStore();
+  limited.readDir = async () => {
+    throw new StorageRateLimitedError();
+  };
+  const rl = await confirmLocale(limited, "car", "c1", "uk", { working: "x", review: "y" });
+  assert.equal((rl as { transient?: boolean }).transient, true); // wait & retry
+  assert.notEqual((rl as { forbidden?: boolean }).forbidden, true);
+});
+
+// Each action must perform AT MOST ONE writeFile: there is no "first write ok,
+// second write fails" sequence inside a single action, so a lost final PUT
+// means the whole action wrote nothing — retrying the action stays version-safe.
+for (const [name, run] of [
+  [
+    "confirmLocale",
+    async (s: FakeStorage) => {
+      const v = await versions(s);
+      return confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+    },
+  ],
+  [
+    "publishItem",
+    async (s: FakeStorage) => {
+      s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+      const v = await versions(s);
+      return publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+    },
+  ],
+  [
+    "unpublishItem",
+    async (s: FakeStorage) => {
+      s.seedFile(
+        "src/content/cms/published.json",
+        JSON.stringify({ publishedAt: "t", cars: [JSON.parse(carJson())], gallery: [] }),
+      );
+      const v = await versions(s);
+      return unpublishItem(s, "car", "c1", { published: v.published });
+    },
+  ],
+] as const) {
+  test(`${name} performs at most one write (no partial-success sequence)`, async () => {
+    const s = baseStore();
+    let writes = 0;
+    const realWrite = s.writeFile.bind(s);
+    s.writeFile = (f, t, e) => {
+      writes += 1;
+      return realWrite(f, t, e);
+    };
+    const r = await run(s);
+    assert.equal(r.ok, true, r.message);
+    assert.ok(writes <= 1, `${name} wrote ${writes} times`);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Two-editor simulation (no real GitHub accounts — the version-token contract)
