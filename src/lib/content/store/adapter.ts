@@ -121,15 +121,17 @@ export class StorageForbiddenError extends StorageBackendError {
 }
 
 /**
- * GitHub is rate-limiting this token (primary `x-ratelimit-remaining: 0`, or a
- * secondary/abuse limit). Nothing is wrong with the session — just wait.
+ * GitHub is rate-limiting this token — a primary limit (HTTP 429, or 403 with
+ * `x-ratelimit-remaining: 0`) or a secondary/abuse limit. Nothing is wrong with
+ * the session — just wait. `waitHint` is a phrase built from `Retry-After` /
+ * `x-ratelimit-reset` when GitHub gave a real time; when it did not, the
+ * message must NOT invent one ("спробуйте пізніше").
  */
 export class StorageRateLimitedError extends StorageBackendError {
   readonly retriable = true;
-  constructor() {
+  constructor(waitHint?: string) {
     super(
-      "GitHub тимчасово обмежив частоту запитів. Зачекайте близько хвилини й " +
-        "оновіть сторінку.",
+      `GitHub тимчасово обмежив частоту запитів. ${waitHint ?? "Спробуйте пізніше."}`,
     );
     this.name = "StorageRateLimitedError";
   }

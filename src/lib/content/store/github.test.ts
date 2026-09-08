@@ -347,7 +347,7 @@ test("a 403 with no conclusive signal -> StorageForbiddenError with neutral word
   });
 });
 
-test("secondary rate limit (body text, no header) -> StorageRateLimitedError", async () => {
+test("secondary rate limit (body text, no header) -> StorageRateLimitedError, no invented wait time", async () => {
   const { impl } = fakeGitHub({
     "/contents/src/content/cms/published.json": () => ({
       status: 403,
@@ -355,10 +355,56 @@ test("secondary rate limit (body text, no header) -> StorageRateLimitedError", a
     }),
   });
   const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
-  await assert.rejects(
-    () => gh.readFile("src/content/cms/published.json"),
-    StorageRateLimitedError,
-  );
+  await assert.rejects(() => gh.readFile("src/content/cms/published.json"), (e: Error) => {
+    assert.ok(e instanceof StorageRateLimitedError);
+    assert.match(e.message, /спробуйте пізніше/i);
+    assert.doesNotMatch(e.message, /за \d+ (с|хв)|близько хвилини/i); // no fabricated duration
+    return true;
+  });
+});
+
+test("HTTP 429 (not 403) is also a rate limit -> StorageRateLimitedError", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/review-state.json": () => ({ status: 429, body: { message: "Too Many Requests" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readFile("src/content/cms/review-state.json"), StorageRateLimitedError);
+});
+
+test("a rate limit with Retry-After puts the real wait time in the message, not a guess", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({
+      status: 429,
+      body: { message: "Too Many Requests" },
+      headers: { "retry-after": "120" },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readFile("src/content/cms/published.json"), (e: Error) => {
+    assert.ok(e instanceof StorageRateLimitedError);
+    assert.match(e.message, /за 2 хв/); // 120s -> "2 хв"
+    assert.doesNotMatch(e.message, /пізніше/);
+    return true;
+  });
+});
+
+test("a rate limit with x-ratelimit-reset (unix seconds) derives the wait from it", async () => {
+  const resetInSeconds = 45;
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({
+      status: 403,
+      body: { message: "API rate limit exceeded" },
+      headers: {
+        "x-ratelimit-remaining": "0",
+        "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + resetInSeconds),
+      },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readFile("src/content/cms/published.json"), (e: Error) => {
+    assert.match(e.message, /за \d+ с/); // ~45s -> seconds form
+    return true;
+  });
 });
 
 test("budget already spent before a write: the PUT is never sent -> StorageUnavailableError (NOT WriteUncertain)", async () => {

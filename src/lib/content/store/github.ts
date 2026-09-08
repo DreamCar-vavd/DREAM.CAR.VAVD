@@ -132,13 +132,36 @@ export class GitHubStorage implements PanelStorage {
   }
 
   /**
-   * Classify a 401/403 by GitHub's documented signals and throw the matching
-   * error. Never forwards the raw body. No-op for any other status.
+   * A phrase like "Спробуйте приблизно за 3 хв." built ONLY from a real
+   * `Retry-After` (seconds) or `x-ratelimit-reset` (unix seconds) header.
+   * Returns undefined when GitHub gave no usable time — the caller must then
+   * not invent one.
+   */
+  private static rateLimitWaitHint(headers: Headers): string | undefined {
+    const say = (seconds: number) =>
+      seconds >= 90
+        ? `Спробуйте приблизно за ${Math.round(seconds / 60)} хв.`
+        : `Спробуйте приблизно за ${Math.max(1, Math.ceil(seconds))} с.`;
+
+    const retryAfter = Number(headers.get("retry-after"));
+    if (Number.isFinite(retryAfter) && retryAfter > 0) return say(retryAfter);
+
+    const reset = Number(headers.get("x-ratelimit-reset")); // unix seconds
+    if (Number.isFinite(reset) && reset > 0) {
+      const secondsLeft = (reset * 1000 - Date.now()) / 1000;
+      if (secondsLeft > 0) return say(secondsLeft);
+    }
+    return undefined;
+  }
+
+  /**
+   * Classify a 401/403/429 by GitHub's documented signals and throw the
+   * matching error. Never forwards the raw body. No-op for any other status.
    *  - 401                         -> StorageAuthError    (sign in again)
-   *  - 403 + rate-limit signal     -> StorageRateLimitedError (wait, retry)
+   *  - 429, or 403 + rate-limit signal -> StorageRateLimitedError (wait; a real
+   *      Retry-After / reset time is put in the message, otherwise none)
    *  - 403 + "not accessible"/perm -> StorageForbiddenError (access changed)
    *  - 403, nothing conclusive     -> StorageForbiddenError, neutral wording
-   * (429 is treated like a rate-limited 403.)
    */
   private static rejectIfUnauthorized(
     status: number,
@@ -154,7 +177,9 @@ export class GitHubStorage implements PanelStorage {
       headers.get("x-ratelimit-remaining") === "0" ||
       headers.has("retry-after") ||
       /\brate limit\b|secondary rate|abuse/.test(msg);
-    if (rateLimited) throw new StorageRateLimitedError();
+    if (rateLimited) {
+      throw new StorageRateLimitedError(GitHubStorage.rateLimitWaitHint(headers));
+    }
 
     if (/not accessible|must have|permission|forbidden|denied/.test(msg)) {
       throw new StorageForbiddenError("недостатньо прав доступу");
