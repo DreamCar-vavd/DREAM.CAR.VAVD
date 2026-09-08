@@ -88,7 +88,45 @@ function PublicState({ row }: { row: PanelRow }) {
   );
 }
 
+function OrphanRow({
+  row,
+  kind,
+  versions,
+}: {
+  row: PanelRow;
+  kind: string;
+  versions: PanelData["versions"];
+}) {
+  return (
+    <section className="rounded-lg border border-amber-300 bg-amber-50/70 p-4 dark:border-amber-800 dark:bg-amber-950/40">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <span className="font-semibold">{row.title}</span>{" "}
+          <span className="text-xs text-neutral-500">{row.subtitle}</span>
+        </div>
+      </div>
+      <p className="mt-2 rounded border border-amber-400 bg-amber-100 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100">
+        Робочу картку видалено. Опублікована версія ще залишається на сайті.
+      </p>
+      <div className="mt-2 text-sm">
+        <PublicState row={row} />
+      </div>
+      <div className="mt-3">
+        <PanelButton
+          payload={{ action: "unpublish", kind, id: row.id }}
+          versions={versions}
+          variant="danger"
+          confirmText={`Прибрати «${row.id}» з сайту? Робочої картки вже немає — щоб повернути матеріал, доведеться створити її заново в Keystatic.`}
+        >
+          Прибрати з сайту
+        </PanelButton>
+      </div>
+    </section>
+  );
+}
+
 function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: PanelData["versions"] }) {
+  if (!row.workingExists) return <OrphanRow row={row} kind={kind} versions={versions} />;
   return (
     <section className="rounded-lg border border-neutral-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -96,9 +134,11 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
           <span className="font-semibold">{row.title}</span>{" "}
           <span className="text-xs text-neutral-500">{row.subtitle}</span>
         </div>
-        <a className="inline-block py-1 text-xs underline" href={row.editHref}>
-          Редагувати в Keystatic →
-        </a>
+        {row.editHref && (
+          <a className="inline-block py-1 text-xs underline" href={row.editHref}>
+            Редагувати в Keystatic →
+          </a>
+        )}
       </div>
 
       <div className="mt-2 text-sm">

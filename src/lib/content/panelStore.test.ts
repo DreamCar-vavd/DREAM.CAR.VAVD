@@ -6,6 +6,7 @@ import { galleryConfirmedText } from "./galleryGate";
 import { serviceConfirmedText } from "./serviceGate";
 import {
   ConflictError,
+  StorageUnavailableError,
   assertAllowedDir,
   assertAllowedFile,
   type AllowedDir,
@@ -388,6 +389,84 @@ test("changing only a shared service price does not require re-confirming any la
     JSON.parse(s.files.get("src/content/cms/published.json")!).services[0].priceAmount,
     "60",
   );
+});
+
+// ---------------------------------------------------------------------------
+// Published entries whose working card was deleted (orphan-published rows)
+// ---------------------------------------------------------------------------
+
+test("orphan published: working card gone, snapshot entry stays -> a read-only row is shown", async () => {
+  const s = baseStore(); // services dir stays empty
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({
+      publishedAt: "t",
+      cars: [],
+      gallery: [],
+      services: [JSON.parse(svcJson({ id: "zzz1" }))],
+    }),
+  );
+  const grp = (await getPanelData(s)).groups.find((g) => g.kind === "service")!;
+  assert.equal(grp.rows.length, 1);
+  const row = grp.rows[0];
+  assert.equal(row.id, "zzz1");
+  assert.equal(row.workingExists, false);
+  assert.equal(row.publishedExists, true);
+  assert.equal(row.publishState, "orphan-published");
+  assert.equal(row.editHref, null); // nothing to edit
+  assert.deepEqual(row.blockers, []); // no publish/confirm affordance implied
+});
+
+test("working card + published entry for the same id -> one row, not a duplicate orphan", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [JSON.parse(svcJson())] }),
+  );
+  const grp = (await getPanelData(s)).groups.find((g) => g.kind === "service")!;
+  assert.equal(grp.rows.length, 1);
+  assert.equal(grp.rows[0].workingExists, true);
+});
+
+test("unpublishing an orphan removes exactly that snapshot entry and leaves the rest", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({
+      publishedAt: "t",
+      cars: [],
+      gallery: [],
+      services: [JSON.parse(svcJson({ id: "keep" })), JSON.parse(svcJson({ id: "gone" }))],
+    }),
+  );
+  const v = await versions(s);
+
+  const stale = await unpublishItem(s, "service", "gone", { published: "stale-token" });
+  assert.equal((stale as { conflict?: boolean }).conflict, true); // version-guarded
+
+  const r = await unpublishItem(s, "service", "gone", { published: v.published });
+  assert.equal(r.ok, true);
+  const snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(
+    snap.services.map((x: { id: string }) => x.id),
+    ["keep"],
+  );
+  // The other kinds' arrays are untouched.
+  assert.deepEqual(snap.cars, []);
+});
+
+test("a storage read failure surfaces as an error — never an empty dashboard or a false 'card deleted'", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [JSON.parse(svcJson())] }),
+  );
+  s.readDir = async () => {
+    throw new StorageUnavailableError("тест: GitHub не відповів");
+  };
+  // Must reject — not resolve with the published service turned into an orphan row.
+  await assert.rejects(() => getPanelData(s), StorageUnavailableError);
 });
 
 // ---------------------------------------------------------------------------

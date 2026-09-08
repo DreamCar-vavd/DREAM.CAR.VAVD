@@ -96,18 +96,25 @@ function rebuildSnapshot(prev: Snapshot, kindKey: KindKey, nextList: unknown[]):
 // dashboard model
 // ---------------------------------------------------------------------------
 
-export type ItemPublishState = "not-published" | "in-sync" | "modified";
+export type ItemPublishState = "not-published" | "in-sync" | "modified" | "orphan-published";
 
 export interface PanelRow {
   id: string;
   title: string;
   subtitle: string;
-  editHref: string;
+  /** `null` when the working card is gone (orphan-published row). */
+  editHref: string | null;
   langStatus: Record<ContentLocale, LangReviewStatus>;
   blockers: GateFailure[];
   publishState: ItemPublishState;
   publiclyVisible: boolean;
   publishedExists: boolean;
+  /**
+   * Whether a working (Keystatic) card backs this row. `false` means the card
+   * was deleted but a published copy still lives in the snapshot — the row is
+   * shown read-only with only "прибрати з сайті".
+   */
+  workingExists: boolean;
 }
 export interface PanelGroup {
   kind: KindKey;
@@ -172,9 +179,15 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i) => {
     const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
     const working = coerceList(kind, dirs[i].data);
-    const publishedById = new Map(
-      coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]).map((p) => [p.id, p]),
-    );
+    const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    const publishedById = new Map(publishedList.map((p) => [p.id, p]));
+    const workingIds = new Set(working.map((w) => w.id));
+
+    const emptyLangStatus = () =>
+      Object.fromEntries(LOCALES.map((l) => [l, "empty" as LangReviewStatus])) as Record<
+        ContentLocale,
+        LangReviewStatus
+      >;
 
     const rows = working.map((item): PanelRow => {
       const pub = publishedById.get(item.id);
@@ -193,14 +206,35 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
         publishState,
         publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
         publishedExists: Boolean(pub),
+        workingExists: true,
       };
     });
+
+    // Entries still in the published snapshot whose working card was deleted.
+    // They keep rendering on the public site, so the panel MUST keep a way to
+    // take them down. Read-only: no edit link (nothing to edit), no publish /
+    // confirm actions, and getPanelData never recreates the working file.
+    const orphanRows = publishedList
+      .filter((pub) => !workingIds.has(pub.id))
+      .map((pub): PanelRow => ({
+        id: pub.id,
+        title: kind.displayTitle(pub),
+        subtitle: subtitleFor(kindKey, pub as never),
+        editHref: null,
+        langStatus: emptyLangStatus(),
+        blockers: [],
+        publishState: "orphan-published",
+        publiclyVisible: kind.isRenderable(pub),
+        publishedExists: true,
+        workingExists: false,
+      }));
+
     return {
       kind: kindKey,
       label: kind.label,
       singleEntry: Boolean(kind.singleEntry),
       createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
-      rows,
+      rows: [...rows, ...orphanRows],
     };
   });
 
