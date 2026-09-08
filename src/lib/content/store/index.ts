@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { LocalFsStorage } from "./localFs";
 import { GitHubStorage } from "./github";
+import { resolveContentBranch } from "./branch";
 import type { PanelStorage } from "./adapter";
 
 export * from "./adapter";
@@ -34,10 +35,11 @@ export async function getStorage(): Promise<PanelStorage> {
   if (!owner || !repo) {
     throw new NotConnectedError("Не налаштовано KEYSTATIC_GITHUB_REPO_OWNER / _NAME.");
   }
-  // Panel writes content to the branch this deployment was built from
-  // (Vercel sets VERCEL_GIT_COMMIT_REF), so a Preview publishes onto its own
-  // branch — never main by accident. Override with PANEL_CONTENT_BRANCH.
-  const branch =
-    process.env.PANEL_CONTENT_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || "main";
-  return new GitHubStorage({ owner, repo, branch, token });
+  // Panel reads/writes on the branch this deployment was built from (Vercel sets
+  // VERCEL_GIT_COMMIT_REF) or PANEL_CONTENT_BRANCH locally. No "main" fallback:
+  // an undefined branch is a hard error, not a silent main target — see
+  // ./branch.ts.
+  const resolved = resolveContentBranch();
+  if (resolved.branch === null) throw new NotConnectedError(resolved.reason);
+  return new GitHubStorage({ owner, repo, branch: resolved.branch, token });
 }

@@ -15,7 +15,15 @@ const LANG_BADGE = {
   reviewed: { text: "Перевірено", cls: "bg-green-100 text-green-800 border-green-300" },
 } as const;
 
-function DeployBanner({ deploy, mode }: { deploy: DeployStatus; mode: "local" | "github" }) {
+function DeployBanner({
+  deploy,
+  mode,
+  branch,
+}: {
+  deploy: DeployStatus;
+  mode: "local" | "github";
+  branch: string | null;
+}) {
   if (mode === "local") {
     return (
       <p className="mt-2 text-xs text-neutral-500">
@@ -24,7 +32,7 @@ function DeployBanner({ deploy, mode }: { deploy: DeployStatus; mode: "local" | 
     );
   }
   const isTest = "isTest" in deploy && deploy.isTest;
-  const where = isTest ? "на тестовому сайті" : "в ефірі";
+  const where = isTest ? `на тестовому сайті гілки «${branch}»` : "в ефірі (Production)";
   const map: Record<DeployStatus["state"], { text: string; cls: string }> = {
     "n/a": { text: "", cls: "" },
     none: { text: "Деплой для поточного знімка не знайдено.", cls: "text-neutral-500" },
@@ -276,13 +284,29 @@ export default async function PanelPage() {
     throw err;
   }
 
+  const keystaticHref = data.branch
+    ? `/keystatic/branch/${encodeURIComponent(data.branch)}`
+    : "/keystatic";
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
       <h1 className="text-xl font-bold">Панель публікації</h1>
+      {data.mode === "github" && data.branch && (
+        <p className="mt-1 text-sm">
+          Робоча гілка:{" "}
+          <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs dark:bg-neutral-800">
+            {data.branch}
+          </code>{" "}
+          <span className="text-xs text-neutral-500">
+            {data.branch === "main"
+              ? "(Production)"
+              : "(тестова гілка — не Production; редактор і перегляд чернетки відкриваються саме на ній)"}
+          </span>
+        </p>
+      )}
       <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         Редагування — у{" "}
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- separate app tree */}
-        <a className="underline" href="/keystatic">
+        <a className="underline" href={keystaticHref}>
           Keystatic
         </a>
         . Зміни там <strong>не потрапляють на сайт</strong>, поки ви не опублікуєте їх тут.
@@ -330,7 +354,7 @@ export default async function PanelPage() {
         ))}
       </nav>
 
-      <DeployBanner deploy={data.deploy} mode={data.mode} />
+      <DeployBanner deploy={data.deploy} mode={data.mode} branch={data.branch} />
       {data.publishedAt && (
         <p className="mt-1 text-xs text-neutral-500">
           Остання публікація: {new Date(data.publishedAt).toLocaleString("uk-UA")}

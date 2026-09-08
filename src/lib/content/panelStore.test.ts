@@ -62,6 +62,7 @@ const galJson = (over: Record<string, unknown> = {}) =>
 /** In-memory file store with real version bumps + conflict checks. */
 class FakeStorage implements PanelStorage {
   readonly mode = "github" as const;
+  branch: string | null = null;
   files = new Map<string, string>();
   dirs = new Map<string, DirEntry[]>();
   deploy: DeployStatus = { state: "ready" };
@@ -305,6 +306,21 @@ test("a new service: appears in its group, is gated, then publishes to the snaps
   assert.equal(grp.rows[0].editHref, "/keystatic/collection/services/item/s1");
   assert.ok(grp.rows[0].blockers.length > 0);
   assert.equal(grp.createHref, "/keystatic/collection/services/create");
+
+  // In github mode with a working branch, every Keystatic link is branch-scoped
+  // so /panel and the editor never diverge onto different branches.
+  s.branch = "codex/admin-panel-spike";
+  const scoped = await getPanelData(s);
+  const sg = scoped.groups.find((g) => g.kind === "service")!;
+  assert.equal(scoped.branch, "codex/admin-panel-spike");
+  assert.equal(
+    sg.rows[0].editHref,
+    "/keystatic/branch/codex%2Fadmin-panel-spike/collection/services/item/s1",
+  );
+  assert.equal(
+    sg.createHref,
+    "/keystatic/branch/codex%2Fadmin-panel-spike/collection/services/create",
+  );
 
   // Reviewed -> publishes; lands only in services[].
   s.seedFile("src/content/cms/review-state.json", JSON.stringify(svcReviewAll));

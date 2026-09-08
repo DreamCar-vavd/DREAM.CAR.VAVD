@@ -62,6 +62,12 @@ export class ConflictError extends Error {
 export interface PanelStorage {
   readonly mode: "local" | "github";
 
+  /**
+   * The git branch this storage reads/writes. `null` in local-file mode (no
+   * branch concept). Never a silent "main" — see store/branch.ts.
+   */
+  readonly branch: string | null;
+
   /** `*.json` files (dotfiles excluded), sorted by name, + a combined version. */
   readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>>;
 

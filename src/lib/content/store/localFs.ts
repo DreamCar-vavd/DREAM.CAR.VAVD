@@ -26,6 +26,7 @@ async function readOr(file: string, fallback: string | null): Promise<string | n
 
 export class LocalFsStorage implements PanelStorage {
   readonly mode = "local" as const;
+  readonly branch = null;
 
   async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
     assertAllowedDir(dir);

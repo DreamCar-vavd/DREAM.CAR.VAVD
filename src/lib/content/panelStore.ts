@@ -116,6 +116,8 @@ export interface PanelData {
   publishedAt: string;
   deploy: DeployStatus;
   mode: "local" | "github";
+  /** Working branch in github mode; `null` for local files. */
+  branch: string | null;
   versions: Versions;
 }
 
@@ -134,10 +136,21 @@ function subtitleFor(kind: KindKey, item: { id: string; order: number } & Record
   }
   return `${item.id} · порядок ${item.order}`;
 }
-const editHrefFor = (kind: KindKey, id: string) =>
+/**
+ * Keystatic URL base. In github mode the panel and the editor MUST agree on the
+ * branch, so every link is branch-scoped; otherwise Keystatic would open its own
+ * last/default branch (main) and show different content than /panel.
+ */
+const keystaticBase = (branch: string | null) =>
+  branch ? `/keystatic/branch/${encodeURIComponent(branch)}` : "/keystatic";
+
+const editHrefFor = (kind: KindKey, id: string, branch: string | null) =>
   kind === "contact"
-    ? "/keystatic/singleton/siteContact" // singleton — one edit page, no "Add"
-    : `/keystatic/collection/${COLLECTION_SLUG[kind]}/item/${id}`;
+    ? `${keystaticBase(branch)}/singleton/siteContact` // singleton — one edit page, no "Add"
+    : `${keystaticBase(branch)}/collection/${COLLECTION_SLUG[kind]}/item/${id}`;
+
+const createHrefFor = (kind: KindKey, branch: string | null) =>
+  `${keystaticBase(branch)}/collection/${COLLECTION_SLUG[kind]}/create`;
 
 export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
@@ -168,7 +181,7 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
         id: item.id,
         title: kind.displayTitle(item),
         subtitle: subtitleFor(kindKey, item as never),
-        editHref: editHrefFor(kindKey, item.id),
+        editHref: editHrefFor(kindKey, item.id, storage.branch),
         langStatus,
         blockers: kind.publishBlockers(item, ctx),
         publishState,
@@ -180,7 +193,7 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
       kind: kindKey,
       label: kind.label,
       singleEntry: Boolean(kind.singleEntry),
-      createHref: kind.singleEntry ? null : `/keystatic/collection/${COLLECTION_SLUG[kindKey]}/create`,
+      createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
       rows,
     };
   });
@@ -190,7 +203,14 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
     versions[k] = dirs[i].version;
   });
 
-  return { groups, publishedAt: snapshot.publishedAt, deploy, mode: storage.mode, versions };
+  return {
+    groups,
+    publishedAt: snapshot.publishedAt,
+    deploy,
+    mode: storage.mode,
+    branch: storage.branch,
+    versions,
+  };
 }
 
 // ---------------------------------------------------------------------------

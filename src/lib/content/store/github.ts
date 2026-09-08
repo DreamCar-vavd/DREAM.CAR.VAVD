@@ -23,12 +23,14 @@ const b64decode = (s: string) => Buffer.from(s, "base64").toString("utf8");
 
 export class GitHubStorage implements PanelStorage {
   readonly mode = "github" as const;
+  readonly branch: string;
   private readonly cfg: GitHubStorageConfig;
   private readonly f: typeof fetch;
   private readonly api = "https://api.github.com";
 
   constructor(cfg: GitHubStorageConfig) {
     this.cfg = cfg;
+    this.branch = cfg.branch;
     this.f = cfg.fetchImpl ?? fetch;
   }
 
