@@ -14,75 +14,28 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head:** `caa3f17` (docs-коміти поверх `87fe84a`) — PR #26 head звірено 2026-09-07
-- **CI `Verify`:** success · Vercel Preview — success (`gh pr checks 26`)
-- **Б1 статус (2026-09-07):** App ще НЕ створено (звірено в Chrome власника:
-  `settings/apps` → «No GitHub Apps», `settings/installations` → лише Vercel;
-  дублікатів немає). Далі — **ручний шлях** (`docs/PANEL-owner-request-B1.md`
-  §«Ручний шлях»), заповнення форми створення App робить власник (класифікатор
-  блокує це асистенту; + потрібен «Confirm access»).
-- **`.env` у setup-копії підготовлено асистентом:**
-  `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env`, права `600`,
-  git-ignored, 4 ключі: `KEYSTATIC_SECRET` згенеровано (80 hex, `randomBytes(40)`,
-  не виводиться); `KEYSTATIC_GITHUB_CLIENT_ID` / `KEYSTATIC_GITHUB_CLIENT_SECRET`
-  порожні (власник вписує через TextEdit, без терміналу);
-  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` порожній (асистент впише реальний slug
-  після створення — `@keystatic/next@5.0.5` читає його для лінка «Install App»;
-  автосетап пише його разом із 3 ключами; відсутність = лише caution-нотатка,
-  не блокер OAuth). `.env.local` (3 несекретні рядки) — не чіпати.
-- **Callback ще не готовий (перевірено):** без `CLIENT_ID/SECRET` у dev-режимі
-  `GET /api/keystatic/github/oauth/callback` → 404, `…/github/login` → 307 на
-  `/keystatic/setup`. OAuth стане доступним лише після вписаних креденшлів +
-  перезапуску сервера.
+- **Head:** docs+код-коміти поверх `87fe84a` (див. `git log`); PR #26 draft.
+- **CI `Verify`:** success · Vercel Preview — success (`gh pr checks 26`, 2026-09-07)
+- **Тести:** **247 pass** · tsc 0 · eslint 0 · `build:webpack` OK ·
+  content:check/guard — зелені (2026-09-08, після П19).
+- **Preview (Vercel):** публічні сторінки працюють; `/panel` + `/keystatic` = 404 без github-env.
 
-### Б1 — 2026-09-08 09:2x: App створено, `.env` заповнено, OAuth готовий
+### Б1 (GitHub App) — стан на 2026-09-08
 
-- **App створено:** `github.com/settings/apps` (акаунт @DreamCar-vavd) →
-  **рівно один** App «DreamCar-vavd Keystatic», slug **`dreamcar-vavd-keystatic`**.
-  (Детальні permissions на GitHub без «Confirm access» власника не видно — їх
-  підтвердить сам OAuth-потік; `gh api /apps/<slug>` → 404, бо App приватний.)
-- **`.env` заповнено власником, звірено без показу значень:** усі 4 ключі
-  наявні й придатні — `KEYSTATIC_GITHUB_CLIENT_ID` (формат `Iv23…`, 20 симв.),
-  `KEYSTATIC_GITHUB_CLIENT_SECRET` (40 симв.), `KEYSTATIC_SECRET` (80 hex),
-  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=dreamcar-vavd-keystatic`. Права `600`,
-  git-ignored, у `git status` не з'являється. `.env.local` не змінювався.
-- **Setup-сервер перезапущено** (лише :3010; `:3000` не чіпали). Новий
-  `next dev` **pid 91166**, вантажить `.env.local, .env`.
-- **OAuth активний (перевірено):** `/keystatic` → «Log in with GitHub» (не Setup);
-  `/api/keystatic/github/login` → 307 на
-  `github.com/login/oauth/authorize?client_id=…&redirect_uri=http://127.0.0.1:3010/api/keystatic/github/oauth/callback`;
-  `/api/keystatic/github/oauth/callback` → 400 (був 404).
-### Б1 — 2026-09-08 10:3x: OAuth-вхід ПРАЦЮЄ; App ще НЕ встановлено
-
-**Перевірено (Chrome власника, сервер :3010 PID 91166):**
-- **Вхід через GitHub успішний.** `http://127.0.0.1:3010/keystatic` → «Log in
-  with GitHub» → авторизація → відкривається **Дашборд Keystatic**, «Hello,
-  DreamCar-vavd!». `http://127.0.0.1:3010/panel` → «Панель публікації»
-  відкривається.
-- **Редактор працює з гілкою `main` за замовчуванням** (репо default branch);
-  на `main` панельного контенту немає → 0 entries. Через перемикач гілок →
-  **`codex/admin-panel-spike`**: читаються **Автомобілі 3, Галерея 8, Послуги 5**;
-  показано кнопку «Pull request #26». Тобто читання файлів через GitHub працює.
-- Непрямо підтверджено: Contents:read (файли), Metadata (список гілок),
-  Pull requests:read (кнопка PR #26), Deployments:read (банер `/panel`
-  «Поточний знімок в ефірі (Production)» — не «стан невідомий»).
-- **Запис не перевіряли** (за умовою — контент не редагувати).
-
-**НЕ перевірено / відкрите:**
-- **App НЕ встановлено на репозиторій.** `github.com/settings/installations` →
-  Installed GitHub Apps = лише **Vercel**. OAuth-вхід працює через **власні**
-  права DreamCar-vavd на свій репозиторій, не через installation. Тому
-  **«доступ лише до DREAM.CAR.VAVD» поки недоказовий** — installation немає.
-- **Деталі дозволів** (Contents RW; Metadata/PR/Deployments саме *read-only*;
-  Webhook off) — сторінка App вимагає «Confirm access» власника, асистенту
-  недоступна. Підтвердяться після встановлення (сторінка installation-config)
-  або власником вручну.
+| Крок | Стан |
+|---|---|
+| App створено | ✅ `github.com/settings/apps` (@DreamCar-vavd) → **один** App «DreamCar-vavd Keystatic», slug `dreamcar-vavd-keystatic` |
+| `.env` setup-копії | ✅ 4 ключі наявні й придатні (звірено без показу значень): `KEYSTATIC_GITHUB_CLIENT_ID` `Iv23…`/20, `_CLIENT_SECRET` 40, `KEYSTATIC_SECRET` 80 hex, `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=dreamcar-vavd-keystatic`. Права `600`, git-ignored |
+| `.env.local` | ✅ `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`, repo owner/name, **`PANEL_CONTENT_BRANCH=codex/admin-panel-spike`** (додано у П19) |
+| Setup-сервер :3010 | ✅ `next dev --webpack -H 127.0.0.1` (pid у `setup-server.log`), вантажить `.env.local, .env` |
+| OAuth-вхід | ✅ **працює** — власник входить, Keystatic + `/panel` відкриваються, читаються 3 авто / 8 галерея / 5 послуг / 1 контакт на `codex/admin-panel-spike` (П19, П20) |
+| App **встановлено** на репозиторій | ❌ **ще ні** — `settings/installations` → лише Vercel. Вхід працює через власні права DreamCar-vavd на публічний репо; **запис-публікація без installation не запрацює** |
+| Дозволи App (RW/RO, Webhook off), scope = лише DREAM.CAR.VAVD | ⏳ **не звірено** — сторінка App вимагає «Confirm access» власника; підтвердиться після встановлення |
+| Тест виходу з панелі / повторного входу | ⏳ після встановлення |
 
 **Наступна дія власника:** встановити App —
 `https://github.com/apps/dreamcar-vavd-keystatic/installations/new` →
 `DreamCar-vavd` → **Only select repositories → DREAM.CAR.VAVD** → Install.
-Потім асистент звіряє scope + робить тест виходу/повторного входу.
-- **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
   `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (кінець гілки),
@@ -110,6 +63,65 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П20 — Б1: App створено, `.env` заповнено, OAuth-вхід підтверджено
+
+- **App:** власник створив «DreamCar-vavd Keystatic» вручну (`settings/apps/new`,
+  ручний шлях — manifest-flow падав, П18). slug `dreamcar-vavd-keystatic`.
+  Асистент манiфест/форму не заповнював (класифікатор блокує; + «Confirm access»).
+- **`.env`:** асистент підготував (права `600`, git-ignored, `KEYSTATIC_SECRET`
+  згенеровано); власник вписав `CLIENT_ID`/`CLIENT_SECRET` через TextEdit (без
+  терміналу); асистент дописав `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`. Усі 4
+  ключі звірені **без показу значень** (формат/довжина).
+- **Callback-готовність (перевірено до і після):** без креденшлів
+  `/api/keystatic/github/oauth/callback` → 404, `…/login` → 307 на `/keystatic/setup`;
+  після заповнення + рестарту серверу → `/keystatic` «Log in with GitHub»,
+  `…/login` → 307 на `github.com/login/oauth/authorize` з правильним `redirect_uri`,
+  `…/oauth/callback` → 400. OAuth недоступний до заповнення `.env` — задокументовано.
+- **Тест входу (Chrome власника):** «Log in with GitHub» → авторизація →
+  **Дашборд Keystatic** («Hello, DreamCar-vavd!») → `/panel` → **читаються 3/8/5/1**
+  на `codex/admin-panel-spike` (після П19). Запис не перевіряли (контент не чіпати).
+- **Відкрите:** App **не встановлено** на репо (`settings/installations` → лише
+  Vercel); вхід працює через власні права на **публічний** репо, не через
+  installation → «доступ лише до DREAM.CAR.VAVD» і деталі дозволів (RW/RO, Webhook)
+  **не звірені**. `gh api /apps/<slug>` → 404 (App приватний). PR-кнопка й
+  читання публічних даних **не є доказом** дозволів.
+- **Наступне:** власник встановлює App (лише DREAM.CAR.VAVD) → асистент звіряє
+  scope у `settings/installations` + тест виходу/повторного входу.
+
+### П19 — /panel читав не ту гілку (виправлено + захист від повтору)
+
+**Причина.** `src/lib/content/store/index.ts` резолвив гілку як
+`PANEL_CONTENT_BRANCH || VERCEL_GIT_COMMIT_REF || "main"`. Локально жодна зі
+змінних не задана → тихий `main`, де панельного контенту немає → `/panel`
+показував 0 записів і «(Production)», хоча Keystatic на `codex/admin-panel-spike`
+бачив 3/8/5. На фото власника — саме цей стан.
+
+**Виправлено (код гілки, не `main`):**
+- **`.env.local` setup-копії:** `PANEL_CONTENT_BRANCH=codex/admin-panel-spike`
+  (асистент; власник env більше не редагує). `.env` і секрети не чіпані.
+- **`src/lib/content/store/branch.ts` (новий):** `resolveContentBranch(env)` —
+  `PANEL_CONTENT_BRANCH` → `VERCEL_GIT_COMMIT_REF` → **`{branch:null, reason}`**.
+  **Прибрано `|| "main"`.** `store/index.ts`: `branch===null` → `NotConnectedError`
+  (усі виклики `getStorage()` вже це обробляють → запис заблоковано, сторінка
+  показує причину з підказкою «задайте PANEL_CONTENT_BRANCH»).
+- **`PanelStorage.branch`** (adapter) — `GitHubStorage` віддає свою гілку,
+  `LocalFsStorage` → `null`. `PanelData.branch` пробрасується у `/panel`.
+- **Keystatic-лінки з `/panel` — гілко-залежні:**
+  `/keystatic/branch/<enc(branch)>/collection|singleton/…` (було без гілки → відкривало
+  Keystatic на `main`). Перегляд чернетки й раніше йшов через `getStorage()` — та сама гілка.
+- **`/panel`:** рядок «Робоча гілка: `<branch>` (тестова гілка — не Production…)»;
+  банер деплою тепер каже «на тестовому сайті гілки «<branch>»» + `(Preview)` +
+  «Остання публікація: <дата>».
+- **Тести:** новий `store/branch.test.ts` (5) — зокрема «без жодної змінної →
+  НЕ тихий main»; `panelStore.test.ts` — гілко-залежні href. **242 → 247 pass.**
+  tsc / eslint / `build:webpack` / `content:check` / `content:guard` — зелені.
+
+**Перевірено в Chrome власника:** `/panel` @ `codex/admin-panel-spike` показує
+**Автомобілі 3 / Галерея 8 / Послуги 5 / Контакти 1**, банер «Поточний знімок на
+тестовому сайті гілки «codex/admin-panel-spike» (Preview)», усі «Редагувати в
+Keystatic» ведуть на `…/branch/codex%2Fadmin-panel-spike/…`. Keystatic і `/panel`
+узгоджені.
 
 ### П18 — діагностика провалу створення App: «We didn't find an App Manifest»
 > Уточнення (12:54): на фото власник **був залогінений**, екран — **«Confirm

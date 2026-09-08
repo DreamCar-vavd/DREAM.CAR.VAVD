@@ -2134,33 +2134,24 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
 - **Робоча копія:** `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`
   (ізольована; **не** `/Users/apple/Projects/DREAM.CAR.VAVD`, не Desktop-копії).
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** — draft, не змерджено.
-- **Head:** `2b4d9f3` (`87fe84a` + docs-коміт минулої сесії) плюс docs-коміт
-  цієї сесії (готове середовище Б1). PR #26 head звірено 2026-09-07.
-- **`main`:** `ce1977af` — **не чіпається**, гілка від нього попереду на ~39 комітів.
+- **Head:** docs+код-коміти поверх `87fe84a` (див. `git log`). PR #26 draft.
+- **`main`:** `ce1977af` — **не чіпається**.
 - **`git status`:** чисто; `origin/codex/admin-panel-spike` = HEAD.
 - **CI `Verify`:** зелений; Vercel Preview — success (`gh pr checks 26`, 2026-09-07).
-- **Локальні перевірки:** `tsc` 0 · `eslint` 0 · **242 pass** · `build` OK ·
-  `content:check`/`guard` OK (без змін коду повторно не ганяти).
-- **Preview (Vercel):** публічні сторінки — 200; **`/panel` + `/keystatic` — 404** доки немає github-env (Б1).
+- **Локальні перевірки:** `tsc` 0 · `eslint` 0 · **247 pass** · `build:webpack` OK ·
+  `content:check`/`guard` OK (2026-09-08, після П19).
+- **Preview (Vercel):** публічні сторінки — 200; `/panel` + `/keystatic` — 404 доки немає github-env (Б1).
+- **Б1 стан:** App створено (`dreamcar-vavd-keystatic`), `.env` заповнено,
+  **OAuth-вхід у локальну панель ПРАЦЮЄ** (читаються 3/8/5/1 на `codex/admin-panel-spike`).
+  **Залишилось:** власник встановлює App (лише DREAM.CAR.VAVD) → звірка scope/дозволів
+  + тест виходу. Детальна таблиця й журнал — `docs/PANEL-progress.md` §«Б1» / П18–П20.
 - **Локальні dev-сервери:**
   - `:3000` — `next dev` власника з цієї копії, файловий режим. Не зупиняти.
-  - `:3010` (loopback) — підготовлений `next dev` з worktree
-    `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` для СПРАВЖНЬОГО
-    створення GitHub App власником (`docs/PANEL-owner-request-B1.md`).
-    `.env.local` (3 несекретні рядки) + **`.env` підготовлено** (права 600,
-    git-ignored, 4 ключі: `KEYSTATIC_SECRET` згенеровано, `CLIENT_ID/SECRET`
-    порожні для власника, `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` порожній —
-    асистент впише реальний slug після створення). Worktree й `.env` **не
-    видаляти** до перенесення у Vercel + hosted-перевірки. Зупиняти сервер —
-    конкретним `kill <pid>` (pid у `…-panel-setup-verify/setup-server.log`).
-    **Перша спроба власника (manifest-flow) впала** («We didn't find an App
-    Manifest»; власник БУВ залогінений, екран «Confirm access»/sudo). Тепер
-    основний шлях — **ручний** (`docs/PANEL-owner-request-B1.md` §«Ручний шлях»):
-    власник заповнює `github.com/settings/apps/new` (класифікатор блокує це
-    асистенту), копіює Client ID/secret у `.env` через TextEdit, асистент
-    дописує slug + перезапускає сервер. **Callback без креденшлів = 404**
-    (перевірено) — OAuth стає доступним лише після заповненого `.env` +
-    рестарту. Журнал — П18/§«Поточний стан».
+  - `:3010` (loopback) — `next dev --webpack` з worktree
+    `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (github-режим,
+    `.env.local` + `.env`). Зупиняти — конкретним `kill <pid>` (pid у
+    `…-panel-setup-verify/setup-server.log`). Worktree й `.env` **не видаляти** до
+    перенесення у Vercel + hosted-перевірки.
 
 ## 2. Що зроблено повністю (код готовий, покрито тестами)
 
