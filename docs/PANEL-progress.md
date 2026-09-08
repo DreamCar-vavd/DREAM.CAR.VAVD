@@ -52,10 +52,36 @@
   `/api/keystatic/github/login` → 307 на
   `github.com/login/oauth/authorize?client_id=…&redirect_uri=http://127.0.0.1:3010/api/keystatic/github/oauth/callback`;
   `/api/keystatic/github/oauth/callback` → 400 (був 404).
-- **Далі — дія власника:** встановити App на **лише `DREAM.CAR.VAVD`** +
-  «Log in with GitHub» на `http://127.0.0.1:3010/keystatic`. Тоді асистент
-  звіряє область встановлення (Chrome власника) + тест входу (редактор →
-  `/panel` → вихід).
+### Б1 — 2026-09-08 10:3x: OAuth-вхід ПРАЦЮЄ; App ще НЕ встановлено
+
+**Перевірено (Chrome власника, сервер :3010 PID 91166):**
+- **Вхід через GitHub успішний.** `http://127.0.0.1:3010/keystatic` → «Log in
+  with GitHub» → авторизація → відкривається **Дашборд Keystatic**, «Hello,
+  DreamCar-vavd!». `http://127.0.0.1:3010/panel` → «Панель публікації»
+  відкривається.
+- **Редактор працює з гілкою `main` за замовчуванням** (репо default branch);
+  на `main` панельного контенту немає → 0 entries. Через перемикач гілок →
+  **`codex/admin-panel-spike`**: читаються **Автомобілі 3, Галерея 8, Послуги 5**;
+  показано кнопку «Pull request #26». Тобто читання файлів через GitHub працює.
+- Непрямо підтверджено: Contents:read (файли), Metadata (список гілок),
+  Pull requests:read (кнопка PR #26), Deployments:read (банер `/panel`
+  «Поточний знімок в ефірі (Production)» — не «стан невідомий»).
+- **Запис не перевіряли** (за умовою — контент не редагувати).
+
+**НЕ перевірено / відкрите:**
+- **App НЕ встановлено на репозиторій.** `github.com/settings/installations` →
+  Installed GitHub Apps = лише **Vercel**. OAuth-вхід працює через **власні**
+  права DreamCar-vavd на свій репозиторій, не через installation. Тому
+  **«доступ лише до DREAM.CAR.VAVD» поки недоказовий** — installation немає.
+- **Деталі дозволів** (Contents RW; Metadata/PR/Deployments саме *read-only*;
+  Webhook off) — сторінка App вимагає «Confirm access» власника, асистенту
+  недоступна. Підтвердяться після встановлення (сторінка installation-config)
+  або власником вручну.
+
+**Наступна дія власника:** встановити App —
+`https://github.com/apps/dreamcar-vavd-keystatic/installations/new` →
+`DreamCar-vavd` → **Only select repositories → DREAM.CAR.VAVD** → Install.
+Потім асистент звіряє scope + робить тест виходу/повторного входу.
 - **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
