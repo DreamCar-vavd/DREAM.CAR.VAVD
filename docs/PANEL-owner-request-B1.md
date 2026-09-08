@@ -7,38 +7,27 @@
 
 | Крок | Стан |
 |---|---|
-| Створити GitHub App `DreamCar-vavd Keystatic` (slug `dreamcar-vavd-keystatic`) | ✅ **ЗРОБЛЕНО** — **другий App не створювати** |
-| Вписати Client ID / Client Secret / `KEYSTATIC_SECRET` / slug у `.env` | ✅ **ЗРОБЛЕНО** — усі 4 ключі на місці, звірено |
-| Локальний вхід через GitHub у `/keystatic` + `/panel` | ✅ **ПРАЦЮЄ** — читаються 3 авто / 8 галерея / 5 послуг / 1 контакт |
-| **→ Встановити App на репозиторій `DREAM.CAR.VAVD`** | ⏳ **ЦЕ ПОТОЧНА ДІЯ ВЛАСНИКА** (нижче) |
-| Тест виходу / повторного входу | ⏳ після встановлення (робить асистент) |
-| Vercel Preview (env + redeploy) | ⏳ окремий запит, після встановлення + тесту виходу |
+| Створити GitHub App `DreamCar-vavd Keystatic` (slug `dreamcar-vavd-keystatic`) | ✅ **ЗРОБЛЕНО** — другий App не створювати |
+| `.env` (Client ID / Client Secret / `KEYSTATIC_SECRET` / slug) | ✅ **ЗРОБЛЕНО** — 4 ключі звірено |
+| Локальний вхід через GitHub у `/keystatic` + `/panel` | ✅ **ПРАЦЮЄ** — 3 авто / 8 галерея / 5 послуг / 1 контакт на `codex/admin-panel-spike` |
+| App встановлено на `DREAM.CAR.VAVD` (тільки на нього) | ✅ **ЗРОБЛЕНО** — звірено в `settings/installations`: Only select repositories → `DreamCar-vavd/DREAM.CAR.VAVD`; Contents **Read and write**; Metadata/Pull requests/Deployments **Read**; Webhook **Active off** |
+| Тест виходу з живої сесії + повторний вхід | ✅ **ПРОЙДЕНО** — після Sign out `/panel`,`/panel/leads`,`/panel/video` → «Ви не увійшли»; чернетка → «Сесію завершено…»; повторний вхід відновлює 3/8/5/1 |
+| Vercel Preview (env + callback + redeploy) | ⏳ **готовий запит** нижче — виконується окремо |
 
-**Поточна дія власника — тільки встановлення** (розділ «Встановити App» нижче).
-Розділи «Ручний шлях» / «manifest-flow» / «Діагностика» — це вже пройдений етап
-створення, лишені як історія. Не повторювати.
+**Локальний Б1 завершено.** Розділи нижче («Встановити App», «Ручний шлях»,
+«manifest-flow», «Діагностика») — історія пройдених кроків, не повторювати.
+**Не перевірено:** запис/публікація з панелі (право `Contents: write` надано,
+але коміт не робився); робота на Vercel Preview.
 
 ---
 
-## Встановити App на `DREAM.CAR.VAVD` (поточна дія власника)
+## ~~Встановити App на `DREAM.CAR.VAVD`~~ — виконано 2026-09-08
 
-**Одне посилання:** `https://github.com/apps/dreamcar-vavd-keystatic/installations/new`
-
-1. Відкрити його (залогінений як `DreamCar-vavd`).
-2. Якщо GitHub попросить **«Confirm access»** — пройти (пароль / passkey / код).
-3. На екрані встановлення: акаунт **`DreamCar-vavd`** → перемикач **«Only select
-   repositories»** → у списку вибрати **тільки `DREAM.CAR.VAVD`** (не «All
-   repositories») → кнопка **«Install»**.
-4. Написати асистенту: **«App встановлено»**.
-
-Асистент далі звірить (у Chrome власника, без показу секретів):
-App справді встановлений · доступ **лише** до `DREAM.CAR.VAVD` ·
-Contents = **Read and write** · Metadata / Pull requests / Deployments =
-**Read-only** · Webhook — **вимкнений**.
-
-> Без встановлення: право «доступ лише до `DREAM.CAR.VAVD`» недоказове, а
-> **публікація з панелі (запис-коміти) не запрацює** — зараз OAuth дає лише
-> читання публічного репозиторію через власні права DreamCar-vavd.
+Звірено в `github.com/settings/installations` → DreamCar-vavd Keystatic:
+**Only select repositories → `DreamCar-vavd/DREAM.CAR.VAVD`** ·
+Permissions: Read and write access to code · Read access to deployments,
+metadata, and pull requests · **Webhook Active — off** · Redirect URI
+`http://127.0.0.1:3010/api/keystatic/github/oauth/callback`.
 
 ---
 
@@ -401,58 +390,72 @@ GitHub (залогінений, `DreamCar-vavd`) → **`https://github.com/setti
 
 ---
 
-## Наступний крок — ЧЕРНЕТКА запиту Vercel Preview
+## Наступний крок — ГОТОВИЙ запит Vercel Preview
 
-Виконувати **ТІЛЬКИ після**: App встановлено на `DREAM.CAR.VAVD` + пройдено тест
-виходу/повторного входу локально. Vercel цим документом **не** змінюється —
-асистент лише передасть запит нижче.
+Локальний Б1 **завершено й перевірено** (2026-09-08, П22): App встановлено на
+`DREAM.CAR.VAVD` (тільки на нього), дозволи звірені, Webhook off; тест виходу з
+живої сесії + повторний вхід — пройдено. Vercel цим документом **не** змінюється —
+запит нижче передається для окремого виконання.
 
 > **ЗАПИТ ДЛЯ ПЕРЕДАЧІ АСИСТЕНТУ — Vercel Preview для hosted-панелі**
 >
-> **Потрібна дія власника:** додати env-змінні у Vercel і зробити redeploy —
-> **лише для Preview гілки `codex/admin-panel-spike`**. Production не чіпати.
+> **Потрібна дія власника:** додати 7 env-змінних у Vercel, додати callback у
+> GitHub App і зробити redeploy — **лише для Preview гілки
+> `codex/admin-panel-spike`**. Production не чіпати.
 >
-> **Точна гілка:** `codex/admin-panel-spike` (PR #26, draft).
-> **Проєкт Vercel:** `dream.car.vavd` (team `6y7h9wdz4r-7375s-projects`).
-> **Перевірена адреса:** стабільний branch-аліас Preview — **скопіювати** з
-> Vercel → Project → Deployments (поряд із гілкою) або Settings → Domains
-> (вигляд `dreamcarvavd-git-codex-admin-panel-spike-<scope>.vercel.app`;
-> **не вигадувати**). Далі `<ALIAS>`.
+> **Проєкт Vercel:** `dream.car.vavd` · team `6y7h9wdz4r-7375s-projects` (Hobby).
+> **Гілка:** `codex/admin-panel-spike` (PR #26, draft).
+> **Перевірений branch-аліас Preview** (звірено у Vercel Dashboard 2026-09-08):
+> `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
+> (у Deployments позначений «Branch link for codex/admin-panel-spike»; Vercel
+> скорочує довгу назву гілки до `codex-admin-p` + хеш `648563` — це нормально).
 >
-> **Env (Vercel → Settings → Environment Variables; для кожної: Environment =
-> Preview, Advanced → Specific Git Branches → `codex/admin-panel-spike`):**
-> звірено з `@keystatic/next@5.0.5` + `src/lib/content/store/branch.ts` (2026-09-08).
+> **1. Env** (Vercel → Settings → Environment Variables → Add; для кожної:
+> Environment = **Preview**, і в **Specific Git Branches** вибрати
+> `codex/admin-panel-spike`). Жодної з цих 7 у проєкті ще немає (звірено).
+> Перелік звірено з `@keystatic/next@5.0.5` + `src/lib/content/store/branch.ts`.
 >
 > | Змінна | Значення | Тип |
 > |---|---|---|
 > | `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND` | `github` | звичайна |
 > | `KEYSTATIC_GITHUB_REPO_OWNER` | `DreamCar-vavd` | звичайна |
 > | `KEYSTATIC_GITHUB_REPO_NAME` | `DREAM.CAR.VAVD` | звичайна |
-> | `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` | `dreamcar-vavd-keystatic` | звичайна (публічний slug; інлайниться у збірку — тому потрібна на Vercel, не лише локально) |
-> | `KEYSTATIC_GITHUB_CLIENT_ID` | з `…-panel-setup-verify/.env` | **ідентифікатор** (не пароль, але тримати в env, не в чаті) |
+> | `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` | `dreamcar-vavd-keystatic` | звичайна (публічний slug; інлайниться у збірку) |
+> | `KEYSTATIC_GITHUB_CLIENT_ID` | з `…-panel-setup-verify/.env` | **ідентифікатор** (не пароль, але лише в env, не в чат) |
 > | `KEYSTATIC_GITHUB_CLIENT_SECRET` | з `…-panel-setup-verify/.env` | **СЕКРЕТ** |
 > | `KEYSTATIC_SECRET` | з `…-panel-setup-verify/.env` | **СЕКРЕТ** (підпис сесії) |
 >
-> `PANEL_CONTENT_BRANCH` — **не задавати** на Vercel: `VERCEL_GIT_COMMIT_REF`
-> уже дорівнює `codex/admin-panel-spike` для Preview цієї гілки (`branch.ts`
-> бере його автоматично). Якщо все ж задавати вручну — рівно
-> `codex/admin-panel-spike`, **не** `panel/content` (це майбутня схема Б4).
+> `PANEL_CONTENT_BRANCH` — **не задавати**: на Vercel `VERCEL_GIT_COMMIT_REF`
+> для Preview цієї гілки вже = `codex/admin-panel-spike`, і `branch.ts` бере
+> його автоматично. (Якщо колись задавати вручну — рівно `codex/admin-panel-spike`,
+> **не** `panel/content`.)
 >
-> Секрети/ідентифікатор вставляти лише у поле Value у Vercel — **не** в чат / Git /
-> звіт. Джерело значень — файл `…-panel-setup-verify/.env` (права 600, git-ignored).
+> Значення 3 секретних/ідентифікатора вставляти **тільки** в поле Value у Vercel
+> — не в чат / Git / звіт. Джерело — файл `…-panel-setup-verify/.env` (права 600,
+> git-ignored). Асистент прочитає лише **імена** ключів для звірки.
 >
-> **Callback:** у GitHub App `dreamcar-vavd-keystatic` → Callback URLs **додати**
-> (не замінювати локальний) `https://<ALIAS>/api/keystatic/github/oauth/callback`.
+> **2. Callback** — у GitHub App `dreamcar-vavd-keystatic` → General →
+> «Identifying and authorizing users» → **Add redirect URI** (локальний
+> `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` **лишити**):
+> `https://dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app/api/keystatic/github/oauth/callback`
+> → Save changes.
 >
-> **Redeploy:** Vercel → Deployments → останній для гілки → ⋯ → Redeploy
-> (env застосовуються лише до нової збірки).
+> **3. Redeploy** — Vercel → Deployments → останній для гілки
+> `codex/admin-panel-spike` → ⋯ → **Redeploy** (env застосовуються лише до нової
+> збірки).
 >
-> **Критерій перевірки:** `https://<ALIAS>/keystatic` → «Sign in with GitHub» →
-> Authorize → редактор; `https://<ALIAS>/panel` → дашборд, «Робоча гілка:
-> codex/admin-panel-spike», матеріали 3/8/5/1, банер «(Preview)». Далі — повний
-> протокол `docs/PANEL-hosted-verification.md`. Захист Preview vs OAuth —
-> `docs/PANEL-hosting-and-approvals.md` §3.5 (лише за фактичним збоєм, глобально
-> не вимикати).
+> **4. Критерій перевірки (на Preview):**
+> `https://dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app/keystatic`
+> → «Sign in with GitHub» → Authorize → редактор;
+> `…/panel` → дашборд, «Робоча гілка: codex/admin-panel-spike», матеріали
+> **3/8/5/1**, банер **«(Preview)»**; потім **Sign out** → `/panel` і чернетка
+> недоступні. Далі — повний протокол `docs/PANEL-hosted-verification.md`.
+>
+> **Увага (Hobby-план):** Preview-деплої за замовчуванням під **Vercel
+> Authentication** (бачить лише команда). GitHub-редірект на callback може
+> впертися в цей захист — тоді діяти за `docs/PANEL-hosting-and-approvals.md`
+> §3.5 (мінімальна зміна за фактичним доказом; глобально захист Preview **не**
+> вимикати).
 >
 > **Межі:** Production / `main` / DNS / тарифи / видимість репо не чіпати.
 > PR #26 лишається draft.

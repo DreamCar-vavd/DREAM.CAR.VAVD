@@ -2141,10 +2141,15 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
 - **Локальні перевірки:** `tsc` 0 · `eslint` 0 · **247 pass** · `build:webpack` OK ·
   `content:check`/`guard` OK (2026-09-08, після П19).
 - **Preview (Vercel):** публічні сторінки — 200; `/panel` + `/keystatic` — 404 доки немає github-env (Б1).
-- **Б1 стан:** App створено (`dreamcar-vavd-keystatic`), `.env` заповнено,
-  **OAuth-вхід у локальну панель ПРАЦЮЄ** (читаються 3/8/5/1 на `codex/admin-panel-spike`).
-  **Залишилось:** власник встановлює App (лише DREAM.CAR.VAVD) → звірка scope/дозволів
-  + тест виходу. Детальна таблиця й журнал — `docs/PANEL-progress.md` §«Б1» / П18–П20.
+- **Б1 стан — ЛОКАЛЬНО ЗАВЕРШЕНО (2026-09-08, П22):** App створено
+  (`dreamcar-vavd-keystatic`) + **встановлено на лише `DREAM.CAR.VAVD`**
+  (Contents RW; Metadata/PR/Deployments R; Webhook off — звірено); `.env`
+  заповнено; локальний OAuth-вхід, тест виходу з живої сесії й повторний вхід —
+  **пройдено**. **Не перевірено:** запис/публікація з панелі; Vercel Preview.
+  **Далі:** готовий запит на Vercel Preview env — `docs/PANEL-owner-request-B1.md`
+  (проєкт `dream.car.vavd`, alias
+  `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
+  звірено). Журнал — П18–П22.
 - **Локальні dev-сервери:**
   - `:3000` — `next dev` власника з цієї копії, файловий режим. Не зупиняти.
   - `:3010` (loopback) — `next dev --webpack` з worktree

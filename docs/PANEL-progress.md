@@ -29,14 +29,13 @@
 | `.env.local` | ✅ `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`, repo owner/name, **`PANEL_CONTENT_BRANCH=codex/admin-panel-spike`** (додано у П19) |
 | Setup-сервер :3010 | ✅ `next dev --webpack -H 127.0.0.1` (pid у `setup-server.log`), вантажить `.env.local, .env` |
 | OAuth-вхід | ✅ **працює** — власник входить, Keystatic + `/panel` відкриваються, читаються 3 авто / 8 галерея / 5 послуг / 1 контакт на `codex/admin-panel-spike` (П19, П20) |
-| App **встановлено** на репозиторій | ⏳ **форму заповнено асистентом**, чекає на «Confirm access» власника (див. П21). Дозволи на екрані встановлення звірені: **Contents: Read and write**; **Deployments / Metadata / Pull requests: Read**; scope вибрано **Only select repositories → DreamCar-vavd/DREAM.CAR.VAVD** |
-| Webhook off | ⏳ на екрані встановлення не показано (App-level); звірити після встановлення |
-| Тест виходу з панелі | ✅ **без-авторизації відхилення** (curl, П21): `/panel`,`/panel/leads`,`/panel/video` → «Ви не увійшли»; `/api/panel/preview` → 401 (draft-cookie не ставиться); `POST /api/panel` → 401. ⏳ **sign-out із живої сесії** — після встановлення |
-| Повторний вхід | ⏳ після встановлення (`request_oauth_on_install` сам відновлює сесію) |
+| App **встановлено** на репозиторій | ✅ **ЗРОБЛЕНО** (П22) — `settings/installations`: **Only select repositories → DreamCar-vavd/DREAM.CAR.VAVD**; Contents **Read and write**; Metadata/Pull requests/Deployments **Read**; **Webhook Active off**; Client ID `Iv23ligKwtoqGEQNKSlk`, Redirect URI `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` |
+| Тест виходу з живої сесії | ✅ **ПРОЙДЕНО** (П22, у Chrome власника): Sign out → `/panel`,`/panel/leads`,`/panel/video` → «Ви не увійшли»; раніше відкрита чернетка `/uk` → «Сесію завершено або відкликано — показано опубліковану версію»; новий `/api/panel/preview` → 401 |
+| Повторний вхід | ✅ **ПРАЦЮЄ** (П22) — «Log in with GitHub» → авто-approve (без consent/Confirm access) → Keystatic + `/panel` з `codex/admin-panel-spike`, матеріали 3/8/5/1 |
+| Vercel Preview | ⏳ **готовий запит** — `docs/PANEL-owner-request-B1.md`, alias звірено |
 
-**Наступна дія власника:** пройти **«Confirm access»** у вкладці Chrome, яку
-відкрив асистент (форму вже заповнено: Only select repositories →
-DreamCar-vavd/DREAM.CAR.VAVD → Install & Authorize).
+**Локальний Б1 завершено.** Не перевірено: запис/публікація з панелі
+(`Contents: write` надано, коміт не робився); робота на Vercel Preview.
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
   `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (кінець гілки),
@@ -64,6 +63,49 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П22 — Б1 ЛОКАЛЬНО ЗАВЕРШЕНО: App встановлено, тест виходу/входу пройдено, запит Vercel готовий
+
+**Встановлення App (в Chrome власника):** перша спроба (П21) впала — GitHub
+sudo «Confirm access» перериває POST і не авто-повторює. Друга спроба з
+`settings/apps/dreamcar-vavd-keystatic/installations` → Install → **Only select
+repositories → DreamCar-vavd/DREAM.CAR.VAVD** → Install & Authorize → пройшло
+(sudo було свіже). Звірено на `settings/installations` (сторінка Configure):
+- Repository access: **Only select repositories → `DreamCar-vavd/DREAM.CAR.VAVD`**
+- Permissions: **Read and write access to code** · **Read access to deployments,
+  metadata, and pull requests** · більше нічого
+- App → General: **Webhook Active — знято**; Redirect URI
+  `http://127.0.0.1:3010/api/keystatic/github/oauth/callback`; Client ID
+  `Iv23ligKwtoqGEQNKSlk`; client secret «Last used within the last week».
+
+**Тест виходу з ЖИВОЇ сесії** (Chrome власника, не curl): під входом відкрито
+`/panel` (3/8/5/1) і чернетку `/uk` (версія `36b42d92`). Далі
+`/api/keystatic/github/logout` (лише сесія Keystatic; GitHub-акаунт у браузері
+не чіпали) →
+- `/keystatic` → лише «Log in with GitHub»;
+- `/panel`, `/panel/leads`, `/panel/video` → «Ви не увійшли через GitHub…», даних немає;
+- `/uk` (раніше відкрита чернетка) після оновлення → **«Сесію завершено або
+  відкликано — перегляд чернетки недоступний. Показано опубліковану версію.»**;
+- новий `GET /api/panel/preview` → **401**.
+
+**Повторний вхід:** «Log in with GitHub» → GitHub авто-approve (App уже
+авторизований, без consent і без Confirm access) → Keystatic dashboard;
+`/keystatic/branch/codex%2Fadmin-panel-spike` → Автомобілі 3, Галерея 8,
+Послуги 5; `/panel` → «Робоча гілка: codex/admin-panel-spike», банер «(Preview)»,
+3/8/5/1, лінки редагування branch-scoped. Тихого повернення на порожній `main`
+немає.
+
+**Vercel (read-only, у Chrome власника):** проєкт `dream.car.vavd`, team
+`6y7h9wdz4r-7375s-projects` (**Hobby**). Стабільний branch-аліас Preview для
+`codex/admin-panel-spike` (Deployments → «Branch link for codex/admin-panel-spike»):
+**`dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`**.
+Env-змінних `KEYSTATIC_*` / `PANEL_CONTENT_BRANCH` / `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`
+у проєкті **немає** (є лише `CONTACT_FORM_ENDPOINT` + `NEXT_PUBLIC_*_URL`).
+Готовий запит із перевіреним callback — `docs/PANEL-owner-request-B1.md`
+(розділ «Наступний крок — ГОТОВИЙ запит Vercel Preview»).
+
+**Не перевірено:** запис/публікація з панелі; hosted-панель на Vercel Preview
+(Hobby → Preview під Vercel Authentication, callback може впертися в захист — §3.5).
 
 ### П21 — Б1: встановлення App (форму заповнено) + без-авторизації відхилення + запит Vercel виправлено
 
