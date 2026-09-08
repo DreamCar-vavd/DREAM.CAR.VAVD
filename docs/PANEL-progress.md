@@ -14,17 +14,17 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head:** `dfbe89c` (код+docs поверх `87fe84a`, див. `git log`); PR #26 draft.
-  Локально не запушено: `7b8b0e0` (docs П24/П25), `3369030` + `dfbe89c` (код —
-  П26). Остання запушена — `b28bcac`.
+- **Head:** `98f0e0a` (код+docs поверх `87fe84a`, див. `git log`); PR #26 draft.
+  Локально **не запушено**: `7b8b0e0` (docs), `3369030`+`dfbe89c` (код, П26),
+  `baba2cd` (docs), `98f0e0a` (код, П27). Остання запушена — `b28bcac`.
 - **Сигнали окремо (не плутати):**
   - **GitHub CI `Verify`** — success на `359c108` і `b28bcac` (`gh pr checks 26`). Виконує tsc/eslint/тести + `next build` (Turbopack), але **без** env-змінних Keystatic → `storage.kind='local'` → github-перевірка не спрацьовує. Тому зелений `Verify` ≠ зелена збірка Vercel Preview, де env вже є.
   - **Vercel Preview build** — на `359c108` **Ready** (`36PPjaFU3fSU8UXG2oVKu6WpYfHe`, збиралось ще до env-змінних); на `b28bcac` **Error** (`8bFFkFtSjXffsi7c22whANajjige`) — Keystatic github-режим уже активний, але без `KEYSTATIC_GITHUB_CLIENT_SECRET` + `KEYSTATIC_SECRET` → див. П24. Очікувано, не регресія коду.
   - **Перевірка запуску сторінок на Vercel** — ще не робилась (немає успішної збірки з github-env).
   - **Перевірка входу користувача на Vercel** — ще не робилась.
-- **Тести:** **259 pass** · tsc 0 · eslint 0 · `npm run build` (**Turbopack**, як на
+- **Тести:** **266 pass** · tsc 0 · eslint 0 · `npm run build` (**Turbopack**, як на
   Vercel) — Compiled successfully, лише 3 давні tracing-warnings `localFs.ts` ·
-  content:check/guard — зелені (2026-09-08, після П26). Це **локальна** збірка
+  content:check/guard — зелені (2026-09-08, після П27). Це **локальна** збірка
   без github-env; успіх Vercel-збірки — окремо, після 2 секретів.
 - **Preview (Vercel):** остання **зелена** збірка — `359c108` (публічні сторінки працюють; `/panel` + `/keystatic` = 404, бо github-env тоді ще не було). `b28bcac` не обслуговується (Error).
 - **Робочі копії:** код гілки — `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` (тут `git log`, коміти, head `b28bcac`). Локальний dev-сервер :3010 обслуговує окремий worktree `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (той самий кінець гілки, `359c108`; має додатковий git-ignored `.env`/`.env.local`). Різниця SHA між ними — лише документаційний коміт `b28bcac`; **перезапуск :3010 через це не потрібен** (код сторінок не змінювався).
@@ -72,6 +72,79 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П27 — доопрацювання шляху помилок панелі (після перевірки повного шляху до користувача)
+
+Коміт `98f0e0a` (локально, не запушено). Наступне після П26.
+
+**Що додатково знайдено й виправлено:**
+- **401/403 від GitHub із наявним токеном** (сесію завершено / доступ App
+  відкликано / втрачено доступ до репо) віддавав загальне
+  `GitHub read X failed (403)` — схоже на сиру відповідь. Тепер → новий
+  `StorageAuthError` з одним зрозумілим повідомленням «увійдіть знову» на
+  читаннях і на записі. `/panel` показує його з тим самим «Відкрити Keystatic
+  і увійти», що й `NotConnectedError`; API дії повертає **401** (прапор `auth`).
+- **`writeFile` тепер розрізняє «запит не пішов» і «пішов, результат невідомий»:**
+  якщо 20-с бюджет екземпляра вичерпано **до** відправлення `PUT` →
+  `StorageUnavailableError` (нічого не сталося, повтор безпечний); лише збій
+  **під час** запиту → `WriteUncertainError`. Автоповтору запису як не було, так і немає.
+- **`getPanelData` захищено щодо `deployStatus()`:** якщо перевірка стану
+  збірки кидає — деградує до `state:"unknown"`, контент, що завантажився,
+  рендериться.
+- `toActionError` не віддає токен, сиру відповідь GitHub чи stack trace —
+  лише текст-підказку самої помилки.
+
+**Межі загального таймауту (звірено за кодом):**
+- Бюджет **20 с** стартує в конструкторі `GitHubStorage`
+  (`deadline = Date.now() + operationTimeoutMs`).
+- Він **спільний** для всіх читань однієї операції панелі: `getStorage()`
+  створює **один** екземпляр на HTTP-запит, і `getPanelData` виконує через нього
+  всі `readDir`/`readFile`/`deployStatus`.
+- Нові екземпляри всередині тієї самої операції **не створюються** (ні
+  `getPanelData`, ні дії їх не роблять; `getStorage()` — раз на запит), тож
+  бюджет не скидається.
+- Бюджет вичерпано до початку запису → `writeFile` кидає `StorageUnavailableError`
+  **до** будь-якого `fetch` (0 `PUT`), бо запис не починався.
+
+**Мовні підтвердження після редагування — правила не змінювались, уже покрито:**
+- `serviceGate.test.ts`: «editing structured text after review re-opens that
+  language»; «an unfinished language blocks only its own review, not the
+  others»; «empty required text blocks publish for that language only»;
+  «changing only the shared numeric price / status keeps every translation
+  reviewed».
+- `carsGate.test.ts`: «editing text after review makes that language
+  need-review again»; «a language with no review confirmation blocks publish».
+- `panelStore.test.ts`: «changing only a shared service price does not require
+  re-confirming any language» (наскрізно через конвеєр).
+
+**Нові тести:** `github.test.ts` +3 (401→auth, 403→auth, бюджет-до-запису →
+`StorageUnavailableError`, не `WriteUncertain`, 0 `PUT`); `panelStore.test.ts`
++4 (дія → `transient` на недоступному читанні; дія → «результат запису
+невідомий»; дія → `auth` і **нічого не тече** — без `Bearer`/`token`/шляхів;
+`getPanelData` виживає при збої `deployStatus`).
+
+**Браузерна перевірка нового рядка (пункт 4) — НЕ виконана наживо.** Причина:
+`next dev` для цього worktree вже працює (:3000, сервер власника — не чіпаю),
+а другий `next dev` із того самого `.next` заблоковано; `next start` у
+production без github-env вимикає `/panel` (`keystaticEnabled=false`); окремий
+worktree/стенд заради тесту — розширення проєкту, чого просили уникати.
+Замість цього — звірка коду `OrphanRow` + юніт-тести:
+
+| Вимога пункту 4 | Де підтверджено |
+|---|---|
+| опубл. запис без робочої картки видно | `getPanelData` → `orphan-published` рядок (`panelStore.test.ts` «orphan published: working card gone…») |
+| довга назва/ID не ламають мобільний вигляд | `OrphanRow`: `flex flex-wrap`, назва/subtitle у `<span>` без `truncate`/`nowrap`, `id` лише в нативному `confirm`; без фіксованих ширин. **Пікселі при 375px не звірені** |
+| немає edit/publish/confirm | `OrphanRow` не рендерить жодного з цих контролів |
+| зрозуміле підтвердження «Прибрати з сайту» | `confirmText` → `window.confirm` з поясненням |
+| скасування нічого не змінює | `PanelButton.run()`: `if (confirmText && !window.confirm(...)) return;` — до будь-якого `fetch` |
+| повторне натискання під час виконання заблоковане | `<button disabled={disabled||busy||pending}>`, `setBusy(true)` одразу (незмінна логіка `PanelButton`) |
+| конфлікт версії пропонує оновити | `unpublishItem` version-guard (`panelStore.test.ts` «unpublishing an orphan … version-guarded») → клієнт показує «Оновити» |
+
+**Перевірено на повному дереві:** tsc 0 · lint 0 · `npm test` **266/266** ·
+`npm run build` (Turbopack) — Compiled successfully. **Не** проти реального
+Vercel/Turbopack-деплою. setup-сервер :3010 на новий код не перемикався;
+:3000 і :3010 не чіпав (тимчасово переміщений `services/detailing.json` для
+спроби локального стенда — одразу повернуто, `git status` чистий).
 
 ### П26 — панель: сироти-публікації видно; таймаути GitHub + зрозумілі помилки
 
