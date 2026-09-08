@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GitHubStorage } from "./github";
-import { ConflictError, StorageUnavailableError, WriteUncertainError } from "./adapter";
+import {
+  ConflictError,
+  StorageAuthError,
+  StorageUnavailableError,
+  WriteUncertainError,
+} from "./adapter";
 
 const CFG = { owner: "DreamCar-vavd", repo: "DREAM.CAR.VAVD", branch: "codex/test", token: "tok_abc" };
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
@@ -275,6 +280,47 @@ test("the whole-instance budget caps a slow directory listing — no unbounded t
   const started = Date.now();
   await assert.rejects(() => gh.readDir("src/content/cms/cars"), StorageUnavailableError);
   assert.ok(Date.now() - started < 400, "stopped at the budget, did not wait for all 20 files");
+});
+
+test("401 on a read = the session is gone -> StorageAuthError", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({
+      status: 401,
+      body: { message: "Bad credentials" },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readFile("src/content/cms/published.json"), StorageAuthError);
+});
+
+test("403 on a read = access revoked -> StorageAuthError, not a generic 'failed (403)'", async () => {
+  const { impl } = fakeGitHub({
+    "/contents/src/content/cms/cars?ref=": () => ({
+      status: 403,
+      body: { message: "Resource not accessible by integration" },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.readDir("src/content/cms/cars"), StorageAuthError);
+});
+
+test("budget already spent before a write: the PUT is never sent -> StorageUnavailableError (NOT WriteUncertain)", async () => {
+  let puts = 0;
+  const impl: typeof fetch = async (_i, init) => {
+    if ((init?.method ?? "GET") === "PUT") puts += 1;
+    return new Response("{}", { status: 200 });
+  };
+  const gh = new GitHubStorage({
+    ...CFG,
+    fetchImpl: impl,
+    requestTimeoutMs: 1000,
+    operationTimeoutMs: 0, // budget is spent the instant the storage is created
+  });
+  await assert.rejects(
+    () => gh.writeFile("src/content/cms/published.json", "{}\n", "sha"),
+    (e: Error) => e.name === "StorageUnavailableError" && !(e instanceof WriteUncertainError),
+  );
+  assert.equal(puts, 0, "nothing was sent, so retrying is safe — not 'uncertain'");
 });
 
 test("conflict, allowlist and branch guarantees are unchanged with timeouts on", async () => {

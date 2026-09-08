@@ -76,9 +76,28 @@ export class StorageUnavailableError extends Error {
 }
 
 /**
+ * GitHub refused the request with 401/403 while a token was present — the
+ * sign-in session ended, the App's authorisation was revoked, or repo access
+ * was lost. Retrying the same call will not help; the user must sign in again.
+ */
+export class StorageAuthError extends Error {
+  constructor() {
+    super(
+      "Немає доступу до репозиторію на GitHub. Найімовірніше, сесію завершено або " +
+        "доступ застосунку відкликано. Відкрийте /keystatic й увійдіть знову.",
+    );
+    this.name = "StorageAuthError";
+  }
+}
+
+/**
  * A WRITE was sent but no response came back (timeout / dropped connection).
  * GitHub may or may not have applied the commit, so the caller must NOT retry
  * blindly: it has to reload and check the current state first.
+ *
+ * NOT the same as a write that never left: when the time budget is already
+ * spent BEFORE the request goes out, nothing happened and the adapter throws
+ * `StorageUnavailableError` (safe to retry) instead.
  */
 export class WriteUncertainError extends Error {
   constructor(what: string) {

@@ -6,7 +6,9 @@ import { galleryConfirmedText } from "./galleryGate";
 import { serviceConfirmedText } from "./serviceGate";
 import {
   ConflictError,
+  StorageAuthError,
   StorageUnavailableError,
+  WriteUncertainError,
   assertAllowedDir,
   assertAllowedFile,
   type AllowedDir,
@@ -467,6 +469,60 @@ test("a storage read failure surfaces as an error — never an empty dashboard o
   };
   // Must reject — not resolve with the published service turned into an orphan row.
   await assert.rejects(() => getPanelData(s), StorageUnavailableError);
+});
+
+// ---------------------------------------------------------------------------
+// The full error path to the user: a panel ACTION result, not just the adapter
+// ---------------------------------------------------------------------------
+
+test("getPanelData still renders content when only the deploy-status probe fails", async () => {
+  const s = baseStore();
+  s.deployStatus = async () => {
+    throw new StorageUnavailableError("GitHub");
+  };
+  const d = await getPanelData(s);
+  assert.equal(d.deploy.state, "unknown"); // "не вдалося перевірити стан збірки"
+  assert.equal(d.groups.length, 5); // the content loaded fine
+});
+
+test("a panel action reports a TRANSIENT failure (not bad input) when a read hits GitHub-unreachable", async () => {
+  const s = baseStore();
+  s.readDir = async () => {
+    throw new StorageUnavailableError("GitHub не відповів");
+  };
+  const r = await publishItem(s, "car", "c1", { working: "x", review: "y", published: "z" });
+  assert.equal(r.ok, false);
+  assert.equal((r as { transient?: boolean }).transient, true);
+});
+
+test("a panel action says the write outcome is UNKNOWN (no retry) when the response is lost", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const v = await versions(s);
+  s.writeFile = async () => {
+    throw new WriteUncertainError("знімок");
+  };
+  const r = await publishItem(s, "car", "c1", {
+    working: v.car,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, false);
+  assert.equal((r as { transient?: boolean }).transient, true);
+  assert.match(r.message, /невідомо|перевірте|перш ніж повторюв/i);
+});
+
+test("a panel action surfaces a sign-in-again message (auth flag) when access is revoked mid-session", async () => {
+  const s = baseStore();
+  s.readDir = async () => {
+    throw new StorageAuthError();
+  };
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: "x", review: "y" });
+  assert.equal(r.ok, false);
+  assert.equal((r as { auth?: boolean }).auth, true);
+  assert.match(r.message, /keystatic|увійд/i);
+  // No token / raw body / stack trace leaked — just the guidance text.
+  assert.doesNotMatch(r.message, /Bearer|token|\bat \/|\.ts:\d+/i);
 });
 
 // ---------------------------------------------------------------------------

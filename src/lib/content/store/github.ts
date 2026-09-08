@@ -1,5 +1,6 @@
 import {
   ConflictError,
+  StorageAuthError,
   StorageUnavailableError,
   WriteUncertainError,
   assertAllowedDir,
@@ -115,11 +116,22 @@ export class GitHubStorage implements PanelStorage {
     return encodeURIComponent(this.cfg.branch);
   }
 
+  /** Milliseconds left in the whole-instance budget (may be <= 0). */
+  private remainingBudget(): number {
+    return this.deadline - Date.now();
+  }
+
+  /** 401/403 with a token present = auth is gone, not a transient blip. */
+  private static rejectIfUnauthorized(status: number): void {
+    if (status === 401 || status === 403) throw new StorageAuthError();
+  }
+
   private async getContent(repoPath: string): Promise<{ text: string | null; sha: string }> {
     const { status, body } = await this.gh(
       this.repoUrl(`/contents/${repoPath}?ref=${this.ref()}`),
     );
     if (status === 404) return { text: null, sha: "" };
+    GitHubStorage.rejectIfUnauthorized(status);
     if (status !== 200) throw new Error(`GitHub read ${repoPath} failed (${status})`);
     const f = body as { content: string; sha: string; encoding: string };
     return { text: f.encoding === "base64" ? b64decode(f.content) : f.content, sha: f.sha };
@@ -129,6 +141,7 @@ export class GitHubStorage implements PanelStorage {
     assertAllowedDir(dir);
     const { status, body } = await this.gh(this.repoUrl(`/contents/${dir}?ref=${this.ref()}`));
     if (status === 404) return { data: [], version: "" };
+    GitHubStorage.rejectIfUnauthorized(status);
     if (status !== 200) throw new Error(`GitHub list ${dir} failed (${status})`);
     const files = (body as { name: string; sha: string; type: string }[])
       .filter((e) => e.type === "file" && e.name.endsWith(".json") && !e.name.startsWith("."))
@@ -162,6 +175,12 @@ export class GitHubStorage implements PanelStorage {
     };
     if (expectedVersion) payload.sha = expectedVersion; // present sha => optimistic lock
 
+    // Budget already spent BEFORE the request goes out: nothing was sent, so
+    // this is a plain "unavailable, retry is safe" — NOT write-uncertain.
+    if (this.remainingBudget() <= 0) {
+      throw new StorageUnavailableError("бюджет часу вичерпано до відправлення запиту на запис");
+    }
+
     let status: number;
     let body: unknown;
     try {
@@ -170,9 +189,10 @@ export class GitHubStorage implements PanelStorage {
         body: JSON.stringify(payload),
       }));
     } catch (err) {
-      // The PUT went out but no answer came back — the commit may or may not
-      // have landed. Do NOT retry here (a blind retry could double-apply or
-      // fight an optimistic-lock); make the caller reload and check.
+      // We got past the pre-flight check, so the PUT was on its way when it
+      // failed — the commit may or may not have landed. Do NOT retry here (a
+      // blind retry could double-apply or fight the optimistic lock); make the
+      // caller reload and check.
       if (err instanceof StorageUnavailableError) throw new WriteUncertainError(what);
       throw err;
     }
@@ -180,6 +200,7 @@ export class GitHubStorage implements PanelStorage {
     if (status === 409 || (status === 422 && expectedVersion)) {
       throw new ConflictError(what);
     }
+    GitHubStorage.rejectIfUnauthorized(status);
     if (status !== 200 && status !== 201) throw new Error(`GitHub write ${file} failed (${status})`);
     return { data: text, version: (body as { content: { sha: string } }).content.sha };
   }

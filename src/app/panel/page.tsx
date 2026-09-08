@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, describeFailure, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError, type DeployStatus } from "@/lib/content/store";
-import { StorageUnavailableError } from "@/lib/content/store/adapter";
+import { StorageAuthError, StorageUnavailableError } from "@/lib/content/store/adapter";
 import { getPanelData, type PanelData, type PanelGroup, type PanelRow } from "@/lib/content/panelStore";
 import { PanelButton, RefreshButton } from "./PanelActions";
 
@@ -308,7 +308,9 @@ export default async function PanelPage() {
   try {
     data = await getPanelData(await getStorage());
   } catch (err) {
-    if (err instanceof NotConnectedError) {
+    if (err instanceof NotConnectedError || err instanceof StorageAuthError) {
+      // Not signed in, or the session ended / the App's access was revoked —
+      // both recover the same way: sign in again.
       return (
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-xl font-bold">Панель публікації</h1>

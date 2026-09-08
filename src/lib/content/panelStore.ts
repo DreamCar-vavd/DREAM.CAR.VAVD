@@ -9,6 +9,7 @@ import {
 import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
 import {
   ConflictError,
+  StorageAuthError,
   StorageUnavailableError,
   WriteUncertainError,
   type DeployStatus,
@@ -166,11 +167,20 @@ const createHrefFor = (kind: KindKey, branch: string | null) =>
   `${keystaticBase(branch)}/collection/${COLLECTION_SLUG[kind]}/create`;
 
 export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
+  // Content reads must succeed — a failure here rejects (the page shows a
+  // retry state), never a blank dashboard. The deploy-status probe is
+  // best-effort: if it can't reach the backend the content still renders and
+  // the banner says the build state is unknown.
   const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
   const [publishedF, reviewF, deploy] = await Promise.all([
     storage.readFile(PUBLISHED),
     storage.readFile(REVIEW),
-    storage.deployStatus(),
+    storage.deployStatus().catch((err): DeployStatus => {
+      if (err instanceof StorageUnavailableError || err instanceof StorageAuthError) {
+        return { state: "unknown", reason: "не вдалося перевірити стан збірки" };
+      }
+      throw err;
+    }),
   ]);
   const snapshot = parseSnapshot(publishedF.data);
   const review = parseReview(reviewF.data);
@@ -268,14 +278,19 @@ export type ActionResult =
       /** GitHub was unreachable / a write's outcome is unknown — a transient
        *  backend problem, not bad input. */
       transient?: boolean;
+      /** The GitHub session ended / access was revoked — the user must sign in
+       *  again; retrying the same request will not help. */
+      auth?: boolean;
     };
 
 const asConflict = (err: unknown): ActionResult | null =>
   err instanceof ConflictError ? { ok: false, message: err.message, conflict: true } : null;
 
 /**
- * Turn any storage error into a user-facing ActionResult:
+ * Turn any storage error into a user-facing ActionResult. Never leaks a token,
+ * a raw GitHub body or a stack trace — only the error's own message text.
  *  - ConflictError        -> {conflict:true}, offer refresh
+ *  - StorageAuthError     -> session ended / access revoked; message says sign in again
  *  - WriteUncertainError  -> outcome unknown; message tells the user to reload
  *                            and check BEFORE retrying (no auto-retry here)
  *  - StorageUnavailableError -> GitHub unreachable; safe to try again later
@@ -284,6 +299,9 @@ const asConflict = (err: unknown): ActionResult | null =>
 function toActionError(err: unknown, prefix: string): ActionResult {
   const conflict = asConflict(err);
   if (conflict) return conflict;
+  if (err instanceof StorageAuthError) {
+    return { ok: false, message: err.message, auth: true };
+  }
   if (err instanceof WriteUncertainError || err instanceof StorageUnavailableError) {
     return { ok: false, message: err.message, transient: true };
   }
