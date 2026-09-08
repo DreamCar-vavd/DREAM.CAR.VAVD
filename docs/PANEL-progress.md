@@ -15,10 +15,15 @@
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
 - **Head:** docs+код-коміти поверх `87fe84a` (див. `git log`); PR #26 draft.
-- **CI `Verify`:** success · Vercel Preview — success (`gh pr checks 26`, 2026-09-07)
+- **Сигнали окремо (не плутати):**
+  - **GitHub CI `Verify`** — success на `359c108` і `b28bcac` (`gh pr checks 26`). Виконує tsc/eslint/тести + `next build` (Turbopack), але **без** env-змінних Keystatic → `storage.kind='local'` → github-перевірка не спрацьовує. Тому зелений `Verify` ≠ зелена збірка Vercel Preview, де env вже є.
+  - **Vercel Preview build** — на `359c108` **Ready** (`36PPjaFU3fSU8UXG2oVKu6WpYfHe`, збиралось ще до env-змінних); на `b28bcac` **Error** (`8bFFkFtSjXffsi7c22whANajjige`) — Keystatic github-режим уже активний, але без `KEYSTATIC_GITHUB_CLIENT_SECRET` + `KEYSTATIC_SECRET` → див. П24. Очікувано, не регресія коду.
+  - **Перевірка запуску сторінок на Vercel** — ще не робилась (немає успішної збірки з github-env).
+  - **Перевірка входу користувача на Vercel** — ще не робилась.
 - **Тести:** **247 pass** · tsc 0 · eslint 0 · `build:webpack` OK ·
   content:check/guard — зелені (2026-09-08, після П19).
-- **Preview (Vercel):** публічні сторінки працюють; `/panel` + `/keystatic` = 404 без github-env.
+- **Preview (Vercel):** остання **зелена** збірка — `359c108` (публічні сторінки працюють; `/panel` + `/keystatic` = 404, бо github-env тоді ще не було). `b28bcac` не обслуговується (Error).
+- **Робочі копії:** код гілки — `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` (тут `git log`, коміти, head `b28bcac`). Локальний dev-сервер :3010 обслуговує окремий worktree `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (той самий кінець гілки, `359c108`; має додатковий git-ignored `.env`/`.env.local`). Різниця SHA між ними — лише документаційний коміт `b28bcac`; **перезапуск :3010 через це не потрібен** (код сторінок не змінювався).
 
 ### Б1 (GitHub App) — стан на 2026-09-08
 
@@ -29,7 +34,7 @@
 | `.env.local` | ✅ `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`, repo owner/name, **`PANEL_CONTENT_BRANCH=codex/admin-panel-spike`** (додано у П19) |
 | Setup-сервер :3010 | ✅ `next dev --webpack -H 127.0.0.1` (pid у `setup-server.log`), вантажить `.env.local, .env` |
 | OAuth-вхід | ✅ **працює** — власник входить, Keystatic + `/panel` відкриваються, читаються 3 авто / 8 галерея / 5 послуг / 1 контакт на `codex/admin-panel-spike` (П19, П20) |
-| App **встановлено** на репозиторій | ✅ **ЗРОБЛЕНО** (П22) — `settings/installations`: **Only select repositories → DreamCar-vavd/DREAM.CAR.VAVD**; Contents **Read and write**; Metadata/Pull requests/Deployments **Read**; **Webhook Active off**; Client ID `Iv23ligKwtoqGEQNKSlk`, Redirect URI `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` |
+| App **встановлено** на репозиторій | ✅ **ЗРОБЛЕНО** (П22) — `settings/installations`: **Only select repositories → DreamCar-vavd/DREAM.CAR.VAVD**; Contents **Read and write**; Metadata/Pull requests/Deployments **Read**; **Webhook Active off**; Client ID `Iv23ligKwtoqGEQNKSIk`, Redirect URI `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` |
 | Тест виходу з живої сесії | ✅ **ПРОЙДЕНО** (П22, у Chrome власника): Sign out → `/panel`,`/panel/leads`,`/panel/video` → «Ви не увійшли»; раніше відкрита чернетка `/uk` → «Сесію завершено або відкликано — показано опубліковану версію»; новий `/api/panel/preview` → 401 |
 | Повторний вхід | ✅ **ПРАЦЮЄ** (П22) — «Log in with GitHub» → авто-approve (без consent/Confirm access) → Keystatic + `/panel` з `codex/admin-panel-spike`, матеріали 3/8/5/1 |
 | Vercel Preview | ⏳ **готовий запит** — `docs/PANEL-owner-request-B1.md`, alias звірено |
@@ -64,11 +69,167 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 
 ## Завершені пункти (новіші зверху)
 
+### П25 — форма 2 секретів підготовлена; сценарій запису/публікації виправлено за схемою
+
+- **Chrome власника:** відкрито Vercel → Environment Variables → «Add Environment
+  Variable»; вписано **обидві** назви `KEYSTATIC_GITHUB_CLIENT_SECRET` і
+  `KEYSTATIC_SECRET`, Type = **Secret**, область = **тільки `codex/admin-panel-spike`**
+  (Production/Preview/Development зняті). **Порожні лише поля Value.** Власник
+  вставляє два значення з `…-panel-setup-verify/.env` і тисне Save.
+- **Джерело обмеження «асистент не вписує секрети»:** системні інструкції
+  асистента, розділ *Prohibited* — «Entering … API keys, or tokens into any
+  field»; лишається забороною навіть на прямий дозвіл користувача. Окремого
+  інструмента передачі облікових даних у цій сесії немає. Обхід іншими
+  інструментами (JS-сеттер поля, CLI) не робиться. Частина, яка потребує участі
+  власника, — саме вставлення двох значень у Value.
+- **Client ID — виправлено в доці:** правильне значення `Iv23ligKwtoqGEQNKSIk`
+  (позиція 18 — велика `I`, 19 — мала `k`; звірено символ-за-символом із
+  setup-`.env`). Раніше в П22/пам'яті стояло хибне `…NKSlk` (мала `l`). У Vercel
+  вписано правильне (звірено в П23, буде переперевірено після 7/7).
+
+**`docs/PANEL-write-publish-scenario.md` — виправлено за реальною схемою
+(`keystatic.config.ts` services з р.336, `serviceGate.ts`):**
+- ключі — `uk/en/ru` з `title` + `shortDescription` + `longDescription` (плюс
+  необов'язкові); попереднє `title.uk`/`description.uk` було хибним;
+- файл — точно `src/content/cms/services/zzz-test-panel.json`; фото — точно
+  `public/images/cms/services/zzz-test-panel/photos/0/image.jpg` (шаблон
+  Keystatic, як у наявних `gallery/*`); «або шлях, який покаже Keystatic» прибрано;
+- **гейт публікації** (`serviceGate.ts`): для кожної мови `title/shortDescription/
+  longDescription` непорожні + статус `reviewed`; `priceAmount` порожній або
+  число; фото не обов'язкові. `priceAmount/priceCurrency` **не** в хеші
+  підтвердження — зміна суми переклад не скидає (додано як окрему перевірку);
+- **порядок прибирання** виправлено: спершу `unpublish` через `/panel` (поки
+  робоча картка є), потім видалення робочої картки, потім тільки свої фото
+  (`zzz-test-panel/`), потім залишок у `review-state.json`. Причина:
+  `getPanelData` будує рядки з `working.map` (`panelStore.ts:173`) — після
+  видалення робочої картки кнопка «Прибрати з сайту» зникає, а опублікований
+  запис лишається;
+- **зафіксовано ваду для подальшого виправлення:** `/panel` не показує
+  «осиротілі» опубліковані записи без робочої картки → немає UI-кнопки їх
+  прибрати (серверний `unpublishItem` працює). Треба показувати такі записи з
+  кнопкою прибирання;
+- **перевірка прибирання** зроблена точною: перелічено конкретні місця
+  (`git show <branch>:src/content/cms/services/`, `published.json`,
+  `review-state.json`, `git ls-tree … public/images/cms/services/`), порівняння з
+  збереженим початковим станом; «пошук `zzz-test` по дереву = 0» прибрано
+  (текст законно є в доці/історії);
+- **сценарій конфлікту** зроблено відтворюваним: обидві сесії — активна кнопка
+  «Опублікувати», зафіксовані `versions`, після зміни в A мова знову підтверджена,
+  B б'є зі старими `versions` → `{conflict:true}` + збережена версія A;
+  розмежовано з «кнопка вимкнена» та «відмова через неперевірену мову».
+
+**Захист `main` — перевірено (тільки читання):**
+- `/panel` бере гілку з `VERCEL_GIT_COMMIT_REF` (Preview) / `PANEL_CONTENT_BRANCH`
+  (локально), без fallback на `main` (`store/branch.ts`); посилання редагування
+  branch-scoped (`panelStore.ts` `keystaticBase`).
+- GitHub → Branches → правило `main` (`branch_protection_rules/81941201`, звірено
+  2026-09-08): **Require a pull request** on, **Do not allow bypassing** on
+  (діє й на адмінів), force-push/deletion off, Require status checks →
+  `Verify (…)`. **Прямий push у `main` заборонено всім.** Require approvals —
+  **вимкнено** (власник технічно може сам змержити PR після зеленого `Verify` —
+  це домовленість, не бар'єр).
+- `content-guard.yml` — у `.github/workflows-proposed/` (не в `.github/workflows/`,
+  тому GitHub його не запускає). Активний workflow один — `.github/workflows/ci.yml`
+  (job `Verify`).
+- **Не перевірено руками:** чи можна вибрати `main` у власному перемикачі гілок
+  Keystatic. Очікування — прямий запис у захищену `main` GitHub відхилить;
+  крок для hosted-протоколу. `resolveContentBranch` без fallback ≠ заборона явно
+  вибраної `main`.
+- **`rebase`-примітка:** правильне фактичне місце майбутнього workflow —
+  `.github/workflows-proposed/content-guard.yml` (не `.github/workflows/`).
+
+**Локальна `/panel 500` — актуальна перевірка (19:47, 2026-09-08):**
+- Свіжий `curl http://127.0.0.1:3010/panel` → **HTTP 200 за 0.9 с**, сторінка
+  рендериться коректно («Ви не увійшли через GitHub» — очікувано без cookie).
+- У `setup-server.log` єдиний `GET /panel 500 in 10.7min` стоїть **одразу після**
+  `[TypeError: fetch failed] … [cause]: Error: read ECONNRESET`, а **наступний**
+  рядок — `GET /panel 200 in 686ms`. Тобто: разовий збій — вихідний запит до
+  GitHub API (рендер `/panel` у github-режимі під входом) обірвався `ECONNRESET`
+  і без короткого таймауту завис ~10 хв, повернувши 500; наступний і всі подальші
+  запити — 200.
+- **Висновок:** не відтворюється; це не дефект коду сторінки й не проблема сесії,
+  а транзієнтний мережевий збій на вихідному виклику до GitHub. Латентна вада
+  стійкості: у github-storage `fetch` немає короткого таймауту → обірваний
+  конект може підвісити рендер на хвилини (на Vercel зріже function-timeout, але
+  UX поганий). Кандидат на виправлення, **не** зараз (без змін коду цього етапу).
+- Сервер :3010 (pid 95334, cwd `…-panel-setup-verify`, порт слухає pid 95335) —
+  здоровий, **не перезапускався** (немає технічної потреби). `:3000` не чіпався.
+
+### П24 — Vercel Preview build впав на `b28bcac` (очікувано): точна причина
+
+**Deployment:** `8bFFkFtSjXffsi7c22whANajjige` · джерело `codex/admin-panel-spike` @
+`b28bcac` · середовище **Preview** · статус **Error** · тривалість 24s · створено
+2026-09-08 (~12:28 UTC у логах) · домени
+`dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` +
+`dreamcarvavd-5t56gx26g-6y7h9wdz4r-7375s-projects.vercel.app`. Тригер — push
+документаційного коміту `b28bcac` (env-змінні на той момент уже були додані).
+
+**Що прямо підтверджено журналом збірки (Build Logs, 145 рядків):**
+```
+✓ Compiled successfully in 8.8s
+Running TypeScript ... Finished TypeScript in 3.7s
+Collecting page data using 1 worker ...
+Error: Failed to collect configuration for /api/keystatic/[...params]
+  [cause]: Error: Missing required config in Keystatic API setup when using the 'github' storage mode:
+  - clientSecret (can be provided via KEYSTATIC_GITHUB_CLIENT_SECRET env var)
+  - secret (can be provided via KEYSTATIC_SECRET env var)
+Turbopack build encountered 3 warnings:
+> Build error occurred
+Error: Failed to collect page data for /api/keystatic/[...params]
+Error: Command "npm run build" exited with 1
+```
+- Компіляція і TypeScript **пройшли** — це не помилка коду/типів.
+- Падіння — на стадії **Collecting page data**, конкретно на роуті
+  `/api/keystatic/[...params]`.
+- Відсутні саме **дві** змінні: `clientSecret`, `secret`. `clientId` у переліку
+  **немає** → `KEYSTATIC_GITHUB_CLIENT_ID` на Preview вже підхоплюється (П23).
+
+**Які змінні відсутні:** `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`
+(на Preview гілки `codex/admin-panel-spike`).
+
+**Що випливає з коду** (`@keystatic/core@0.6.9`, `@keystatic/next@5.0.5`,
+Next 16.3.0):
+- `src/app/api/keystatic/[...params]/route.ts` на рівні модуля викликає
+  `makeRouteHandler({ config })` → `@keystatic/next` → `makeGenericAPIRouteHandler`.
+- У `@keystatic/core/dist/keystatic-core-api-generic.node.js` (~р. 322): якщо
+  `storage.kind === 'github'` **і** `NODE_ENV !== 'development'` **і** бракує
+  будь-якого з `clientId/clientSecret/secret` → **synchronous `throw`** на етапі
+  обчислення модуля. `next build` виконує модуль під час «collect page data» →
+  збірка падає.
+- github-режим вмикається через `keystaticEnabled` (`src/lib/keystaticEnabled.ts`):
+  `NODE_ENV !== 'production' || NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND === 'github'`.
+  На `359c108` env ще не було → на Preview `keystaticEnabled=false` → роут
+  віддавав 404, `throw` не спрацьовував, збірка була зелена. Додавання
+  `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` (П23) увімкнуло перевірку.
+- 3 попередження Turbopack — окреме, доброякісне: filesystem-tracing на
+  `path.join(process.cwd(), …)` у `src/lib/content/store/localFs.ts`. Присутнє й
+  на зеленій збірці `359c108`. **Не причина** падіння.
+- І Vercel, і CI `Verify` збирають через `next build` (**Turbopack**). Різниця не
+  в бандлері, а в **env**: на Preview гілки задано
+  `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` → `storage.kind='github'` → `throw`;
+  у CI цієї змінної немає → `storage.kind='local'` → без `throw`. Локальний
+  `build:webpack` теж без github-env → теж зелений. Зелені CI/локальні збірки цю
+  ваду конфігурації Preview не ловлять.
+
+**Що можна підтвердити лише наступною збіркою:** що після додавання двох
+секретів + redeploy збірка стане зеленою повністю. Додавання ключів прибирає
+**цей конкретний** `throw`; інші стадії («collect page data» для інших роутів,
+генерація сторінок) на цій конфігурації ще не проходили. Гарантій «зникнуть усі
+помилки» немає — оцінюємо за фактом наступної збірки. Це проблема **конфігурації
+середовища**, не коду — код не змінюємо.
+
 ### П23 — Vercel Preview: 5 env-змінних + callback додано (асистентом); 2 секрети — за власником
 
+> **Історична примітка (додано в П24):** рядок нижче писався до появи
+> env-змінних. Формулювання «CI `Verify` + Vercel — pass; останній Preview
+> deployment `36PPjaFU3fSU8UXG2oVKu6WpYfHe`» стосується збірки `359c108`, яка
+> збиралась **без** github-env. Після додавання env-змінних push `b28bcac` дав
+> **невдалу** збірку `8bFFkFtSjXffsi7c22whANajjige` (див. П24). CI `Verify` ≠
+> збірка Vercel.
+
 **Стан на 2026-09-08.** Гілка `codex/admin-panel-spike` @ `359c108` (без змін після
-контрольної точки); PR #26 draft; CI `Verify` + Vercel — pass; останній Preview
-deployment `36PPjaFU3fSU8UXG2oVKu6WpYfHe`.
+контрольної точки); PR #26 draft; ~~CI `Verify` + Vercel — pass; останній Preview
+deployment `36PPjaFU3fSU8UXG2oVKu6WpYfHe`~~ (див. історичну примітку вище).
 
 **Асистент зробив у Chrome власника (read+write, значень секретів не показував):**
 - **Vercel env — 5 із 7** додано як **Config**, Environment = **Preview**, scope =
@@ -86,15 +247,22 @@ deployment `36PPjaFU3fSU8UXG2oVKu6WpYfHe`.
   «Branch link for codex/admin-panel-spike».
 
 **Залишилось (2 секрети — вводить власник; правило: асистент не вписує
-API-ключі/токени у поля):**
+API-ключі/токени у поля — джерело обмеження: системні інструкції асистента,
+розділ «Prohibited», без винятків навіть на прямий дозвіл; окремого
+credential-tool у цій сесії немає):**
 - `KEYSTATIC_GITHUB_CLIENT_SECRET` (len 40) і `KEYSTATIC_SECRET` (len 80 hex) —
-  Type **Secret**, Environment **Preview**, Specific Git Branches
-  **`codex/admin-panel-spike`**. Значення — з `…-panel-setup-verify/.env`.
-- Потім: **redeploy** останнього Preview → перевірка збірки → браузерна перевірка
-  входу/панелі/чернетки/виходу (робить асистент).
+  Type **Secret**, Environment — **тільки гілка `codex/admin-panel-spike`**.
+  Значення — з `…-panel-setup-verify/.env`.
+- **П24-оновлення:** асистент **підготував форму** «Add Environment Variable» у
+  Chrome власника — обидві назви вписані, Type = Secret, область =
+  `codex/admin-panel-spike`; **порожні лише поля Value**. Власнику: вставити два
+  значення й натиснути Save (або, якщо форма закрилась, — з нуля за інструкцією
+  в `docs/PANEL-owner-request-B1.md`).
+- Потім: **redeploy** `b28bcac` (або новішого) → перевірка збірки → браузерна
+  перевірка входу/панелі/чернетки/виходу (робить асистент).
 
 **Redeploy НЕ робити до 7/7** — Keystatic github-режим без цих трьох ключів
-валить production-build («Missing required config»).
+валить production-build («Missing required config», підтверджено — П24).
 
 ### П22 — Б1 ЛОКАЛЬНО ЗАВЕРШЕНО: App встановлено, тест виходу/входу пройдено, запит Vercel готовий
 
@@ -108,7 +276,7 @@ repositories → DreamCar-vavd/DREAM.CAR.VAVD** → Install & Authorize → пр
   metadata, and pull requests** · більше нічого
 - App → General: **Webhook Active — знято**; Redirect URI
   `http://127.0.0.1:3010/api/keystatic/github/oauth/callback`; Client ID
-  `Iv23ligKwtoqGEQNKSlk`; client secret «Last used within the last week».
+  `Iv23ligKwtoqGEQNKSIk`; client secret «Last used within the last week».
 
 **Тест виходу з ЖИВОЇ сесії** (Chrome власника, не curl): під входом відкрито
 `/panel` (3/8/5/1) і чернетку `/uk` (версія `36b42d92`). Далі
