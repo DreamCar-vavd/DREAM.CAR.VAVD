@@ -59,6 +59,37 @@ export class ConflictError extends Error {
   }
 }
 
+/**
+ * The storage backend could not be reached, or did not answer within the
+ * adapter's time budget. A READ that fails this way must surface as an error —
+ * never as an empty list that looks like real "nothing here" data. Retrying a
+ * read is safe.
+ */
+export class StorageUnavailableError extends Error {
+  constructor(what: string) {
+    super(
+      `Не вдалося отримати дані з GitHub (${what}). Мережа або GitHub тимчасово ` +
+        `недоступні — зачекайте хвилину й оновіть сторінку. Дані не втрачені.`,
+    );
+    this.name = "StorageUnavailableError";
+  }
+}
+
+/**
+ * A WRITE was sent but no response came back (timeout / dropped connection).
+ * GitHub may or may not have applied the commit, so the caller must NOT retry
+ * blindly: it has to reload and check the current state first.
+ */
+export class WriteUncertainError extends Error {
+  constructor(what: string) {
+    super(
+      `Відповідь від GitHub не надійшла, тому невідомо, чи збережено «${what}». ` +
+        `Оновіть сторінку й перевірте поточний стан, перш ніж повторювати дію.`,
+    );
+    this.name = "WriteUncertainError";
+  }
+}
+
 export interface PanelStorage {
   readonly mode: "local" | "github";
 

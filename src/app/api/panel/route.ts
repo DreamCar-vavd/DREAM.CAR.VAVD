@@ -65,5 +65,10 @@ export async function POST(request: Request) {
     default:
       return json({ ok: false, message: `Невідома дія «${body.action}».` }, 400);
   }
-  return json(r, r.ok ? 200 : "conflict" in r && r.conflict ? 409 : 400);
+  if (r.ok) return json(r, 200);
+  if ("conflict" in r && r.conflict) return json(r, 409);
+  // `transient` = GitHub unreachable / write outcome unknown; the message
+  // itself tells the user to reload and check before retrying.
+  if ("transient" in r && r.transient) return json(r, 503);
+  return json(r, 400);
 }

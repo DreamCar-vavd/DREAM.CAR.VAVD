@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, describeFailure, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError, type DeployStatus } from "@/lib/content/store";
+import { StorageUnavailableError } from "@/lib/content/store/adapter";
 import { getPanelData, type PanelData, type PanelGroup, type PanelRow } from "@/lib/content/panelStore";
 import { PanelButton, RefreshButton } from "./PanelActions";
 
@@ -278,6 +279,21 @@ export default async function PanelPage() {
           <a className="mt-3 inline-block underline" href="/keystatic">
             Відкрити Keystatic і увійти →
           </a>
+        </main>
+      );
+    }
+    if (err instanceof StorageUnavailableError) {
+      // Data could not be loaded — do NOT render an empty dashboard as if the
+      // site had no content. Say what happened and offer a retry.
+      return (
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-xl font-bold">Панель публікації</h1>
+          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+            {err.message}
+          </p>
+          <p className="mt-3">
+            <RefreshButton />
+          </p>
         </main>
       );
     }

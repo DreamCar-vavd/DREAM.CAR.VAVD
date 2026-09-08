@@ -7,7 +7,13 @@ import {
   type ReviewState,
 } from "./carsGate";
 import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
-import { ConflictError, type DeployStatus, type PanelStorage } from "./store/adapter";
+import {
+  ConflictError,
+  StorageUnavailableError,
+  WriteUncertainError,
+  type DeployStatus,
+  type PanelStorage,
+} from "./store/adapter";
 
 export const sha256 = (input: string) => createHash("sha256").update(input).digest("hex");
 
@@ -220,10 +226,44 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
 
 export type ActionResult =
   | { ok: true; message: string }
-  | { ok: false; message: string; blockers?: GateFailure[]; conflict?: boolean };
+  | {
+      ok: false;
+      message: string;
+      blockers?: GateFailure[];
+      conflict?: boolean;
+      /** GitHub was unreachable / a write's outcome is unknown — a transient
+       *  backend problem, not bad input. */
+      transient?: boolean;
+    };
 
 const asConflict = (err: unknown): ActionResult | null =>
   err instanceof ConflictError ? { ok: false, message: err.message, conflict: true } : null;
+
+/**
+ * Turn any storage error into a user-facing ActionResult:
+ *  - ConflictError        -> {conflict:true}, offer refresh
+ *  - WriteUncertainError  -> outcome unknown; message tells the user to reload
+ *                            and check BEFORE retrying (no auto-retry here)
+ *  - StorageUnavailableError -> GitHub unreachable; safe to try again later
+ *  - anything else        -> generic failure with the message prefixed
+ */
+function toActionError(err: unknown, prefix: string): ActionResult {
+  const conflict = asConflict(err);
+  if (conflict) return conflict;
+  if (err instanceof WriteUncertainError || err instanceof StorageUnavailableError) {
+    return { ok: false, message: err.message, transient: true };
+  }
+  return { ok: false, message: `${prefix}: ${(err as Error).message}` };
+}
+
+/** Run an action body; map storage failures (incl. the load phase) to a result. */
+async function runAction(prefix: string, body: () => Promise<ActionResult>): Promise<ActionResult> {
+  try {
+    return await body();
+  } catch (err) {
+    return toActionError(err, prefix);
+  }
+}
 
 async function loadKind(storage: PanelStorage, kindKey: KindKey) {
   const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
@@ -244,28 +284,26 @@ export async function confirmLocale(
   locale: ContentLocale,
   expected: { working: string; review: string },
 ): Promise<ActionResult> {
-  const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
-  if (workingVersion !== expected.working || reviewVersion !== expected.review) {
-    return { ok: false, conflict: true, message: new ConflictError("робочі картки").message };
-  }
-  const item = working.find((w) => w.id === id);
-  if (!item) return { ok: false, message: `«${id}» не знайдено.` };
-  if (kind.langStatus(item, locale, { review, sha256 }) === "empty") {
-    return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
-  }
-  const next: ReviewState = {
-    ...review,
-    [id]: {
-      ...review[id],
-      [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
-    },
-  };
-  try {
+  return runAction("Не збережено", async () => {
+    const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
+    if (workingVersion !== expected.working || reviewVersion !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("робочі картки").message };
+    }
+    const item = working.find((w) => w.id === id);
+    if (!item) return { ok: false, message: `«${id}» не знайдено.` };
+    if (kind.langStatus(item, locale, { review, sha256 }) === "empty") {
+      return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
+    }
+    const next: ReviewState = {
+      ...review,
+      [id]: {
+        ...review[id],
+        [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
+      },
+    };
     await storage.writeFile(REVIEW, `${JSON.stringify(next, null, 2)}\n`, expected.review);
-  } catch (err) {
-    return asConflict(err) ?? { ok: false, message: `Не збережено: ${(err as Error).message}` };
-  }
-  return { ok: true, message: `${locale.toUpperCase()}: позначено перевіреним.` };
+    return { ok: true, message: `${locale.toUpperCase()}: позначено перевіреним.` };
+  });
 }
 
 export async function publishItem(
@@ -274,51 +312,51 @@ export async function publishItem(
   id: string,
   expected: { working: string; review: string; published: string },
 ): Promise<ActionResult> {
-  const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
-  const publishedF = await storage.readFile(PUBLISHED);
-  if (workingVersion !== expected.working || reviewVersion !== expected.review) {
-    return { ok: false, conflict: true, message: new ConflictError("контент").message };
-  }
-  const item = working.find((w) => w.id === id);
-  if (!item) return { ok: false, message: `«${id}» не знайдено.` };
+  return runAction("Публікація не вдалася", async () => {
+    const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
+    const publishedF = await storage.readFile(PUBLISHED);
+    if (workingVersion !== expected.working || reviewVersion !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("контент").message };
+    }
+    const item = working.find((w) => w.id === id);
+    if (!item) return { ok: false, message: `«${id}» не знайдено.` };
 
-  const blockers = kind.publishBlockers(item, { review, sha256 });
-  if (blockers.length > 0) {
-    return { ok: false, message: "Не можна опублікувати — є невирішені пункти.", blockers };
-  }
+    const blockers = kind.publishBlockers(item, { review, sha256 });
+    if (blockers.length > 0) {
+      return { ok: false, message: "Не можна опублікувати — є невирішені пункти.", blockers };
+    }
 
-  const snapshot = parseSnapshot(publishedF.data);
-  const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
-  const existing = current.find((p) => p.id === id);
-  if (existing && stable(existing) === stable(item)) {
-    return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
-  }
+    const snapshot = parseSnapshot(publishedF.data);
+    const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    const existing = current.find((p) => p.id === id);
+    if (existing && stable(existing) === stable(item)) {
+      return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
+    }
 
-  const nextList = [...current.filter((p) => p.id !== id), item].sort(
-    (a, b) => a.order - b.order || a.id.localeCompare(b.id),
-  );
-  const nextSnapshot = rebuildSnapshot(snapshot, kindKey, nextList as unknown[]);
+    const nextList = [...current.filter((p) => p.id !== id), item].sort(
+      (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+    );
+    const nextSnapshot = rebuildSnapshot(snapshot, kindKey, nextList as unknown[]);
 
-  // Close the read→verify→write TOCTOU window: re-read working + review right
-  // before committing; abort on any drift (parallel Keystatic save / confirm).
-  const recheck = await loadKind(storage, kindKey);
-  if (recheck.workingVersion !== expected.working || recheck.reviewVersion !== expected.review) {
-    return { ok: false, conflict: true, message: new ConflictError("контент").message };
-  }
+    // Close the read→verify→write TOCTOU window: re-read working + review right
+    // before committing; abort on any drift (parallel Keystatic save / confirm).
+    const recheck = await loadKind(storage, kindKey);
+    if (recheck.workingVersion !== expected.working || recheck.reviewVersion !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("контент").message };
+    }
 
-  try {
     await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
-  } catch (err) {
-    return asConflict(err) ?? { ok: false, message: `Публікація не вдалася: ${(err as Error).message}` };
-  }
-  const tail =
-    storage.mode === "github"
-      ? " Очікуйте завершення збірки (1–3 хв), стан — угорі сторінки."
-      : " Зміни на сайті.";
-  return {
-    ok: true,
-    message: kind.isRenderable(item) ? `Опубліковано.${tail}` : `Опубліковано. «${id}» приховане публічно.`,
-  };
+    const tail =
+      storage.mode === "github"
+        ? " Очікуйте завершення збірки (1–3 хв), стан — угорі сторінки."
+        : " Зміни на сайті.";
+    return {
+      ok: true,
+      message: kind.isRenderable(item)
+        ? `Опубліковано.${tail}`
+        : `Опубліковано. «${id}» приховане публічно.`,
+    };
+  });
 }
 
 export async function unpublishItem(
@@ -327,25 +365,27 @@ export async function unpublishItem(
   id: string,
   expected: { published: string },
 ): Promise<ActionResult> {
-  const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
-  const publishedF = await storage.readFile(PUBLISHED);
-  if (publishedF.version !== expected.published) {
-    return { ok: false, conflict: true, message: new ConflictError("знімок").message };
-  }
-  const snapshot = parseSnapshot(publishedF.data);
-  const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
-  if (!current.some((p) => p.id === id)) {
-    return { ok: false, message: `«${id}» і так не опубліковане.` };
-  }
-  const nextSnapshot = rebuildSnapshot(
-    snapshot,
-    kindKey,
-    current.filter((p) => p.id !== id) as unknown[],
-  );
-  try {
+  return runAction("Не вдалося прибрати з сайту", async () => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    const publishedF = await storage.readFile(PUBLISHED);
+    if (publishedF.version !== expected.published) {
+      return { ok: false, conflict: true, message: new ConflictError("знімок").message };
+    }
+    const snapshot = parseSnapshot(publishedF.data);
+    const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    if (!current.some((p) => p.id === id)) {
+      return { ok: false, message: `«${id}» і так не опубліковане.` };
+    }
+    const nextSnapshot = rebuildSnapshot(
+      snapshot,
+      kindKey,
+      current.filter((p) => p.id !== id) as unknown[],
+    );
     await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
-  } catch (err) {
-    return asConflict(err) ?? { ok: false, message: `Не вдалося: ${(err as Error).message}` };
-  }
-  return { ok: true, message: `«${id}» прибрано з сайту. Робоча картка збережена.` };
+    const tail = storage.mode === "github" ? " Опубліковану версію буде знято після наступної збірки." : "";
+    return {
+      ok: true,
+      message: `«${id}» прибрано з опублікованого знімка.${tail}`,
+    };
+  });
 }

@@ -52,16 +52,22 @@ export function PanelButton({
         ok: boolean;
         message: string;
         conflict?: boolean;
+        transient?: boolean;
         blockers?: { kind: string }[];
       };
       const extra = data.blockers?.length ? ` (${data.blockers.length} пункт(и))` : "";
+      // A conflict or a transient backend failure both mean "reload and check
+      // before acting again" — same amber treatment + refresh affordance.
       setMsg({
-        kind: data.ok ? "ok" : data.conflict ? "conflict" : "err",
+        kind: data.ok ? "ok" : data.conflict || data.transient ? "conflict" : "err",
         text: data.message + extra,
       });
       if (data.ok) startTransition(() => router.refresh());
     } catch {
-      setMsg({ kind: "err", text: "Помилка мережі. Дані могли не зберегтися — оновіть сторінку." });
+      setMsg({
+        kind: "conflict",
+        text: "Помилка мережі — відповідь не отримано. Дію могло бути застосовано або ні; оновіть сторінку й перевірте стан перш ніж повторювати.",
+      });
     } finally {
       setBusy(false);
     }
