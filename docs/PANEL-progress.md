@@ -14,17 +14,18 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head:** `98f0e0a` (код+docs поверх `87fe84a`, див. `git log`); PR #26 draft.
-  Локально **не запушено**: `7b8b0e0` (docs), `3369030`+`dfbe89c` (код, П26),
-  `baba2cd` (docs), `98f0e0a` (код, П27). Остання запушена — `b28bcac`.
+- **Head:** `699e698` (код+docs поверх `87fe84a`, див. `git log`); PR #26 draft.
+  Локально **не запушено**: `7b8b0e0` `baba2cd` `ef4f16b` (docs),
+  `3369030` `dfbe89c` (П26), `98f0e0a` (П27), `699e698` (П28). Остання запушена
+  (**перевірений GitHub SHA — лише з локального `origin/*`**) — `b28bcac`.
 - **Сигнали окремо (не плутати):**
   - **GitHub CI `Verify`** — success на `359c108` і `b28bcac` (`gh pr checks 26`). Виконує tsc/eslint/тести + `next build` (Turbopack), але **без** env-змінних Keystatic → `storage.kind='local'` → github-перевірка не спрацьовує. Тому зелений `Verify` ≠ зелена збірка Vercel Preview, де env вже є.
   - **Vercel Preview build** — на `359c108` **Ready** (`36PPjaFU3fSU8UXG2oVKu6WpYfHe`, збиралось ще до env-змінних); на `b28bcac` **Error** (`8bFFkFtSjXffsi7c22whANajjige`) — Keystatic github-режим уже активний, але без `KEYSTATIC_GITHUB_CLIENT_SECRET` + `KEYSTATIC_SECRET` → див. П24. Очікувано, не регресія коду.
   - **Перевірка запуску сторінок на Vercel** — ще не робилась (немає успішної збірки з github-env).
   - **Перевірка входу користувача на Vercel** — ще не робилась.
-- **Тести:** **266 pass** · tsc 0 · eslint 0 · `npm run build` (**Turbopack**, як на
+- **Тести:** **273 pass** · tsc 0 · eslint 0 · `npm run build` (**Turbopack**, як на
   Vercel) — Compiled successfully, лише 3 давні tracing-warnings `localFs.ts` ·
-  content:check/guard — зелені (2026-09-08, після П27). Це **локальна** збірка
+  content:check/guard — зелені (2026-09-08, після П28). Це **локальна** збірка
   без github-env; успіх Vercel-збірки — окремо, після 2 секретів.
 - **Preview (Vercel):** остання **зелена** збірка — `359c108` (публічні сторінки працюють; `/panel` + `/keystatic` = 404, бо github-env тоді ще не було). `b28bcac` не обслуговується (Error).
 - **Робочі копії:** код гілки — `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` (тут `git log`, коміти, head `b28bcac`). Локальний dev-сервер :3010 обслуговує окремий worktree `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (той самий кінець гілки, `359c108`; має додатковий git-ignored `.env`/`.env.local`). Різниця SHA між ними — лише документаційний коміт `b28bcac`; **перезапуск :3010 через це не потрібен** (код сторінок не змінювався).
@@ -72,6 +73,79 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П28 — класифікація 401 / 403 GitHub; звірка меж; CWD серверів власника
+
+Коміт `699e698` (локально, не запушено).
+
+**Знайдені дефекти й виправлення:**
+1. **Усі 401/403 йшли в один `StorageAuthError` «увійдіть знову».** Але 403 не
+   доводить завершення сесії, а обмежений 403 повторним входом не лікується.
+   Новий базовий `StorageBackendError` з полем `retriable` і 4 випадками:
+   - **401** → `StorageAuthError` (`retriable:false`) — увійти знову;
+   - **403** + `x-ratelimit-remaining: 0` / `retry-after` / `rate limit` /
+     `secondary` / `abuse` → `StorageRateLimitedError` (`retriable:true`) —
+     зачекати й оновити;
+   - **403** + `not accessible` / `permission` / `must have` / `denied` →
+     `StorageForbiddenError` (`retriable:false`) — доступ звужено, до власника репо;
+   - **403** без ознак → `StorageForbiddenError` з **нейтральним** формулюванням,
+     без вигаданої причини.
+   Сира відповідь GitHub нікуди не передається (класифікатор її читає, у
+   повідомлення вона не потрапляє — є тести на відсутність тіла/`Bearer`).
+2. **`gh()` тепер повертає ще й заголовки** (для `x-ratelimit-remaining` /
+   `retry-after`); `rejectIfUnauthorized(status, headers, body)` — класифікатор.
+3. **`writeFile`:** остаточна відповідь 401/403 означає, що коміт **не** стався
+   → auth/forbidden/rate-limit, ніколи не `WriteUncertainError`.
+4. **Перехоплення deployment status** (`getPanelData` і `github.deployStatus`)
+   тепер за базовим `StorageBackendError` — відхилена перевірка збірки все одно
+   деградує до `unknown` (банер ніколи не показує це як успішну збірку), дашборд
+   не гасне. Перехоплення лишається **тільки** для deployment status — читання
+   контенту (`readDir`/`readFile`) не обгорнуті й кидають далі.
+5. `/panel`: 401/не-увійшли → екран входу; **403** → червоний екран «доступ
+   відхилено, звірте з власником репо» (без обіцянки, що повторний вхід
+   допоможе); `retriable` (недоступно / обмежено) → бурштиновий екран повтору.
+6. API дії: `{auth}` → 401, `{forbidden}` → 403, `{transient}` → 503.
+
+**Безпечність повтору всієї дії (пункт 2):** `confirmLocale`, `publishItem`,
+`unpublishItem` кожна виконує **не більше одного** `writeFile` — послідовності
+«перший запис ок, другий впав» усередині однієї дії **немає**, тож втрачений
+останній `PUT` = дія не записала нічого. Доданий табличний тест на «≤ 1 запис
+на дію». Version-token + TOCTOU + optimistic-lock уже покривають, що повторна
+дія лишається conflict-safe (тести «two editors, same version…», «editor B
+publishes against a snapshot editor A already moved», «retry after a lost
+response…»). Автоповторів запису не додано.
+
+**Межі deployment status (пункт 3), звірено за кодом:**
+- помилка `readDir`/`readFile` **не** перетворюється на порожній список — вони
+  поза `.catch` (тест «a storage read failure surfaces as an error…»);
+- `unknown` у банері має свій стиль (`ℹ Стан збірки невідомий`), **не** зелений
+  `✅ Поточний знімок …`;
+- `deployStatus` бере sha з `branchHeadSha()` (реальний HEAD гілки; після
+  публікації = коміт публікації) і питає deployments саме за цим sha — старе
+  посилання на Preview як «поточний результат» не подається; порожній список
+  для нового sha → `state:"none"` («деплой не знайдено»), не старий URL;
+- окремого «очікуваного sha» ніде не передається, тож зіставляти нема з чим —
+  без змін.
+
+**CWD серверів власника (пункт 4), лише читанням:**
+- **:3000** — pid 71636 (parent 71635), `next-server v16.3.0`, старт Пн 07.09
+  10:27, **CWD = `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`** —
+  та сама копія, де я комічу.
+- **:3010** — pid 95335 (parent 95334), старт Вт 08.09 11:26,
+  **CWD = `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify`**.
+- Отже тимчасове переміщення `services/detailing.json` (П27) відбулося саме в
+  копії, яку обслуговує :3000. Файл повернуто за ~1 хв, `git status` чистий, але
+  **довести, що сервер власника не побачив зміни на ту хвилину, не можна.**
+- **Надалі:** у `-admin-panel-20260906` — без переміщень контенту й без
+  `next dev`/`next start` поверх спільного `.next`. Візуальну перевірку
+  звичайної панелі роблю на Preview; сценарій без робочої картки лишаю
+  **неперевіреним у браузері** (для нього потрібна заборонена зараз зміна
+  реального контенту).
+
+**Перевірено на повному дереві:** tsc 0 · lint 0 · `npm test` **273/273** ·
+`npm run build` (**Turbopack**) — Compiled successfully, 3 давні warnings.
+**Не** проти реального Vercel/Turbopack-деплою (потрібні 2 секрети).
+setup-сервер :3010 на новий код не перемикався; :3000/:3010 не чіпав.
 
 ### П27 — доопрацювання шляху помилок панелі (після перевірки повного шляху до користувача)
 
