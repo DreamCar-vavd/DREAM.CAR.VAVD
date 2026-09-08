@@ -29,13 +29,14 @@
 | `.env.local` | ✅ `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`, repo owner/name, **`PANEL_CONTENT_BRANCH=codex/admin-panel-spike`** (додано у П19) |
 | Setup-сервер :3010 | ✅ `next dev --webpack -H 127.0.0.1` (pid у `setup-server.log`), вантажить `.env.local, .env` |
 | OAuth-вхід | ✅ **працює** — власник входить, Keystatic + `/panel` відкриваються, читаються 3 авто / 8 галерея / 5 послуг / 1 контакт на `codex/admin-panel-spike` (П19, П20) |
-| App **встановлено** на репозиторій | ❌ **ще ні** — `settings/installations` → лише Vercel. Вхід працює через власні права DreamCar-vavd на публічний репо; **запис-публікація без installation не запрацює** |
-| Дозволи App (RW/RO, Webhook off), scope = лише DREAM.CAR.VAVD | ⏳ **не звірено** — сторінка App вимагає «Confirm access» власника; підтвердиться після встановлення |
-| Тест виходу з панелі / повторного входу | ⏳ після встановлення |
+| App **встановлено** на репозиторій | ⏳ **форму заповнено асистентом**, чекає на «Confirm access» власника (див. П21). Дозволи на екрані встановлення звірені: **Contents: Read and write**; **Deployments / Metadata / Pull requests: Read**; scope вибрано **Only select repositories → DreamCar-vavd/DREAM.CAR.VAVD** |
+| Webhook off | ⏳ на екрані встановлення не показано (App-level); звірити після встановлення |
+| Тест виходу з панелі | ✅ **без-авторизації відхилення** (curl, П21): `/panel`,`/panel/leads`,`/panel/video` → «Ви не увійшли»; `/api/panel/preview` → 401 (draft-cookie не ставиться); `POST /api/panel` → 401. ⏳ **sign-out із живої сесії** — після встановлення |
+| Повторний вхід | ⏳ після встановлення (`request_oauth_on_install` сам відновлює сесію) |
 
-**Наступна дія власника:** встановити App —
-`https://github.com/apps/dreamcar-vavd-keystatic/installations/new` →
-`DreamCar-vavd` → **Only select repositories → DREAM.CAR.VAVD** → Install.
+**Наступна дія власника:** пройти **«Confirm access»** у вкладці Chrome, яку
+відкрив асистент (форму вже заповнено: Only select repositories →
+DreamCar-vavd/DREAM.CAR.VAVD → Install & Authorize).
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
   `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (кінець гілки),
@@ -63,6 +64,35 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П21 — Б1: встановлення App (форму заповнено) + без-авторизації відхилення + запит Vercel виправлено
+
+- **Vercel-запит (`docs/PANEL-owner-request-B1.md`) виправлено:** прибрано
+  суперечливе `PANEL_CONTENT_BRANCH=panel/content` (на Vercel `VERCEL_GIT_COMMIT_REF`
+  сам = `codex/admin-panel-spike`; якщо задавати — тільки так, не `panel/content`).
+  Додано `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=dreamcar-vavd-keystatic`.
+  Перелік env звірено з `@keystatic/next@5.0.5` + `store/branch.ts`. Client ID
+  позначено як ідентифікатор, Client Secret / `KEYSTATIC_SECRET` — секрети.
+  **Vercel не змінювався.**
+- **Початок інструкції власнику** переписано: статус-таблиця «що вже зроблено»
+  (App створено, `.env`, вхід) — щоб не створити дубль App; поточна дія = лише
+  встановлення. Стара історія створення позначена як пройдений етап.
+- **Встановлення App:** асистент у Chrome власника відкрив
+  `apps/dreamcar-vavd-keystatic/installations/new`, вибрав **Only select
+  repositories → DreamCar-vavd/DREAM.CAR.VAVD**, натиснув **Install & Authorize**.
+  На екрані встановлення звірено дозволи: **Contents: Read and write** ·
+  **Deployments / Metadata / Pull requests: Read** · більше нічого.
+  Далі GitHub → **«Confirm access»** (sudo) — **фінальний крок за власником**
+  (пароль/passkey — асистент не вводить). Вкладку лишено відкритою.
+- **Без-авторизації відхилення (curl, без cookie):** `/panel`, `/panel/leads`,
+  `/panel/video` → «Ви не увійшли» (даних немає); `GET /api/panel/preview` →
+  **401** і **draft-cookie не ставиться**; `POST /api/panel` (confirm-locale,
+  publish) → **401** + `{"ok":false,"message":"Ви не увійшли через GitHub…"}`.
+- **Коротка інструкція користування** (увійти → відкрити матеріал → чернетка →
+  вийти) додана в `docs/PANEL-owner-request-B1.md`.
+- **Не тестувалося:** запис/публікація (`Contents: write` — право надано, але
+  коміт з панелі не робили); sign-out із живої сесії + повторний вхід — після
+  завершення встановлення.
 
 ### П20 — Б1: App створено, `.env` заповнено, OAuth-вхід підтверджено
 
