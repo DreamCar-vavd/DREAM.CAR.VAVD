@@ -33,9 +33,29 @@
 - **Callback ще не готовий (перевірено):** без `CLIENT_ID/SECRET` у dev-режимі
   `GET /api/keystatic/github/oauth/callback` → 404, `…/github/login` → 307 на
   `/keystatic/setup`. OAuth стане доступним лише після вписаних креденшлів +
-  перезапуску сервера. Порядок: власник створює App → копіює Client ID/secret у
-  `.env` → асистент дописує slug + перезапускає сервер + звіряє готовність
-  callback → власник встановлює App на `DREAM.CAR.VAVD` → власник авторизується.
+  перезапуску сервера.
+
+### Б1 — 2026-09-08 09:2x: App створено, `.env` заповнено, OAuth готовий
+
+- **App створено:** `github.com/settings/apps` (акаунт @DreamCar-vavd) →
+  **рівно один** App «DreamCar-vavd Keystatic», slug **`dreamcar-vavd-keystatic`**.
+  (Детальні permissions на GitHub без «Confirm access» власника не видно — їх
+  підтвердить сам OAuth-потік; `gh api /apps/<slug>` → 404, бо App приватний.)
+- **`.env` заповнено власником, звірено без показу значень:** усі 4 ключі
+  наявні й придатні — `KEYSTATIC_GITHUB_CLIENT_ID` (формат `Iv23…`, 20 симв.),
+  `KEYSTATIC_GITHUB_CLIENT_SECRET` (40 симв.), `KEYSTATIC_SECRET` (80 hex),
+  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=dreamcar-vavd-keystatic`. Права `600`,
+  git-ignored, у `git status` не з'являється. `.env.local` не змінювався.
+- **Setup-сервер перезапущено** (лише :3010; `:3000` не чіпали). Новий
+  `next dev` **pid 91166**, вантажить `.env.local, .env`.
+- **OAuth активний (перевірено):** `/keystatic` → «Log in with GitHub» (не Setup);
+  `/api/keystatic/github/login` → 307 на
+  `github.com/login/oauth/authorize?client_id=…&redirect_uri=http://127.0.0.1:3010/api/keystatic/github/oauth/callback`;
+  `/api/keystatic/github/oauth/callback` → 400 (був 404).
+- **Далі — дія власника:** встановити App на **лише `DREAM.CAR.VAVD`** +
+  «Log in with GitHub» на `http://127.0.0.1:3010/keystatic`. Тоді асистент
+  звіряє область встановлення (Chrome власника) + тест входу (редактор →
+  `/panel` → вихід).
 - **Тести:** 242 pass · tsc 0 · eslint 0 · build OK · content:check/guard/export — зелені (без змін коду повторно не ганяти)
 - **Preview:** публічні сторінки працюють; `/panel` + `/keystatic` = **404** без github-env
 - **Setup GitHub App готовий до дії власника:** ізольований worktree
