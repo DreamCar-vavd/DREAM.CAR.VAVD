@@ -64,6 +64,38 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 
 ## Завершені пункти (новіші зверху)
 
+### П23 — Vercel Preview: 5 env-змінних + callback додано (асистентом); 2 секрети — за власником
+
+**Стан на 2026-09-08.** Гілка `codex/admin-panel-spike` @ `359c108` (без змін після
+контрольної точки); PR #26 draft; CI `Verify` + Vercel — pass; останній Preview
+deployment `36PPjaFU3fSU8UXG2oVKu6WpYfHe`.
+
+**Асистент зробив у Chrome власника (read+write, значень секретів не показував):**
+- **Vercel env — 5 із 7** додано як **Config**, Environment = **Preview**, scope =
+  **тільки гілка `codex/admin-panel-spike`** (Production знято):
+  `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`, `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`,
+  `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`,
+  `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG=dreamcar-vavd-keystatic`,
+  `KEYSTATIC_GITHUB_CLIENT_ID=Iv23ligKwtoqGEQNKSIk` (звірено байт-у-байт із
+  `…-panel-setup-verify/.env` — саме `…NKSIk`, не з фото). Контактні env не чіпав.
+- **GitHub App → Redirect URIs** — тепер **два** (звірено після save):
+  `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` (локальний, збережено) +
+  `https://dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app/api/keystatic/github/oauth/callback`.
+  Webhook Active — лишається off.
+- Branch alias повторно звірено: у Vercel Deployments (фільтр за гілкою) —
+  «Branch link for codex/admin-panel-spike».
+
+**Залишилось (2 секрети — вводить власник; правило: асистент не вписує
+API-ключі/токени у поля):**
+- `KEYSTATIC_GITHUB_CLIENT_SECRET` (len 40) і `KEYSTATIC_SECRET` (len 80 hex) —
+  Type **Secret**, Environment **Preview**, Specific Git Branches
+  **`codex/admin-panel-spike`**. Значення — з `…-panel-setup-verify/.env`.
+- Потім: **redeploy** останнього Preview → перевірка збірки → браузерна перевірка
+  входу/панелі/чернетки/виходу (робить асистент).
+
+**Redeploy НЕ робити до 7/7** — Keystatic github-режим без цих трьох ключів
+валить production-build («Missing required config»).
+
 ### П22 — Б1 ЛОКАЛЬНО ЗАВЕРШЕНО: App встановлено, тест виходу/входу пройдено, запит Vercel готовий
 
 **Встановлення App (в Chrome власника):** перша спроба (П21) впала — GitHub
