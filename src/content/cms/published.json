@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-09T13:11:01.051Z",
+  "publishedAt": "2026-09-09T13:15:59.122Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1110,7 +1110,7 @@
       "uk": {
         "title": "ZZZ Тест панелі — видалити",
         "shortDescription": "Тимчасовий матеріал для перевірки запису. DELETE ME. (правка UK)",
-        "longDescription": "Створено під час hosted-перевірки панелі на гілці codex/admin-panel-spike. Підлягає видаленню одразу після тесту.",
+        "longDescription": "Створено під час hosted-перевірки панелі на гілці codex/admin-panel-spike. Підлягає видаленню одразу після тесту. [зміна 2 — вкладка A]",
         "cardDescription": "",
         "bullets": [],
         "modalLead": "",
