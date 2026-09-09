@@ -516,6 +516,19 @@ export default async function PanelPage() {
       {data.groups.map((group) => (
         <Group key={group.kind} group={group} versions={data.versions} />
       ))}
+
+      <div className="mt-10 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+        <p className="text-xs text-neutral-500">
+          Обслуговування: після кількох замін фото на сайті лишаються старі копії
+          зображень (вони нічому не шкодять). Прибрати їх можна тут — коли ніхто
+          нічого не публікує.
+        </p>
+        <div className="mt-2">
+          <PanelButton payload={{ action: "cleanup-frozen-media" }} versions={data.versions}>
+            Прибрати старі копії фото
+          </PanelButton>
+        </div>
+      </div>
     </main>
   );
 }

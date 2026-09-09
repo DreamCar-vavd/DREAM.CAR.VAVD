@@ -165,7 +165,7 @@ async function main() {
     const car = coerceCar(String(raw.id ?? ""), raw);
     const w = `авто «${car.id || "?"}»`;
     if (!car.id) problems.push(`${w}: немає id`);
-    for (const b of getPublishBlockers(car, { review, sha256 })) {
+    for (const b of getPublishBlockers(car, { review, sha256, reviewKey: `car:${car.id}` })) {
       problems.push(`${w}: ${describeFailure(b)}`);
     }
     car.photos.forEach((ph, i) => checkMedia(`${w} фото ${i}`, ph.image));
@@ -190,7 +190,7 @@ async function main() {
     const p = coerceGalleryProject(String(raw.id ?? ""), raw);
     const w = `галерея «${p.id || "?"}»`;
     if (!p.id) problems.push(`${w}: немає id`);
-    for (const b of getGalleryPublishBlockers(p, { review, sha256 })) {
+    for (const b of getGalleryPublishBlockers(p, { review, sha256, reviewKey: `gallery:${p.id}` })) {
       problems.push(`${w}: ${describeFailure(b)}`);
     }
     p.photos.forEach((ph, i) => checkMedia(`${w} фото ${i}`, ph.image));
@@ -200,7 +200,7 @@ async function main() {
     const s = coerceService(String(raw.id ?? ""), raw);
     const w = `послуга «${s.id || "?"}»`;
     if (!s.id) problems.push(`${w}: немає id`);
-    for (const b of getServicePublishBlockers(s, { review, sha256 })) {
+    for (const b of getServicePublishBlockers(s, { review, sha256, reviewKey: `service:${s.id}` })) {
       problems.push(`${w}: ${describeFailure(b)}`);
     }
     // iconSrc is a pre-existing static asset (/images/services/…), not
@@ -211,7 +211,7 @@ async function main() {
   for (const raw of contact ?? []) {
     const c = coerceContact(String(raw.id ?? "site"), raw);
     const w = `контакти «${c.id || "?"}»`;
-    for (const b of getContactPublishBlockers(c, { review, sha256 })) {
+    for (const b of getContactPublishBlockers(c, { review, sha256, reviewKey: `contact:${c.id}` })) {
       problems.push(`${w}: ${describeFailure(b)}`);
     }
   }
@@ -220,7 +220,7 @@ async function main() {
     const pr = coercePromo(String(raw.id ?? ""), raw);
     const w = `матеріал «${pr.id || "?"}»`;
     if (!pr.id) problems.push(`${w}: немає id`);
-    for (const b of getPromoPublishBlockers(pr, { review, sha256 })) {
+    for (const b of getPromoPublishBlockers(pr, { review, sha256, reviewKey: `promo:${pr.id}` })) {
       problems.push(`${w}: ${describeFailure(b)}`);
     }
     checkMedia(`${w} зображення`, pr.image);

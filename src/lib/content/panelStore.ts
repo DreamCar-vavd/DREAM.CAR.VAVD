@@ -9,6 +9,7 @@ import {
 import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
 import {
   ConflictError,
+  MediaMissingError,
   PUBLISHED_MEDIA_DIR,
   StorageAuthError,
   StorageBackendError,
@@ -91,40 +92,50 @@ function instanceMap(entries: { name: string; text: string }[]): Map<string, str
 }
 
 /**
- * review-state.json is a flat `slug -> { locale: {hash, at} }` map shared by
- * every kind. Keystatic's "Delete entry" is a direct GitHub commit that removes
- * the item JSON (and its images) but never touches this file, so deleting a
- * card through the editor leaves its review row behind. Left alone those rows
- * accumulate, and — worse — if the same slug is re-created later a leftover hash
- * could briefly show a language as "перевірено" that was never re-confirmed.
- *
- * A row is stale when its slug backs no working card in ANY kind. This is the
- * one place that decides it; callers pass the union of every kind's working
- * ids. Pure — no I/O.
+ * review-state.json key for a card. Namespaced by kind so `cars/foo` and
+ * `services/foo` keep SEPARATE confirmations — confirming one never touches the
+ * other. Bare (un-namespaced) keys are legacy: still read as a fallback by the
+ * gates, and migrated by scripts/migrate-review-keys.mjs.
  */
-function staleReviewSlugs(review: ReviewState, workingSlugs: ReadonlySet<string>): string[] {
-  return Object.keys(review).filter((slug) => !workingSlugs.has(slug));
+export const reviewKeyFor = (kindKey: KindKey, id: string) => `${kindKey}:${id}`;
+
+/**
+ * Keystatic's "Delete entry" is a direct GitHub commit that removes the item
+ * JSON (and its images) but never `review-state.json`, so deleting a card
+ * through the editor leaves its review row behind. Left alone those rows
+ * accumulate.
+ *
+ * A row is stale when NOTHING backs its key: for `kind:slug` — no working card
+ * of that kind; for a bare legacy key — no working card of any kind. `liveKeys`
+ * holds both forms for every working card. Pure — no I/O.
+ */
+function staleReviewSlugs(review: ReviewState, liveKeys: ReadonlySet<string>): string[] {
+  return Object.keys(review).filter((k) => !liveKeys.has(k));
 }
-function pruneReview(review: ReviewState, workingSlugs: ReadonlySet<string>): ReviewState {
-  if (staleReviewSlugs(review, workingSlugs).length === 0) return review;
+function pruneReview(review: ReviewState, liveKeys: ReadonlySet<string>): ReviewState {
+  if (staleReviewSlugs(review, liveKeys).length === 0) return review;
   return Object.fromEntries(
-    Object.entries(review).filter(([slug]) => workingSlugs.has(slug)),
+    Object.entries(review).filter(([k]) => liveKeys.has(k)),
   ) as ReviewState;
 }
 
 /**
- * Every working-card id across every kind, in one set. Used to spot stale
- * review-state rows. Best-effort at the call sites that only need it for
- * cleanup — a read failure here must never sink the surrounding action.
+ * Every working card, as BOTH `kind:slug` and bare `slug` — so a namespaced row
+ * is live iff its own kind still has the card, while a legacy bare row is live
+ * iff any kind does. Best-effort at cleanup call sites (a read failure must not
+ * sink the surrounding action).
  */
 async function collectWorkingSlugs(storage: PanelStorage): Promise<Set<string>> {
   const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
-  const slugs = new Set<string>();
+  const keys = new Set<string>();
   KIND_ORDER.forEach((kindKey, i) => {
     const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
-    for (const w of coerceList(kind, dirs[i].data)) slugs.add(w.id);
+    for (const w of coerceList(kind, dirs[i].data)) {
+      keys.add(w.id);
+      keys.add(reviewKeyFor(kindKey, w.id));
+    }
   });
-  return slugs;
+  return keys;
 }
 
 function coerceList<W extends { id: string; order: number }>(
@@ -204,89 +215,119 @@ function withRewrittenImages(
   };
 }
 
+const mediaHash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex").slice(0, 24);
+const frozenRel = (dir: string, slug: string, hash: string, ext: string) =>
+  `images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${hash}.${ext}`;
+
 /**
- * Copy each still-working image this item references into its content-addressed
- * `_pub/` folder and return the item with those URLs rewritten. Idempotent: an
- * image already under `_pub/` is left as-is, and `putPublishedMedia` skips a
- * byte-identical file. A working file that is already gone is left pointing
- * where it was — publish still proceeds; that single tile is the `onError`
- * case, not a blocked publish.
+ * Plan the frozen copy of every photo this item references: read each working
+ * file, hash it, and return the `_pub/` copies to write plus the item with its
+ * URLs rewritten. NOTHING is written here.
+ *
+ * A card that names a photo whose file is genuinely missing → `MediaMissingError`
+ * (publish must abort; the previous published photos stay live). A network /
+ * auth / rate-limit failure propagates its own typed error. An OPTIONAL photo
+ * that was never filled in never reaches this (empty `image` is dropped by
+ * `itemImageUrls`). A URL already under `_pub/`, or one that is not a CMS image
+ * path at all, is passed through untouched.
  */
-async function freezeItemMedia(
+async function planFrozenMedia(
   storage: PanelStorage,
   kindKey: KindKey,
   item: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
+): Promise<{ item: Record<string, unknown>; puts: { path: string; bytes: Uint8Array }[] }> {
   const dir = IMAGE_DIR[kindKey];
-  if (!dir) return item;
+  if (!dir) return { item, puts: [] };
   const slug = String(item.id ?? "");
   const rewrite = new Map<string, string>();
+  const puts: { path: string; bytes: Uint8Array }[] = [];
   for (const url of itemImageUrls(kindKey, item)) {
     if (url.includes(PUB_SEG)) continue; // already frozen
-    if (!url.startsWith("/images/cms/") || !IMG_EXT_RE.test(url)) continue;
-    const bytes = await storage.readMedia(`public${url}`).catch(() => null);
-    if (!bytes) continue; // working file already gone — keep the old URL
+    if (!url.startsWith("/images/cms/") || !IMG_EXT_RE.test(url)) continue; // not our media
+    const bytes = await storage.readMedia(`public${url}`); // throws on network/auth/etc.
+    if (bytes === null) throw new MediaMissingError(`public${url}`); // named file is gone
     const ext = url.match(IMG_EXT_RE)![1].toLowerCase();
-    const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 24);
-    const rel = `images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${hash}.${ext}`;
-    await storage.putPublishedMedia(`public/${rel}`, bytes);
+    const rel = frozenRel(dir, slug, mediaHash(bytes), ext);
+    puts.push({ path: `public/${rel}`, bytes });
     rewrite.set(url, `/${rel}`);
   }
-  return withRewrittenImages(kindKey, item, rewrite);
+  return { item: withRewrittenImages(kindKey, item, rewrite), puts };
 }
+
+/** Write the planned `_pub/` copies (idempotent — a byte-identical file is skipped). */
+async function writeFrozenMedia(
+  storage: PanelStorage,
+  puts: { path: string; bytes: Uint8Array }[],
+): Promise<void> {
+  for (const p of puts) await storage.putPublishedMedia(p.path, p.bytes);
+}
+
+const FROZEN_HASH_RE = /\/_pub\/([a-f0-9]{8,64})\.\w+$/;
 
 /**
  * Is the published snapshot entry `pub` still in sync with working card `item`,
- * accounting for frozen photos? Every non-photo field (and photo COUNT, ORDER
- * and CAPTIONS) is compared exactly; a photo's image URL counts as unchanged
- * when it is byte-for-byte the working URL OR a frozen (`_pub/`) copy sitting in
- * that slot. Working photo paths are positional (`photos/<i>/…`), so a same-slot
- * content swap is invisible here — exactly as it was before freezing existed;
- * the draft preview and changed captions remain the signal for that.
+ * accounting for frozen photos?
+ *
+ * Non-photo fields, and photo COUNT / ORDER / CAPTIONS, are compared exactly. A
+ * photo slot is in sync only when its published image is the ACTUAL current
+ * version of the working file: a frozen `_pub/<hash>` matches when
+ * `sha256(working bytes)` still equals `<hash>`; a plain path matches only when
+ * identical. So replacing photo A with B at the same path, or re-ordering
+ * photos, now reads as an unpublished change. A working file that cannot be read
+ * (network / missing) also reads as changed — we cannot prove it is the same.
+ *
+ * Cost: one image read per still-frozen photo slot (parallel), only for items
+ * that are otherwise unchanged. The panel is an admin page, not a public route.
  */
-function inSyncIgnoringFrozenPhotos(
+async function inSyncIgnoringFrozenPhotos(
+  storage: PanelStorage,
   kindKey: KindKey,
   pub: Record<string, unknown>,
   item: Record<string, unknown>,
-): boolean {
+): Promise<boolean> {
   const stripPhotoUrls = (o: Record<string, unknown>) => {
     if (kindKey === "promo") return { ...o, image: "" };
     const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
     return { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
   };
   if (stable(stripPhotoUrls(pub)) !== stable(stripPhotoUrls(item))) return false;
+
   const pu = itemImageUrls(kindKey, pub);
   const iu = itemImageUrls(kindKey, item);
-  return pu.length === iu.length && pu.every((p, i) => p === iu[i] || p.includes(PUB_SEG));
+  if (pu.length !== iu.length) return false;
+
+  const slotChanged = await Promise.all(
+    pu.map(async (pubUrl, i): Promise<boolean> => {
+      const wantHash = pubUrl.match(FROZEN_HASH_RE)?.[1];
+      if (wantHash === undefined) return pubUrl !== iu[i]; // plain path — must match exactly
+      if (iu[i].includes(PUB_SEG)) return iu[i].match(FROZEN_HASH_RE)?.[1] !== wantHash;
+      if (!iu[i].startsWith("/images/cms/") || !IMG_EXT_RE.test(iu[i])) return true;
+      const bytes = await storage.readMedia(`public${iu[i]}`).catch(() => null);
+      return !bytes || mediaHash(bytes) !== wantHash;
+    }),
+  );
+  return !slotChanged.some(Boolean);
 }
 
-/**
- * Delete `_pub/` files for `slug` that nothing in `snapshot` points at any more.
- * Best-effort and safe: it only ever removes a file the just-written snapshot
- * does NOT reference, and only inside the slug's own `_pub/` folder.
- */
-async function gcFrozenMedia(
-  storage: PanelStorage,
-  kindKey: KindKey,
-  slug: string,
-  snapshot: Snapshot,
-): Promise<void> {
-  const dir = IMAGE_DIR[kindKey];
-  if (!dir) return;
-  const pubDir = `public/images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}`;
-  const present = await storage.listPublishedMedia(pubDir);
-  if (present.length === 0) return;
-  const referenced = new Set<string>();
+/** Every `_pub/` file path referenced anywhere in `snapshot` (public URLs). */
+function referencedFrozenPaths(snapshot: Snapshot): Set<string> {
+  const refs = new Set<string>();
   JSON.stringify(snapshot, (_k, v) => {
-    if (typeof v === "string" && v.includes(`${PUB_SEG}`)) {
-      const m = v.match(/\/_pub\/([^/]+)$/);
-      if (m && v.includes(`/images/cms/${dir}/${slug}/`)) referenced.add(m[1]);
+    if (typeof v === "string" && v.includes(PUB_SEG) && /\/_pub\/[a-f0-9]+\.\w+$/.test(v)) {
+      refs.add(v);
     }
     return v;
   });
-  for (const name of present) {
-    if (!referenced.has(name)) await storage.deletePublishedMedia(`${pubDir}/${name}`);
+  return refs;
+}
+/** `public/images/cms/<dir>/<slug>/_pub` for every (dir, slug) that appears in the snapshot. */
+function frozenDirsInSnapshot(snapshot: Snapshot): Set<string> {
+  const dirs = new Set<string>();
+  for (const ref of referencedFrozenPaths(snapshot)) {
+    const m = ref.match(/^\/images\/cms\/([^/]+)\/([^/]+)\/_pub\//);
+    if (m) dirs.add(`public/images/cms/${m[1]}/${m[2]}/${PUBLISHED_MEDIA_DIR}`);
   }
+  return dirs;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,84 +433,99 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   const workingLists = KIND_ORDER.map((kindKey, i) =>
     coerceList(KINDS[kindKey] as ContentKind<{ id: string; order: number }>, dirs[i].data),
   );
-  const workingSlugs = new Set(workingLists.flat().map((w) => w.id));
-  // A review row for a slug with no working card is stale (Keystatic delete).
-  // Don't let it gate or badge anything; report it so it can be tidied.
-  const stale = staleReviewSlugs(review, workingSlugs);
-  const ctx = { review: pruneReview(review, workingSlugs), sha256 };
+  const liveKeys = new Set<string>();
+  KIND_ORDER.forEach((kindKey, i) => {
+    for (const w of workingLists[i]) {
+      liveKeys.add(w.id);
+      liveKeys.add(reviewKeyFor(kindKey, w.id));
+    }
+  });
+  // A review row whose key nothing backs is stale (Keystatic delete). Don't let
+  // it gate or badge anything; report it so it can be tidied.
+  const stale = staleReviewSlugs(review, liveKeys);
+  const ctx = { review: pruneReview(review, liveKeys), sha256 };
   const instances = KIND_ORDER.map((_, i) => instanceMap(dirs[i].data));
 
-  const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i) => {
-    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
-    const working = workingLists[i];
-    const instanceOf = (id: string) => instances[i].get(id) ?? "";
-    const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
-    const publishedById = new Map(publishedList.map((p) => [p.id, p]));
-    const workingIds = new Set(working.map((w) => w.id));
+  const groups: PanelGroup[] = await Promise.all(
+    KIND_ORDER.map(async (kindKey, i): Promise<PanelGroup> => {
+      const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+      const working = workingLists[i];
+      const instanceOf = (id: string) => instances[i].get(id) ?? "";
+      const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+      const publishedById = new Map(publishedList.map((p) => [p.id, p]));
+      const workingIds = new Set(working.map((w) => w.id));
 
-    const emptyLangStatus = () =>
-      Object.fromEntries(LOCALES.map((l) => [l, "empty" as LangReviewStatus])) as Record<
-        ContentLocale,
-        LangReviewStatus
-      >;
+      const emptyLangStatus = () =>
+        Object.fromEntries(LOCALES.map((l) => [l, "empty" as LangReviewStatus])) as Record<
+          ContentLocale,
+          LangReviewStatus
+        >;
 
-    const rows = working.map((item): PanelRow => {
-      const pub = publishedById.get(item.id);
-      const itemCtx = { ...ctx, instance: instanceOf(item.id) };
-      const langStatus = Object.fromEntries(
-        LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
-      ) as Record<ContentLocale, LangReviewStatus>;
-      let publishState: ItemPublishState = "not-published";
-      if (pub) {
-        publishState = inSyncIgnoringFrozenPhotos(
-          kindKey,
-          pub as unknown as Record<string, unknown>,
-          item as unknown as Record<string, unknown>,
-        )
-          ? "in-sync"
-          : "modified";
-      }
+      const rows = await Promise.all(
+        working.map(async (item): Promise<PanelRow> => {
+          const pub = publishedById.get(item.id);
+          const itemCtx = {
+            ...ctx,
+            instance: instanceOf(item.id),
+            reviewKey: reviewKeyFor(kindKey, item.id),
+          };
+          const langStatus = Object.fromEntries(
+            LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
+          ) as Record<ContentLocale, LangReviewStatus>;
+          let publishState: ItemPublishState = "not-published";
+          if (pub) {
+            publishState = (await inSyncIgnoringFrozenPhotos(
+              storage,
+              kindKey,
+              pub as unknown as Record<string, unknown>,
+              item as unknown as Record<string, unknown>,
+            ))
+              ? "in-sync"
+              : "modified";
+          }
+          return {
+            id: item.id,
+            title: kind.displayTitle(item),
+            subtitle: subtitleFor(kindKey, item as never),
+            editHref: editHrefFor(kindKey, item.id, storage.branch),
+            langStatus,
+            blockers: kind.publishBlockers(item, itemCtx),
+            publishState,
+            publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
+            publishedExists: Boolean(pub),
+            workingExists: true,
+          };
+        }),
+      );
+
+      // Entries still in the published snapshot whose working card was deleted.
+      // They keep rendering on the public site, so the panel MUST keep a way to
+      // take them down. Read-only: no edit link (nothing to edit), no publish /
+      // confirm actions, and getPanelData never recreates the working file.
+      const orphanRows = publishedList
+        .filter((pub) => !workingIds.has(pub.id))
+        .map((pub): PanelRow => ({
+          id: pub.id,
+          title: kind.displayTitle(pub),
+          subtitle: subtitleFor(kindKey, pub as never),
+          editHref: null,
+          langStatus: emptyLangStatus(),
+          blockers: [],
+          publishState: "orphan-published",
+          publiclyVisible: kind.isRenderable(pub),
+          publishedExists: true,
+          workingExists: false,
+        }));
+
       return {
-        id: item.id,
-        title: kind.displayTitle(item),
-        subtitle: subtitleFor(kindKey, item as never),
-        editHref: editHrefFor(kindKey, item.id, storage.branch),
-        langStatus,
-        blockers: kind.publishBlockers(item, itemCtx),
-        publishState,
-        publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
-        publishedExists: Boolean(pub),
-        workingExists: true,
+        kind: kindKey,
+        label: kind.label,
+        singleEntry: Boolean(kind.singleEntry),
+        createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
+        rows: [...rows, ...orphanRows],
       };
-    });
-
-    // Entries still in the published snapshot whose working card was deleted.
-    // They keep rendering on the public site, so the panel MUST keep a way to
-    // take them down. Read-only: no edit link (nothing to edit), no publish /
-    // confirm actions, and getPanelData never recreates the working file.
-    const orphanRows = publishedList
-      .filter((pub) => !workingIds.has(pub.id))
-      .map((pub): PanelRow => ({
-        id: pub.id,
-        title: kind.displayTitle(pub),
-        subtitle: subtitleFor(kindKey, pub as never),
-        editHref: null,
-        langStatus: emptyLangStatus(),
-        blockers: [],
-        publishState: "orphan-published",
-        publiclyVisible: kind.isRenderable(pub),
-        publishedExists: true,
-        workingExists: false,
-      }));
-
-    return {
-      kind: kindKey,
-      label: kind.label,
-      singleEntry: Boolean(kind.singleEntry),
-      createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
-      rows: [...rows, ...orphanRows],
-    };
-  });
+    }),
+  );
 
   const versions = { review: reviewF.version, published: publishedF.version } as Versions;
   KIND_ORDER.forEach((k, i) => {
@@ -525,6 +581,7 @@ const asConflict = (err: unknown): ActionResult | null =>
 function toActionError(err: unknown, prefix: string): ActionResult {
   const conflict = asConflict(err);
   if (conflict) return conflict;
+  if (err instanceof MediaMissingError) return { ok: false, message: err.message };
   if (err instanceof StorageAuthError) return { ok: false, message: err.message, auth: true };
   if (err instanceof StorageForbiddenError) {
     return { ok: false, message: err.message, forbidden: true };
@@ -579,7 +636,11 @@ export async function confirmLocale(
     const item = working.find((w) => w.id === id);
     if (!item) return { ok: false, message: `«${id}» не знайдено.` };
     const cardInstance = instances.get(id) ?? "";
-    if (kind.langStatus(item, locale, { review, sha256, instance: cardInstance }) === "empty") {
+    const rkey = reviewKeyFor(kindKey, id);
+    if (
+      kind.langStatus(item, locale, { review, sha256, instance: cardInstance, reviewKey: rkey }) ===
+      "empty"
+    ) {
       return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
     }
     // This is the only action that writes review-state, so it is also the only
@@ -587,23 +648,25 @@ export async function confirmLocale(
     // entry" (which never touches this file). Best-effort: if the extra reads
     // fail we still write the confirmation, just without the tidy-up.
     let base = review;
-    const workingSlugs = await collectWorkingSlugs(storage).catch(() => null);
-    if (workingSlugs) {
-      workingSlugs.add(id); // the card we just re-read is live by definition
-      base = pruneReview(review, workingSlugs);
+    const liveKeys = await collectWorkingSlugs(storage).catch(() => null);
+    if (liveKeys) {
+      liveKeys.add(id).add(rkey); // the card we just re-read is live by definition
+      base = pruneReview(review, liveKeys);
     }
-    // If the row was last confirmed against a DIFFERENT card instance (the slug
-    // was deleted and re-created), the sibling locales' hashes belong to a card
-    // that no longer exists — start the row fresh so confirming one language
-    // never silently revives the others. Same instance -> keep them.
-    const prevRow = (base[id]?.instance ?? "") === cardInstance ? base[id] : undefined;
-    const next: ReviewState = {
-      ...base,
-      [id]: {
-        ...prevRow,
-        instance: cardInstance,
-        [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
-      },
+    // This row is keyed by kind — start it from the namespaced row, falling back
+    // to a legacy bare row once (and dropping that bare row, so `cars/foo` and
+    // `services/foo` stop sharing it). If the row was last confirmed against a
+    // DIFFERENT card instance (deleted + re-created), drop the sibling locales
+    // so confirming one language never silently revives the others.
+    const legacyRow = base[id];
+    const priorRow = base[rkey] ?? legacyRow;
+    const prevRow = (priorRow?.instance ?? "") === cardInstance ? priorRow : undefined;
+    const next: ReviewState = { ...base };
+    delete next[id]; // consolidate any legacy bare key into the namespaced one
+    next[rkey] = {
+      ...prevRow,
+      instance: cardInstance,
+      [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
     };
     await storage.writeFile(REVIEW, `${JSON.stringify(next, null, 2)}\n`, expected.review);
     return { ok: true, message: `${locale.toUpperCase()}: позначено перевіреним.` };
@@ -628,7 +691,12 @@ export async function publishItem(
     const item = working.find((w) => w.id === id);
     if (!item) return { ok: false, message: `«${id}» не знайдено.` };
 
-    const blockers = kind.publishBlockers(item, { review, sha256, instance: instances.get(id) ?? "" });
+    const blockers = kind.publishBlockers(item, {
+      review,
+      sha256,
+      instance: instances.get(id) ?? "",
+      reviewKey: reviewKeyFor(kindKey, id),
+    });
     if (blockers.length > 0) {
       return { ok: false, message: "Не можна опублікувати — є невирішені пункти.", blockers };
     }
@@ -640,15 +708,16 @@ export async function publishItem(
       return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
     }
 
-    // Copy every referenced working image into the slug's content-addressed
-    // `_pub/` folder and publish THAT — a later Keystatic edit to the working
-    // photos can no longer 404 the live page. Idempotent; a working file that
-    // is already gone stays pointing where it was.
-    const frozen = (await freezeItemMedia(
+    // Plan the frozen copy of every referenced photo (reads + hashes only — no
+    // write). A named photo whose file is missing, or a network / auth failure,
+    // throws here → the publish aborts and the previous published.json (and its
+    // photos) stay exactly as they were.
+    const { item: frozenRaw, puts } = await planFrozenMedia(
       storage,
       kindKey,
       item as unknown as Record<string, unknown>,
-    )) as typeof item;
+    );
+    const frozen = frozenRaw as typeof item;
     // Re-freezing an unchanged photo set produces the exact same `_pub/` URLs,
     // so re-publishing an item that only DIFFERED by working-vs-frozen photo
     // paths (e.g. straight after the freeze migration) is a clean no-op.
@@ -668,11 +737,13 @@ export async function publishItem(
       return { ok: false, conflict: true, message: new ConflictError("контент").message };
     }
 
+    // Write the frozen copies, then the snapshot (version-guarded), then write
+    // the copies ONCE MORE: if a manual "прибрати старі копії фото" ran in the
+    // gap and deleted one, this restores it, and after the snapshot write no
+    // cleanup will touch a file the current published.json points at.
+    await writeFrozenMedia(storage, puts);
     await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
-    // The snapshot is committed; now drop `_pub/` copies it no longer points at.
-    // Best-effort — a failure here leaves only unreferenced files, never a
-    // broken page, and the next publish sweeps them.
-    await gcFrozenMedia(storage, kindKey, id, nextSnapshot).catch(() => {});
+    await writeFrozenMedia(storage, puts).catch(() => {});
     const tail =
       storage.mode === "github"
         ? " Очікуйте завершення збірки (1–3 хв), стан — угорі сторінки."
@@ -709,8 +780,9 @@ export async function unpublishItem(
       current.filter((p) => p.id !== id) as unknown[],
     );
     await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
-    // Nothing points at this slug's frozen images any more — drop them.
-    await gcFrozenMedia(storage, kindKey, id, nextSnapshot).catch(() => {});
+    // The slug's `_pub/` copies are now unreferenced, but deleting them here
+    // could race a parallel re-publish — the owner sweeps them with
+    // "прибрати старі копії фото" (cleanupFrozenMedia).
     const tail = storage.mode === "github" ? " Опубліковану версію буде знято після наступної збірки." : "";
     return {
       ok: true,
@@ -775,28 +847,76 @@ export async function completeDeletion(
 export async function freezePublishedMedia(storage: PanelStorage): Promise<{ changed: number }> {
   const publishedF = await storage.readFile(PUBLISHED);
   const snapshot = parseSnapshot(publishedF.data);
+  const allPuts: { path: string; bytes: Uint8Array }[] = [];
   let changed = 0;
   for (const kindKey of KIND_ORDER) {
-    const key = KEY_FOR_KIND[kindKey];
-    const list = snapshot[key];
+    const list = snapshot[KEY_FOR_KIND[kindKey]];
     for (let i = 0; i < list.length; i += 1) {
       const before = stable(list[i]);
-      list[i] = await freezeItemMedia(storage, kindKey, list[i] as Record<string, unknown>);
+      const { item, puts } = await planFrozenMedia(
+        storage,
+        kindKey,
+        list[i] as Record<string, unknown>,
+      );
+      list[i] = item;
+      allPuts.push(...puts);
       if (stable(list[i]) !== before) changed += 1;
     }
   }
   if (changed === 0) return { changed: 0 };
-  await storage.writeFile(
-    PUBLISHED,
-    `${JSON.stringify(snapshot, null, 2)}\n`,
-    publishedF.version,
-  );
-  for (const kindKey of KIND_ORDER) {
-    for (const raw of snapshot[KEY_FOR_KIND[kindKey]]) {
-      await gcFrozenMedia(storage, kindKey, String((raw as { id?: unknown }).id ?? ""), snapshot).catch(
-        () => {},
-      );
-    }
-  }
+  await writeFrozenMedia(storage, allPuts);
+  await storage.writeFile(PUBLISHED, `${JSON.stringify(snapshot, null, 2)}\n`, publishedF.version);
   return { changed };
+}
+
+/**
+ * Explicit, guarded sweep of `_pub/` copies no longer referenced by the CURRENT
+ * published.json — the deferred replacement for the old auto-GC, which could
+ * race a parallel re-publish and delete a photo it needed. Version-guarded on
+ * published.json: if it moved since the caller loaded the page, abort so we
+ * never act on a stale view. Only deletes; never writes published.json.
+ */
+export async function cleanupFrozenMedia(
+  storage: PanelStorage,
+  expected: { published: string },
+): Promise<ActionResult> {
+  return runAction("Не вдалося прибрати старі копії", async () => {
+    const publishedF = await storage.readFile(PUBLISHED);
+    if ((publishedF.version || "") !== expected.published) {
+      return { ok: false, conflict: true, message: new ConflictError("знімок").message };
+    }
+    const snapshot = parseSnapshot(publishedF.data);
+    const referenced = referencedFrozenPaths(snapshot); // full public URLs kept by the live site
+
+    // Every `_pub/` folder we can reach: those the snapshot points into, plus
+    // every working card's (a card whose photos were edited down still has old
+    // copies). A slug that is neither published nor a working card is invisible
+    // here — that residue is swept by re-running the migration script.
+    const dirs = new Set(frozenDirsInSnapshot(snapshot));
+    const kindDirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
+    KIND_ORDER.forEach((kindKey, i) => {
+      const imgDir = IMAGE_DIR[kindKey];
+      if (!imgDir) return;
+      for (const e of kindDirs[i].data) {
+        const slug = e.name.replace(/\.json$/, "");
+        dirs.add(`public/images/cms/${imgDir}/${slug}/${PUBLISHED_MEDIA_DIR}`);
+      }
+    });
+
+    let removed = 0;
+    for (const pubDir of dirs) {
+      const urlBase = `/${pubDir.replace(/^public\//, "")}`;
+      for (const name of await storage.listPublishedMedia(pubDir)) {
+        if (!referenced.has(`${urlBase}/${name}`)) {
+          await storage.deletePublishedMedia(`${pubDir}/${name}`);
+          removed += 1;
+        }
+      }
+    }
+    return {
+      ok: true,
+      message:
+        removed === 0 ? "Зайвих копій фото немає." : `Прибрано зайвих копій фото: ${removed}.`,
+    };
+  });
 }

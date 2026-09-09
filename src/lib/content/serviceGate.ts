@@ -5,6 +5,7 @@
 import {
   LOCALES,
   reviewInstanceMatches,
+  reviewRowFor,
   type ContentLocale,
   type GateContext,
   type GateFailure,
@@ -99,7 +100,7 @@ export function getServiceLangStatus(
 ): LangReviewStatus {
   const l = service[locale];
   if (!REQUIRED.every((f) => String(l?.[f] ?? "").trim())) return "empty";
-  const confirmedHash = ctx.review?.[service.id]?.[locale]?.hash;
+  const confirmedHash = reviewRowFor(ctx, service.id)?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
   if (!reviewInstanceMatches(ctx, service.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(serviceConfirmedText(l))) return "needs-review";

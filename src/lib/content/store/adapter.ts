@@ -200,6 +200,24 @@ export class WriteUncertainError extends Error {
   }
 }
 
+/**
+ * A card names a photo, but the file behind it is not there to publish (the
+ * working file is genuinely missing — a 404, not a network error). Retrying
+ * will not make it appear; the owner has to re-add or remove the photo in
+ * Keystatic. Publishing must abort so the previous published photos stay live.
+ */
+export class MediaMissingError extends Error {
+  constructor(publicPath: string) {
+    super(
+      `Фото «${publicPath}» вказане в матеріалі, але файл відсутній — ` +
+        `не можна опублікувати. Перевідкрийте картку в Keystatic, повторно ` +
+        `додайте або приберіть це фото, збережіть — і опублікуйте знову. ` +
+        `Поточна опублікована версія на сайті не змінена.`,
+    );
+    this.name = "MediaMissingError";
+  }
+}
+
 export interface PanelStorage {
   readonly mode: "local" | "github";
 

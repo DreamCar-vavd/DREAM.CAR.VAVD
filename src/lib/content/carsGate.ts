@@ -111,6 +111,18 @@ export interface GateContext {
    * as "reviewed" when its recorded `instance` equals this.
    */
   instance?: string;
+  /**
+   * The `kind:slug` review-state key for this card. When set, that row is used
+   * (falling back to a legacy bare `slug` row); when unset, the bare `slug`.
+   * The panel and the `main` content-guard set it so `cars/foo` and
+   * `services/foo` never share a confirmation.
+   */
+  reviewKey?: string;
+}
+
+/** The review row for this card: namespaced `kind:slug` first, then legacy bare. */
+export function reviewRowFor(ctx: GateContext, id: string): ReviewRow | undefined {
+  return (ctx.reviewKey ? ctx.review?.[ctx.reviewKey] : undefined) ?? ctx.review?.[id];
 }
 
 /**
@@ -128,7 +140,7 @@ export interface GateContext {
  */
 export function reviewInstanceMatches(ctx: GateContext, id: string): boolean {
   if (ctx.instance === undefined) return true;
-  return (ctx.review?.[id]?.instance ?? "") === ctx.instance;
+  return (reviewRowFor(ctx, id)?.instance ?? "") === ctx.instance;
 }
 
 /** Per-language review status for the panel's badges. */
@@ -140,7 +152,7 @@ export function getLangStatus(
   const lang = car[locale];
   const filled = REQUIRED_LANG_FIELDS.every((f) => String(lang?.[f] ?? "").trim());
   if (!filled) return "empty";
-  const confirmedHash = ctx.review?.[car.id]?.[locale]?.hash;
+  const confirmedHash = reviewRowFor(ctx, car.id)?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
   if (!reviewInstanceMatches(ctx, car.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(confirmedText(lang))) return "needs-review";

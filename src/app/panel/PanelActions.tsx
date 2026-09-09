@@ -17,7 +17,8 @@ type ActionPayload =
   | { action: "confirm-locale"; kind: string; id: string; locale: string }
   | { action: "publish"; kind: string; id: string }
   | { action: "unpublish"; kind: string; id: string }
-  | { action: "complete-deletion" };
+  | { action: "complete-deletion" }
+  | { action: "cleanup-frozen-media" };
 
 export function PanelButton({
   payload,

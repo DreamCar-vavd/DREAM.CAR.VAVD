@@ -22,6 +22,7 @@ import {
   type Versioned,
 } from "./store/adapter";
 import {
+  cleanupFrozenMedia,
   completeDeletion,
   confirmLocale,
   getPanelData,
@@ -203,7 +204,8 @@ test("confirmLocale writes the review hash, version-guarded", async () => {
   const v = await versions(s);
   const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
   assert.equal(r.ok, true);
-  assert.ok(JSON.parse(s.files.get("src/content/cms/review-state.json")!).c1.uk.hash);
+  // review-state keys are namespaced by kind (car:c1, not c1).
+  assert.ok(JSON.parse(s.files.get("src/content/cms/review-state.json")!)["car:c1"].uk.hash);
 });
 
 test("confirmLocale conflicts when the working set moved since page load", async () => {
@@ -585,6 +587,100 @@ test("adding a photo to an already-frozen item shows 'modified'", async () => {
   assert.equal(grp.rows[0].publishState, "modified");
 });
 
+test("re-ordering two photos (Keystatic renumbers the files) reads as 'modified'", async () => {
+  const s = photoStore();
+  s.seedDir("src/content/cms/services", [
+    {
+      name: "s1.json",
+      text: svcJson({
+        photos: [
+          { image: "/images/cms/services/s1/photos/0/image.jpg", caption: "" },
+          { image: "/images/cms/services/s1/photos/1/image.jpg", caption: "" },
+        ],
+      }),
+    },
+  ]);
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("A"));
+  s.seedMedia("public/images/cms/services/s1/photos/1/image.jpg", jpgBytes("B"));
+  const v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  assert.equal(
+    (await getPanelData(s)).groups.find((g) => g.kind === "service")!.rows[0].publishState,
+    "in-sync",
+  );
+  // Keystatic swap: same two paths, bytes at each slot exchanged.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedMedia("public/images/cms/services/s1/photos/1/image.jpg", jpgBytes("A"));
+  assert.equal(
+    (await getPanelData(s)).groups.find((g) => g.kind === "service")!.rows[0].publishState,
+    "modified",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Two collections, same slug — SEPARATE confirmations (task §3)
+// ---------------------------------------------------------------------------
+
+test("cars/foo and services/foo keep separate confirmations — confirming one never clears the other", async () => {
+  const s = new FakeStorage();
+  s.seedDir("src/content/cms/cars", [{ name: "foo.json", text: carJson({ id: "foo", bornAt: "car-foo" }) }]);
+  s.seedDir("src/content/cms/services", [
+    { name: "foo.json", text: svcJson({ id: "foo", bornAt: "svc-foo" }) },
+  ]);
+
+  // Confirm all three languages of the SERVICE foo.
+  for (const l of ["uk", "en", "ru"] as const) {
+    const v = await versions(s);
+    const r = await confirmLocale(s, "service", "foo", l, { working: v.service, review: v.review });
+    assert.equal(r.ok, true, r.message);
+  }
+  let d = await getPanelData(s);
+  const svcRow = () => d.groups.find((g) => g.kind === "service")!.rows[0];
+  const carRow = () => d.groups.find((g) => g.kind === "car")!.rows[0];
+  assert.equal(svcRow().langStatus.uk, "reviewed");
+  assert.equal(carRow().langStatus.uk, "needs-review"); // the car was never confirmed
+
+  // Now confirm the CAR foo's uk — the service's confirmations must survive.
+  const v = await versions(s);
+  const r = await confirmLocale(s, "car", "foo", "uk", { working: v.car, review: v.review });
+  assert.equal(r.ok, true, r.message);
+  d = await getPanelData(s);
+  assert.equal(carRow().langStatus.uk, "reviewed");
+  assert.equal(svcRow().langStatus.uk, "reviewed"); // untouched
+  assert.equal(svcRow().langStatus.en, "reviewed");
+
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.ok(review["service:foo"].uk.hash && review["service:foo"].en.hash);
+  assert.ok(review["car:foo"].uk.hash);
+  assert.equal(review["car:foo"].instance, "car-foo");
+  assert.equal(review["service:foo"].instance, "svc-foo");
+});
+
+test("a legacy bare review key is honoured until the card is re-confirmed", async () => {
+  const s = new FakeStorage();
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
+  // Pre-namespace row, keyed by the bare slug.
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      s1: {
+        uk: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        en: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        ru: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+      },
+    }),
+  );
+  const d = await getPanelData(s);
+  assert.equal(d.groups.find((g) => g.kind === "service")!.rows[0].langStatus.uk, "reviewed");
+
+  // Re-confirming uk migrates the row to `service:s1` and drops the bare key.
+  const v = await versions(s);
+  await confirmLocale(s, "service", "s1", "uk", { working: v.service, review: v.review });
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.equal(review["s1"], undefined);
+  assert.ok(review["service:s1"].uk.hash && review["service:s1"].en.hash); // en/ru carried over
+});
+
 test("a draft photo edit after publishing does NOT change the published image", async () => {
   const s = photoStore();
   const v = await versions(s);
@@ -602,16 +698,20 @@ test("a draft photo edit after publishing does NOT change the published image", 
   assert.deepEqual([...s.media.get(`public${publishedUrl}`)!], [...publishedBytes]);
 });
 
-test("re-publishing a changed photo swaps the _pub file and GCs the old one", async () => {
+test("replacing a photo with new bytes reads as 'modified', re-publishes, and the old copy stays until cleanup", async () => {
   const s = photoStore();
   let v = await versions(s);
   await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
   const oldUrl = svcPhotoUrls(s)[0];
+  assert.equal((await getPanelData(s)).groups.find((g) => g.kind === "service")!.rows[0].publishState, "in-sync");
 
+  // Same path, same caption, same count — only the BYTES change.
   s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
-  s.seedDir("src/content/cms/services", [
-    { name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }, // bump working version
-  ]);
+  assert.equal(
+    (await getPanelData(s)).groups.find((g) => g.kind === "service")!.rows[0].publishState,
+    "modified", // content comparison catches the swap
+  );
+
   v = await versions(s);
   const r = await publishItem(s, "service", "s1", {
     working: v.service,
@@ -622,7 +722,14 @@ test("re-publishing a changed photo swaps the _pub file and GCs the old one", as
   const newUrl = svcPhotoUrls(s)[0];
   assert.notEqual(newUrl, oldUrl);
   assert.ok(s.media.has(`public${newUrl}`));
-  assert.equal(s.media.has(`public${oldUrl}`), false); // old copy garbage-collected
+  assert.ok(s.media.has(`public${oldUrl}`)); // deferred — NOT auto-deleted by publish
+
+  // The explicit sweep removes the now-unreferenced old copy, keeps the new one.
+  v = await versions(s);
+  const c = await cleanupFrozenMedia(s, { published: v.published });
+  assert.equal(c.ok, true, c.message);
+  assert.equal(s.media.has(`public${oldUrl}`), false);
+  assert.ok(s.media.has(`public${newUrl}`));
 });
 
 test("re-publishing an unchanged photo set is a no-op — no churn", async () => {
@@ -641,31 +748,122 @@ test("re-publishing an unchanged photo set is a no-op — no churn", async () =>
   assert.equal(svcPhotoUrls(s)[0], url);
 });
 
-test("publish still succeeds when a working photo file is already gone — the URL is kept, not blocked", async () => {
+test("a card that names a photo whose file is missing does NOT publish — the previous published state is kept", async () => {
   const s = photoStore();
-  s.media.delete("public/images/cms/services/s1/photos/0/image.jpg"); // Keystatic already removed it
-  const v = await versions(s);
+  // First publish A so there is a previous published state to protect.
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const publishedBefore = s.files.get("src/content/cms/published.json")!;
+  const frozenUrl = svcPhotoUrls(s)[0];
+
+  // Keystatic removed the working file but the card still lists it; owner edits
+  // text and re-publishes.
+  s.media.delete("public/images/cms/services/s1/photos/0/image.jpg");
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+  v = await versions(s);
   const r = await publishItem(s, "service", "s1", {
     working: v.service,
     review: v.review,
     published: v.published,
   });
-  assert.equal(r.ok, true, r.message);
-  // Nothing to freeze — the snapshot keeps the working path (that one tile is
-  // the onError case; the publish is not blocked).
-  assert.equal(svcPhotoUrls(s)[0], "/images/cms/services/s1/photos/0/image.jpg");
+  assert.equal(r.ok, false);
+  assert.match(r.message, /фото|Фото/);
+  assert.notEqual((r as { transient?: boolean }).transient, true); // retrying won't fix it
+  // published.json untouched; the previous frozen photo still there.
+  assert.equal(s.files.get("src/content/cms/published.json"), publishedBefore);
+  assert.ok(s.media.has(`public${frozenUrl}`));
 });
 
-test("unpublishing a slug garbage-collects its frozen _pub images", async () => {
+for (const [name, err, expectTransient] of [
+  ["a network error", new StorageUnavailableError("тест"), true],
+  ["a permission refusal", new StorageForbiddenError("тест"), false],
+] as const) {
+  test(`publish aborts (no snapshot write) on ${name} while freezing a photo`, async () => {
+    const s = photoStore();
+    let v = await versions(s);
+    await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+    const publishedBefore = s.files.get("src/content/cms/published.json")!;
+
+    s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+    s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+    s.readMedia = async () => {
+      throw err;
+    };
+    v = await versions(s);
+    const r = await publishItem(s, "service", "s1", {
+      working: v.service,
+      review: v.review,
+      published: v.published,
+    });
+    assert.equal(r.ok, false);
+    assert.equal((r as { transient?: boolean }).transient === true, expectTransient);
+    assert.equal(s.files.get("src/content/cms/published.json"), publishedBefore);
+  });
+}
+
+test("unpublishing a slug leaves its _pub copies for the explicit cleanup (no publish-time race)", async () => {
   const s = photoStore();
   let v = await versions(s);
   await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
   const url = svcPhotoUrls(s)[0];
   assert.ok(s.media.has(`public${url}`));
+
   v = await versions(s);
   const r = await unpublishItem(s, "service", "s1", { published: v.published });
   assert.equal(r.ok, true, r.message);
-  assert.equal(s.media.has(`public${url}`), false); // frozen copy dropped
+  assert.ok(s.media.has(`public${url}`)); // still there — deferred
+
+  v = await versions(s);
+  const c = await cleanupFrozenMedia(s, { published: v.published });
+  assert.equal(c.ok, true, c.message);
+  assert.equal(s.media.has(`public${url}`), false); // swept — nothing references it
+});
+
+test("a cleanup that races an in-flight re-publish cannot strand the new photo", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const urlA = svcPhotoUrls(s)[0];
+
+  // Owner changes the photo; a re-publish begins.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+
+  // Inject: right before publish-2 commits the new snapshot, a manual cleanup
+  // runs against the STILL-OLD published.json and deletes the new _pub/<B> file.
+  const realWrite = s.writeFile.bind(s);
+  let injected = false;
+  s.writeFile = async (file, text, expected) => {
+    if (file.endsWith("published.json") && !injected) {
+      injected = true;
+      const cv = (await getPanelData(s)).versions;
+      await cleanupFrozenMedia(s, { published: cv.published }); // deletes _pub/<B>
+    }
+    return realWrite(file, text, expected);
+  };
+
+  v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  s.writeFile = realWrite;
+  assert.equal(r.ok, true, r.message);
+  const urlB = svcPhotoUrls(s)[0];
+  assert.notEqual(urlB, urlA);
+  assert.ok(injected); // the cleanup really ran mid-publish
+  assert.ok(s.media.has(`public${urlB}`)); // publish re-put it after the snapshot write
+});
+
+test("cleanupFrozenMedia conflicts (deletes nothing) when published.json moved since page load", async () => {
+  const s = photoStore();
+  const v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const url = svcPhotoUrls(s)[0];
+  const c = await cleanupFrozenMedia(s, { published: "stale-token" });
+  assert.equal((c as { conflict?: boolean }).conflict, true);
+  assert.ok(s.media.has(`public${url}`)); // untouched
 });
 
 test("publishing one slug never touches another slug's frozen _pub folder", async () => {
@@ -752,7 +950,7 @@ test("confirmLocale garbage-collects stale review-state rows in its single write
   assert.equal(r.ok, true, r.message);
   const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
   assert.equal(review["ghost-service"], undefined); // pruned
-  assert.ok(review.c1.uk.hash); // the confirmation still landed
+  assert.ok(review["car:c1"].uk.hash); // the confirmation still landed
 });
 
 test("a re-created slug does not inherit the deleted card's review status", async () => {
@@ -927,10 +1125,11 @@ test("editing one language on a re-created instance never revives the other lang
   assert.equal(r.ok, true, r.message);
 
   const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
-  assert.equal(review.c1.instance, "inst-B"); // row re-bound to the new card
-  assert.ok(review.c1.uk.hash); // uk confirmed
-  assert.equal(review.c1.en, undefined); // en/ru dropped — they were inst-A's
-  assert.equal(review.c1.ru, undefined);
+  assert.equal(review["c1"], undefined); // legacy bare key consolidated away
+  assert.equal(review["car:c1"].instance, "inst-B"); // row re-bound to the new card
+  assert.ok(review["car:c1"].uk.hash); // uk confirmed
+  assert.equal(review["car:c1"].en, undefined); // en/ru dropped — they were inst-A's
+  assert.equal(review["car:c1"].ru, undefined);
 
   const d = await getPanelData(s);
   assert.equal(d.groups[0].rows[0].langStatus.uk, "reviewed");
@@ -953,9 +1152,9 @@ test("re-confirming the SAME instance keeps the other languages", async () => {
   const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
   assert.equal(r.ok, true, r.message);
   const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
-  assert.ok(review.c1.uk.hash);
-  assert.ok(review.c1.en.hash); // untouched — same instance
-  assert.equal(review.c1.instance, "inst-A");
+  assert.ok(review["car:c1"].uk.hash);
+  assert.ok(review["car:c1"].en.hash); // untouched — same instance
+  assert.equal(review["car:c1"].instance, "inst-A");
 });
 
 test("publish is blocked while a re-created card still carries a stale-instance review row", async () => {
@@ -1002,7 +1201,7 @@ test("confirmLocale still writes the confirmation when the cleanup reads fail", 
   const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
   assert.equal(r.ok, true, r.message);
   const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
-  assert.ok(review.c1.uk.hash); // confirmation landed
+  assert.ok(review["car:c1"].uk.hash); // confirmation landed
   assert.ok(review["ghost"]); // cleanup skipped (reads unavailable) — not lost
 });
 
@@ -1160,8 +1359,8 @@ test("two editors, same version: the first save wins, the second gets a conflict
 
   // A's write survived; B's did not clobber it.
   const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
-  assert.ok(review.c1.uk.hash);
-  assert.equal(review.c1.en, undefined);
+  assert.ok(review["car:c1"].uk.hash);
+  assert.equal(review["car:c1"].en, undefined);
 });
 
 test("two editors publishing DIFFERENT items: both land, neither drops the other's work", async () => {

@@ -311,13 +311,25 @@ export class GitHubStorage implements PanelStorage {
       branch: this.cfg.branch,
     };
     if (existing) payload.sha = existing.sha;
-    const { status, body, headers } = await this.gh(this.repoUrl(`/contents/${repoPath}`), {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
+    let status: number;
+    let body: unknown;
+    let headers: Headers;
+    try {
+      ({ status, body, headers } = await this.gh(this.repoUrl(`/contents/${repoPath}`), {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }));
+    } catch (err) {
+      // The PUT was on its way when the connection failed — the media blob may
+      // or may not have landed. Content-addressed, so a retry is safe, but the
+      // caller must not assume the publish succeeded.
+      if (err instanceof StorageUnavailableError) throw new WriteUncertainError("копію фото");
+      throw err;
+    }
+    if (status === 409 || (status === 422 && existing)) throw new WriteUncertainError("копію фото");
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200 && status !== 201) {
-      throw new Error(`GitHub write ${repoPath} failed (${status})`);
+      throw new StorageUnavailableError(`запис копії фото не вдався (${status})`);
     }
   }
 

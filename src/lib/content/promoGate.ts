@@ -10,6 +10,7 @@
 import {
   LOCALES,
   reviewInstanceMatches,
+  reviewRowFor,
   type ContentLocale,
   type GateContext,
   type GateFailure,
@@ -79,7 +80,7 @@ export function getPromoLangStatus(
 ): LangReviewStatus {
   const l = p[locale];
   if (!requiredFields(p.type).every((f) => String(l?.[f] ?? "").trim())) return "empty";
-  const confirmedHash = ctx.review?.[p.id]?.[locale]?.hash;
+  const confirmedHash = reviewRowFor(ctx, p.id)?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
   if (!reviewInstanceMatches(ctx, p.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(promoConfirmedText(l))) return "needs-review";

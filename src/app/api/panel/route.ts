@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
-import { completeDeletion, confirmLocale, publishItem, unpublishItem } from "@/lib/content/panelStore";
+import {
+  cleanupFrozenMedia,
+  completeDeletion,
+  confirmLocale,
+  publishItem,
+  unpublishItem,
+} from "@/lib/content/panelStore";
 import { KINDS, type KindKey } from "@/lib/content/kinds";
 import type { ActionResult } from "@/lib/content/panelStore";
 
@@ -52,10 +58,12 @@ export async function POST(request: Request) {
   const review = String(v.review ?? "");
   const published = String(v.published ?? "");
 
-  // "complete-deletion" is item-independent — it sweeps every orphaned
-  // review-state row — so it is handled before the kind/id checks below.
+  // Item-independent actions — handled before the kind/id checks below.
   if (body.action === "complete-deletion") {
     return respond(await completeDeletion(storage, { review }));
+  }
+  if (body.action === "cleanup-frozen-media") {
+    return respond(await cleanupFrozenMedia(storage, { published }));
   }
 
   const kind = body.kind as KindKey;
