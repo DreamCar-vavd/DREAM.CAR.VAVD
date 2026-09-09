@@ -253,20 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "service:zzz-photo": {
-    "instance": "mtuclj0u-uh6vpb93",
-    "uk": {
-      "hash": "2262aa99b81332d5d93799f384cb4519a1881feecaa95d7c0ec8fae77fd86c35",
-      "at": "2026-09-09T17:06:10.073Z"
-    },
-    "en": {
-      "hash": "7d5c36f3ab96f2fcc92bfdb132e7fb1060e3208b2e916e02a8174ae16daaf33b",
-      "at": "2026-09-09T17:06:22.113Z"
-    },
-    "ru": {
-      "hash": "5febbbd43aa6b67bbe998f2d0e58a5d2742f02c7560e29901e49ee7bdf6c79f8",
-      "at": "2026-09-09T17:06:37.424Z"
-    }
   }
 }
