@@ -12,11 +12,11 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`35132d4`** (`git ls-remote origin refs/heads/codex/admin-panel-spike`) |
+| **Remote HEAD** | **`f6e522f`** (`git ls-remote origin refs/heads/codex/admin-panel-spike`) |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `35132d4` | success |
-| Vercel Preview на `35132d4` | success |
+| CI `Verify` на `f6e522f` | success |
+| Vercel Preview на `f6e522f` | success |
 | Тести / tsc / eslint | **293 pass / 1 todo**, tsc 0, eslint 0, `npm run build` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
@@ -25,7 +25,7 @@
 `src/content/cms/published.json` → поле `publishedAt`
 (`2026-09-06T00:00:00Z` → `2026-09-09T14:31:45Z`) — штатна зміна `publishItem`
 після тесту `zzz-test-panel`. `review-state.json` — байт-у-байт як `604c27e`.
-Решта змін у `35132d4` — новий код + docs + тести. `git grep zzz` у
+Решта змін у `f6e522f` — новий код + docs + тести. `git grep zzz` у
 `src/content/**`/`public/**` = нічого (окрім протоколу `docs/PANEL-test-zzz-run-20260909.md`).
 
 ---
@@ -34,12 +34,12 @@
 
 | Шлях | Стан | Призначення |
 |---|---|---|
-| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | **HEAD `2675c5b` — СТАРИЙ**; `origin` вже підтягнутий до `35132d4`; dev-сервер `:3000` працює (pid ~71635) | «канонічна» ізольована копія (пам'ять указує на неї). **Синхронізувати:** `git checkout codex/admin-panel-spike && git reset --hard origin/codex/admin-panel-spike`. `2675c5b` — це незапушений коміт фонової сесії; його код **байт-у-байт** дорівнює `981c435` у запушеній історії (`git diff 2675c5b 981c435 -- src/lib/content/panelStore.ts` = порожньо), а його docs-правки перекриті моїм П36-узгодженням. **Нічого не втрачається.** `2675c5b` лишиться в reflog. |
-| `/Users/apple/Projects/dcv-panel-dev-20260909/repo` | HEAD `35132d4`, гілка `integration`, чисто, є `node_modules` + prod-збірка | моя копія для розробки цієї сесії. Порт для тестів був `:3021` (сервери зупинені). Можна взяти її або зробити свіжий клон. |
+| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | **HEAD `2675c5b` — СТАРИЙ**; `origin` вже підтягнутий до `f6e522f`; dev-сервер `:3000` працює (pid ~71635) | «канонічна» ізольована копія (пам'ять указує на неї). **Синхронізувати:** `git checkout codex/admin-panel-spike && git reset --hard origin/codex/admin-panel-spike`. `2675c5b` — це незапушений коміт фонової сесії; його код **байт-у-байт** дорівнює `981c435` у запушеній історії (`git diff 2675c5b 981c435 -- src/lib/content/panelStore.ts` = порожньо), а його docs-правки перекриті моїм П36-узгодженням. **Нічого не втрачається.** `2675c5b` лишиться в reflog. |
+| `/Users/apple/Projects/dcv-panel-dev-20260909/repo` | HEAD `f6e522f`, гілка `integration`, чисто, є `node_modules` + prod-збірка | моя копія для розробки цієї сесії. Порт для тестів був `:3021` (сервери зупинені). Можна взяти її або зробити свіжий клон. |
 | `/Users/apple/Projects/dcv-restore-verify-20260909/repo` | HEAD `604c27e` | базовий стан для порівняння + `TEST-LOG.md` + `/baseline/` (знімки `published.json`/`review-state.json`/хеші на момент П35). |
 | `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` | worktree для Б1-setup; `.env` (4 секрети, git-ignored) + `.env.local`; dev `:3010` (pid ~95334) | **не видаляти** доки секрети не покладено у захищене сховище власника. |
 
-**Рекомендація новому чату:** синхронізувати канонічну копію до `35132d4`
+**Рекомендація новому чату:** синхронізувати канонічну копію до `f6e522f`
 (команда вище) АБО зробити свіжий клон. Працювати в одній копії, `npm ci`.
 
 ---
@@ -194,8 +194,8 @@ slug+hash. Практична шкода мала (текст — це те, щ�
 
 ## 9. Перший крок нового чату (пропозиція)
 
-1. Синхронізувати робочу копію до `35132d4` (розд. 2) або свіжий клон + `npm ci`.
-2. `git ls-remote origin refs/heads/codex/admin-panel-spike` (= `35132d4`) і
+1. Синхронізувати робочу копію до `f6e522f` (розд. 2) або свіжий клон + `npm ci`.
+2. `git ls-remote origin refs/heads/codex/admin-panel-spike` (= `f6e522f`) і
    `refs/heads/main` (= `ce1977af`) — звірити, що нічого не зрушилось.
 3. `npm test && npx tsc --noEmit && npm run lint` — має бути 293 pass / 1 todo, 0, 0.
 4. Уточнити з власником, який із відкритих пунктів (розд. 5) робити далі.
