@@ -8,6 +8,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getPublishedServiceSlugs, getServicesMeta } from "@/lib/content/publishedServices";
 import { siteUrl } from "@/lib/site";
 import { GoldLink } from "@/components/GoldButton";
+import { ServicePhotos } from "@/components/ServicePhotos";
 
 interface RouteParams {
   locale: string;
@@ -130,6 +131,18 @@ export default async function ServicePage({ params }: { params: Promise<RoutePar
           </li>
         ))}
       </ul>
+
+      <ServicePhotos
+        photos={meta.photos}
+        title={copy.title}
+        labels={{
+          heading: locale === "en" ? "Photos" : locale === "ru" ? "Фотографии" : "Фотографії",
+          photoAlt: dict.carsForSale.photoAlt,
+          closeGallery: dict.carsForSale.closeGallery,
+          previousPhoto: dict.carsForSale.previousPhoto,
+          nextPhoto: dict.carsForSale.nextPhoto,
+        }}
+      />
 
       <div className="mt-10 flex flex-col gap-3 sm:flex-row">
         <GoldLink href={`/${locale}#contacts`} variant="solid">
