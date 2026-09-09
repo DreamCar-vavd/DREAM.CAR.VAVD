@@ -253,12 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "zzz-verify-b": {
-    "instance": "mtub6fpx-19xpa2s3",
-    "uk": {
-      "hash": "668f37565a91aceeedd77effa8bf478afa365a7ba972e705b90bab4791384a5a",
-      "at": "2026-09-09T16:24:56.761Z"
-    }
   }
 }
