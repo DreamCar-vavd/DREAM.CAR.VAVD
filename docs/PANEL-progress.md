@@ -14,26 +14,28 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Remote = Local HEAD:** `1d3fdb9` (П35 — реальний тест `zzz-test-panel`
-  виконано на Preview, 2026-09-09 ~13:30 BST). `main` =
-  `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не зрушив** за весь тест
+- **Remote = Local HEAD:** `149ab53` (П37 — фото послуг + фікс review-state
+  перевірено на Preview + інструкція власнику, 2026-09-09 ~15:00 BST; **запушено**,
+  CI `Verify` + Vercel — success). `main` =
+  `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не зрушив** за всю роботу
   (звірявся `git ls-remote origin` після кожної дії). PR #26 draft.
-  Фінальний Preview deployment `5sxMSQBPudCRarwVsxAQyccVhkET` (`1d3fdb9`) —
-  Ready; branch alias
+  branch alias
   `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`.
-  Протокол тесту — `docs/PANEL-test-zzz-run-20260909.md`.
-  **Стан даних CMS після тесту = початковому** (звірено вмістом, не назвами):
-  усі 5 послуг / 3 авто / 8 галерея / контакт / `review-state.json` —
-  байт-у-байт як до тесту; єдина відмінність — `published.json.publishedAt`
-  (`2026-09-06T00:00:00Z` → `2026-09-09T13:25:15Z`, штатна зміна `publishItem`).
-  Тестові коміти лишились в історії гілки (історію не переписували).
-- **П36 (2026-09-09, після П35):** панель сама прибирає осиротілі рядки
-  `review-state.json`, що їх лишало Keystatic-видалення картки. Код — лише
-  `src/lib/content/panelStore.ts` (+ тести `panelStore.test.ts`): `staleReviewSlugs`/
-  `pruneReview`; `getPanelData` не гейтить по стале-рядках і віддає їх у
-  `staleReviewSlugs`; `confirmLocale` прибирає їх своїм єдиним записом
-  (best-effort). Ручний коміт `1d3fdb9` (П35) лишається — він прибрав один
-  конкретний ключ; П36 автоматизує це надалі.
+  Протоколи — `docs/PANEL-test-zzz-run-20260909.md` (П35),
+  `docs/PANEL-service-photos.md` (фото), `docs/PANEL-owner-guide.md` (інструкція).
+  **Стан даних CMS = початковому** (звірено вмістом, не назвами): `review-state.json`
+  байт-у-байт = `604c27e`; `published.json` content = `604c27e` окрім
+  `publishedAt` (`2026-09-06T00:00:00Z` → `2026-09-09T14:31:45Z`, штатна зміна
+  `publishItem`). Тестові коміти лишились в історії (історію не переписували).
+- **П36 (2026-09-09):** панель сама прибирає осиротілі рядки `review-state.json`,
+  що їх лишало Keystatic-видалення картки. Код — лише `src/lib/content/panelStore.ts`
+  (+ тести): `staleReviewSlugs`/`pruneReview`; `getPanelData` не гейтить по
+  стале-рядках і віддає їх у `staleReviewSlugs`; `confirmLocale` прибирає їх своїм
+  єдиним записом (best-effort). Ручний коміт `1d3fdb9` (П35) лишається — він
+  прибрав один конкретний ключ; П36 автоматизує це надалі. **Перевірено живо на
+  Preview (github-режим):** delete через Keystatic лишив ключ → наступний confirm
+  одним записом його прибрав. Залишок п. 8 (повторне створення з байт-ідентичним
+  текстом) — `todo`, не закрито.
 - **hosted Б1 — перевірено (П32, Chrome власника, авторизована сесія):**
   вхід через GitHub (callback на Preview-хост) ✅ · Keystatic-дашборд ✅ ·
   `/panel` на `codex/admin-panel-spike` ✅ · **3 авто / 8 галерей / 5 послуг /

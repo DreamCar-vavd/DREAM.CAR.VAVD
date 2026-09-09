@@ -462,7 +462,7 @@ test("unpublishing an orphan removes exactly that snapshot entry and leaves the 
 });
 
 // ---------------------------------------------------------------------------
-// Stale review-state rows left by a Keystatic "Delete entry" (П35)
+// Stale review-state rows left by a Keystatic "Delete entry" (П36)
 // ---------------------------------------------------------------------------
 
 test("a review-state row with no working card does not gate or badge the dashboard, and is reported", async () => {
