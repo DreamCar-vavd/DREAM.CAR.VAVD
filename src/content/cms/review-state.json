@@ -1,5 +1,6 @@
 {
   "suzuki-sx4-s-cross": {
+    "instance": "legacy-suzuki-sx4-s-cross",
     "uk": {
       "hash": "62ef7cd7f7f45a83b7173f7e1381c039876c437fda9c6433213d6e7c573bc191",
       "at": "2026-09-06T00:00:00.000Z"
@@ -14,6 +15,7 @@
     }
   },
   "dacia-sandero-2022": {
+    "instance": "legacy-dacia-sandero-2022",
     "uk": {
       "hash": "b1971dd22e0b953bd00c47a253ee3773cc7b625d16cc504c61974b53dfdfb619",
       "at": "2026-09-06T00:00:00.000Z"
@@ -28,6 +30,7 @@
     }
   },
   "dacia-sandero-comfort-2019": {
+    "instance": "legacy-dacia-sandero-comfort-2019",
     "uk": {
       "hash": "bc2d996249367c2975d661f9d5be1e850cb284e067f7049229a6433df7c25905",
       "at": "2026-09-06T00:00:00.000Z"
@@ -42,6 +45,7 @@
     }
   },
   "maserati-levante": {
+    "instance": "legacy-maserati-levante",
     "uk": {
       "hash": "df9bd7c39617a4fbcf737314c500ad3ebbd5721cc2bf2ac1d67c0d3ee7c91ca9",
       "at": "2026-09-06T00:00:00.000Z"
@@ -56,6 +60,7 @@
     }
   },
   "volvo-xc60-d5": {
+    "instance": "legacy-volvo-xc60-d5",
     "uk": {
       "hash": "eecf9eaa6bdd14a7413a8d6a3ee4a00984d397d975e23afebd36028154d96f57",
       "at": "2026-09-06T00:00:00.000Z"
@@ -70,6 +75,7 @@
     }
   },
   "showcase-01": {
+    "instance": "legacy-showcase-01",
     "uk": {
       "hash": "4f3a3ff9dc6d33173786096d4952ab3f55b78c3077952f17dbd52360e9b7fa12",
       "at": "2026-09-06T00:00:00.000Z"
@@ -84,6 +90,7 @@
     }
   },
   "showcase-02": {
+    "instance": "legacy-showcase-02",
     "uk": {
       "hash": "4dd905c7f3df48af6f779178adf6575d6c53ec6da58f1734090e51eba8fcd041",
       "at": "2026-09-06T00:00:00.000Z"
@@ -98,6 +105,7 @@
     }
   },
   "showcase-03": {
+    "instance": "legacy-showcase-03",
     "uk": {
       "hash": "58757b4b5547676fb71fc44252ffa3fd46cc2a52e82a5c1a64dfc15965af22d8",
       "at": "2026-09-06T00:00:00.000Z"
@@ -112,6 +120,7 @@
     }
   },
   "showcase-04": {
+    "instance": "legacy-showcase-04",
     "uk": {
       "hash": "d23757a333fd5c5d74b3990beef62a2d9eb8ac132866312df6e229ca85782004",
       "at": "2026-09-06T00:00:00.000Z"
@@ -126,6 +135,7 @@
     }
   },
   "showcase-05": {
+    "instance": "legacy-showcase-05",
     "uk": {
       "hash": "5367618255a0b9ff8709084b71a49728933dfdec7bebcbcf62cbf4a66927a851",
       "at": "2026-09-06T00:00:00.000Z"
@@ -140,6 +150,7 @@
     }
   },
   "showcase-06": {
+    "instance": "legacy-showcase-06",
     "uk": {
       "hash": "a8a95543a85db4b8c53e49044b4228efb413128217efb7515a153217b2afc0c1",
       "at": "2026-09-06T00:00:00.000Z"
@@ -154,6 +165,7 @@
     }
   },
   "car-selection": {
+    "instance": "legacy-car-selection",
     "uk": {
       "hash": "2edb50b83cd0ca185e56dbc440bedc6b0741928eaf159bd7a7773190b5178fae",
       "at": "2026-09-06T00:00:00.000Z"
@@ -168,6 +180,7 @@
     }
   },
   "car-service": {
+    "instance": "legacy-car-service",
     "uk": {
       "hash": "5bbbc9d2453b0762486eb4b7ed3eded2db1e2d204d9b43897cb5dd3a790401f6",
       "at": "2026-09-06T00:00:00.000Z"
@@ -182,6 +195,7 @@
     }
   },
   "diagnostics": {
+    "instance": "legacy-diagnostics",
     "uk": {
       "hash": "9b2abc2dd8a1d4cb6990d89d01ba05077c23a28d916fd5be4d39f6bcdfb316c1",
       "at": "2026-09-06T00:00:00.000Z"
@@ -196,6 +210,7 @@
     }
   },
   "srs-airbag": {
+    "instance": "legacy-srs-airbag",
     "uk": {
       "hash": "ad2ef587e32785414c0328a2671674377726c9ed1d48b8f14a79100ff55041a4",
       "at": "2026-09-06T00:00:00.000Z"
@@ -210,6 +225,7 @@
     }
   },
   "detailing": {
+    "instance": "legacy-detailing",
     "uk": {
       "hash": "67c44d8f5b62b23641183e25d9dd839a2e5f1bee31023778092c48db065ca185",
       "at": "2026-09-06T00:00:00.000Z"
@@ -224,6 +240,7 @@
     }
   },
   "site": {
+    "instance": "legacy-site",
     "uk": {
       "hash": "2f9d9990253b5e107116bfb8aa1e2774c5c9528c2251902098f7a35316f9f484",
       "at": "2026-09-06T00:00:00.000Z"

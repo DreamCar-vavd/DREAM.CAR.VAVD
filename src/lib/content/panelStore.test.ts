@@ -526,29 +526,124 @@ test("a re-created slug does not inherit the deleted card's review status", asyn
   assert.deepEqual(d.staleReviewSlugs, []);
 });
 
-// KNOWN RESIDUAL (task 14:51 item 8): if a card is deleted straight from
-// Keystatic and re-created under the SAME slug with BYTE-IDENTICAL confirmed
-// text BEFORE any other confirm has fired the prune, the leftover row is not
-// stale (the slug is live again) and its stored hash still matches the
-// identical text — so the card shows "reviewed" without a fresh human
-// confirm. Fully closing this needs the review row bound to a card-instance
-// token, not just content (a bigger change than this fix). Recorded as `todo`
-// so it stays visible; the narrower harm is low (the text IS what a human
-// approved before the delete).
-test(
-  "residual: delete + immediate re-create with identical text still shows reviewed",
-  { todo: "needs per-card-instance binding of review rows" },
-  async () => {
-    const s = baseStore();
-    s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
-    // delete then immediately re-create c1 with the same bytes, no confirm between
-    s.seedDir("src/content/cms/cars", []);
-    s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson() }]);
-    const d = await getPanelData(s);
-    // desired: "needs-review"; actual today: "reviewed"
-    assert.equal(d.groups[0].rows[0].langStatus.uk, "needs-review");
-  },
-);
+// task 14:51 item 8 — CLOSED by per-instance review binding. A card deleted
+// straight from Keystatic and re-created under the SAME slug with BYTE-IDENTICAL
+// confirmed text, BEFORE any other confirm fires the stale-row prune: the
+// leftover row's `instance` no longer matches the freshly-minted `bornAt`, so
+// every language falls back to "needs-review" even though the slug is live
+// again and the text hash still matches.
+test("delete + immediate re-create (new instance) re-opens review even with byte-identical text", async () => {
+  const s = baseStore();
+  // c1 was confirmed while it carried instance "inst-A".
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      c1: {
+        instance: "inst-A",
+        uk: { hash: sha(confirmedText(CAR_L)), at: "t" },
+        en: { hash: sha(confirmedText(CAR_L)), at: "t" },
+        ru: { hash: sha(confirmedText(CAR_L)), at: "t" },
+      },
+    }),
+  );
+  // Delete, then immediately re-create c1 — same bytes, fresh Keystatic instance.
+  s.seedDir("src/content/cms/cars", []);
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ bornAt: "inst-B" }) }]);
+  const d = await getPanelData(s);
+  assert.equal(d.groups[0].rows[0].langStatus.uk, "needs-review");
+  assert.equal(d.groups[0].rows[0].langStatus.en, "needs-review");
+  assert.equal(d.groups[0].rows[0].langStatus.ru, "needs-review");
+  // The slug is live again, so the row is NOT stale — the instance mismatch is
+  // what re-opens it.
+  assert.deepEqual(d.staleReviewSlugs, []);
+});
+
+test("a legacy row (no instance) still trusts a legacy card (no bornAt) by hash alone", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll)); // no `instance`
+  const d = await getPanelData(s); // c1 has no bornAt
+  assert.equal(d.groups[0].rows[0].langStatus.uk, "reviewed");
+});
+
+test("editing one language on a re-created instance never revives the other languages", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      c1: {
+        instance: "inst-A",
+        uk: { hash: sha(confirmedText(CAR_L)), at: "t" },
+        en: { hash: sha(confirmedText(CAR_L)), at: "t" },
+        ru: { hash: sha(confirmedText(CAR_L)), at: "t" },
+      },
+    }),
+  );
+  // Re-created as inst-B with identical text.
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ bornAt: "inst-B" }) }]);
+  const v = await versions(s);
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+  assert.equal(r.ok, true, r.message);
+
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.equal(review.c1.instance, "inst-B"); // row re-bound to the new card
+  assert.ok(review.c1.uk.hash); // uk confirmed
+  assert.equal(review.c1.en, undefined); // en/ru dropped — they were inst-A's
+  assert.equal(review.c1.ru, undefined);
+
+  const d = await getPanelData(s);
+  assert.equal(d.groups[0].rows[0].langStatus.uk, "reviewed");
+  assert.equal(d.groups[0].rows[0].langStatus.en, "needs-review");
+});
+
+test("re-confirming the SAME instance keeps the other languages", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ bornAt: "inst-A" }) }]);
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      c1: {
+        instance: "inst-A",
+        en: { hash: sha(confirmedText(CAR_L)), at: "t" },
+      },
+    }),
+  );
+  const v = await versions(s);
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+  assert.equal(r.ok, true, r.message);
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.ok(review.c1.uk.hash);
+  assert.ok(review.c1.en.hash); // untouched — same instance
+  assert.equal(review.c1.instance, "inst-A");
+});
+
+test("publish is blocked while a re-created card still carries a stale-instance review row", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [
+    { name: "s1.json", text: svcJson({ bornAt: "inst-B" }) },
+  ]);
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      s1: {
+        instance: "inst-A", // confirmed against the deleted card
+        uk: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        en: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        ru: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+      },
+    }),
+  );
+  const v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, false);
+  assert.ok(
+    (r as { blockers?: { kind: string }[] }).blockers!.some((b) => b.kind === "needs-review"),
+  );
+  assert.equal(s.files.has("src/content/cms/published.json"), false);
+});
 
 test("confirmLocale still writes the confirmation when the cleanup reads fail", async () => {
   const s = baseStore();

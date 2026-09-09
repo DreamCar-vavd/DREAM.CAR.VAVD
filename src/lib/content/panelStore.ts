@@ -62,6 +62,25 @@ function parseReview(text: string | null): ReviewState {
 }
 
 /**
+ * The card-instance token stored on a working card JSON as `bornAt`. Keystatic
+ * mints a fresh one on every "create" (schema default), so a delete + re-create
+ * under the same slug yields a different token even with identical text. "" when
+ * the card predates the field (legacy) or the JSON is unreadable — a legacy
+ * card only ever matches a legacy (token-less) review row.
+ */
+function instanceToken(text: string): string {
+  try {
+    return String((JSON.parse(text || "{}") as { bornAt?: unknown }).bornAt ?? "");
+  } catch {
+    return "";
+  }
+}
+/** slug -> instance token, for one kind's raw directory entries. */
+function instanceMap(entries: { name: string; text: string }[]): Map<string, string> {
+  return new Map(entries.map((e) => [e.name.replace(/\.json$/, ""), instanceToken(e.text)]));
+}
+
+/**
  * review-state.json is a flat `slug -> { locale: {hash, at} }` map shared by
  * every kind. Keystatic's "Delete entry" is a direct GitHub commit that removes
  * the item JSON (and its images) but never touches this file, so deleting a
@@ -239,10 +258,12 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   // Don't let it gate or badge anything; report it so it can be tidied.
   const stale = staleReviewSlugs(review, workingSlugs);
   const ctx = { review: pruneReview(review, workingSlugs), sha256 };
+  const instances = KIND_ORDER.map((_, i) => instanceMap(dirs[i].data));
 
   const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i) => {
     const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
     const working = workingLists[i];
+    const instanceOf = (id: string) => instances[i].get(id) ?? "";
     const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
     const publishedById = new Map(publishedList.map((p) => [p.id, p]));
     const workingIds = new Set(working.map((w) => w.id));
@@ -255,8 +276,9 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
 
     const rows = working.map((item): PanelRow => {
       const pub = publishedById.get(item.id);
+      const itemCtx = { ...ctx, instance: instanceOf(item.id) };
       const langStatus = Object.fromEntries(
-        LOCALES.map((l) => [l, kind.langStatus(item, l, ctx)]),
+        LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
       ) as Record<ContentLocale, LangReviewStatus>;
       let publishState: ItemPublishState = "not-published";
       if (pub) publishState = stable(pub) === stable(item) ? "in-sync" : "modified";
@@ -266,7 +288,7 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
         subtitle: subtitleFor(kindKey, item as never),
         editHref: editHrefFor(kindKey, item.id, storage.branch),
         langStatus,
-        blockers: kind.publishBlockers(item, ctx),
+        blockers: kind.publishBlockers(item, itemCtx),
         publishState,
         publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
         publishedExists: Boolean(pub),
@@ -386,6 +408,7 @@ async function loadKind(storage: PanelStorage, kindKey: KindKey) {
     kind,
     working: coerceList(kind, dir.data),
     workingVersion: dir.version,
+    instances: instanceMap(dir.data),
     review: parseReview(reviewF.data),
     reviewVersion: reviewF.version,
   };
@@ -399,13 +422,17 @@ export async function confirmLocale(
   expected: { working: string; review: string },
 ): Promise<ActionResult> {
   return runAction("Не збережено", async () => {
-    const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
+    const { kind, working, workingVersion, instances, review, reviewVersion } = await loadKind(
+      storage,
+      kindKey,
+    );
     if (workingVersion !== expected.working || reviewVersion !== expected.review) {
       return { ok: false, conflict: true, message: new ConflictError("робочі картки").message };
     }
     const item = working.find((w) => w.id === id);
     if (!item) return { ok: false, message: `«${id}» не знайдено.` };
-    if (kind.langStatus(item, locale, { review, sha256 }) === "empty") {
+    const cardInstance = instances.get(id) ?? "";
+    if (kind.langStatus(item, locale, { review, sha256, instance: cardInstance }) === "empty") {
       return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
     }
     // This is the only action that writes review-state, so it is also the only
@@ -418,10 +445,16 @@ export async function confirmLocale(
       workingSlugs.add(id); // the card we just re-read is live by definition
       base = pruneReview(review, workingSlugs);
     }
+    // If the row was last confirmed against a DIFFERENT card instance (the slug
+    // was deleted and re-created), the sibling locales' hashes belong to a card
+    // that no longer exists — start the row fresh so confirming one language
+    // never silently revives the others. Same instance -> keep them.
+    const prevRow = (base[id]?.instance ?? "") === cardInstance ? base[id] : undefined;
     const next: ReviewState = {
       ...base,
       [id]: {
-        ...base[id],
+        ...prevRow,
+        instance: cardInstance,
         [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
       },
     };
@@ -437,7 +470,10 @@ export async function publishItem(
   expected: { working: string; review: string; published: string },
 ): Promise<ActionResult> {
   return runAction("Публікація не вдалася", async () => {
-    const { kind, working, workingVersion, review, reviewVersion } = await loadKind(storage, kindKey);
+    const { kind, working, workingVersion, instances, review, reviewVersion } = await loadKind(
+      storage,
+      kindKey,
+    );
     const publishedF = await storage.readFile(PUBLISHED);
     if (workingVersion !== expected.working || reviewVersion !== expected.review) {
       return { ok: false, conflict: true, message: new ConflictError("контент").message };
@@ -445,7 +481,7 @@ export async function publishItem(
     const item = working.find((w) => w.id === id);
     if (!item) return { ok: false, message: `«${id}» не знайдено.` };
 
-    const blockers = kind.publishBlockers(item, { review, sha256 });
+    const blockers = kind.publishBlockers(item, { review, sha256, instance: instances.get(id) ?? "" });
     if (blockers.length > 0) {
       return { ok: false, message: "Не можна опублікувати — є невирішені пункти.", blockers };
     }

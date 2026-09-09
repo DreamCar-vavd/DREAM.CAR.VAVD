@@ -7,6 +7,7 @@
  */
 import {
   LOCALES,
+  reviewInstanceMatches,
   type ContentLocale,
   type GateContext,
   type GateFailure,
@@ -91,6 +92,7 @@ export function getContactLangStatus(
   if (!REQUIRED_LANG.every((f) => String(l?.[f] ?? "").trim())) return "empty";
   const confirmedHash = ctx.review?.[c.id]?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
+  if (!reviewInstanceMatches(ctx, c.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(contactConfirmedText(l))) return "needs-review";
   return "reviewed";
 }

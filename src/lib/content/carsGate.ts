@@ -58,11 +58,25 @@ export interface CmsCar {
   ru: CmsCarLanguage;
 }
 
-/** review-state.json shape: which text was confirmed reviewed, per car/locale. */
-export type ReviewState = Record<
-  string,
-  Partial<Record<ContentLocale, { hash: string; at: string }>>
->;
+/**
+ * One review-state.json row: the per-locale confirmed-text hashes, plus the
+ * card-INSTANCE token (`bornAt`) the row was last confirmed against.
+ *
+ * `instance` binds the confirmation to the physical card that was reviewed, not
+ * just to its slug + text. Keystatic's "Delete entry" leaves the row behind; if
+ * the same slug is then re-created (Keystatic mints a fresh `bornAt`), the
+ * leftover row's `instance` no longer matches and every locale falls back to
+ * "needs-review" — even when the new card's text is byte-identical.
+ *
+ * Absent `instance` (rows written before this binding, or a card with no
+ * `bornAt` yet) is treated as "" and only matches a card that likewise has no
+ * token — so pre-existing confirmations are never invalidated wholesale.
+ */
+export type ReviewRow = Partial<Record<ContentLocale, { hash: string; at: string }>> & {
+  instance?: string;
+};
+/** review-state.json shape: which text was confirmed reviewed, per card/locale. */
+export type ReviewState = Record<string, ReviewRow>;
 
 /** Sale statuses that keep a *published* car OFF the public site. */
 const HIDDEN_SALE_STATUSES: ReadonlySet<SaleStatus> = new Set(["preparing", "sold"]);
@@ -91,6 +105,30 @@ export interface GateContext {
   review?: ReviewState;
   /** Node crypto in callers; without it the review check is skipped. */
   sha256?: (input: string) => string;
+  /**
+   * The working card's current `bornAt` token, threaded per item by panelStore.
+   * "" / undefined when the card has no token (legacy). A review row only counts
+   * as "reviewed" when its recorded `instance` equals this.
+   */
+  instance?: string;
+}
+
+/**
+ * Does the stored review row belong to the SAME card instance we are gating?
+ *
+ * Only enforced when the caller actually tracks instances (`ctx.instance` is a
+ * string — the panel threads the working card's `bornAt`, `""` when it has
+ * none). Callers that do not — the `main` content-guard and build-time
+ * assertions, which see only the published snapshot — leave it `undefined` and
+ * fall back to the hash check alone.
+ *
+ * With a token present: `"" === ""` (legacy row + legacy card) passes; every
+ * other mismatch — including a tokened card against a token-less row — fails,
+ * so deleting a card and re-creating it under the same slug re-opens review.
+ */
+export function reviewInstanceMatches(ctx: GateContext, id: string): boolean {
+  if (ctx.instance === undefined) return true;
+  return (ctx.review?.[id]?.instance ?? "") === ctx.instance;
 }
 
 /** Per-language review status for the panel's badges. */
@@ -104,6 +142,7 @@ export function getLangStatus(
   if (!filled) return "empty";
   const confirmedHash = ctx.review?.[car.id]?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
+  if (!reviewInstanceMatches(ctx, car.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(confirmedText(lang))) return "needs-review";
   return "reviewed";
 }

@@ -38,6 +38,24 @@ const storage =
  * and set from the panel dashboard (/panel), so any text edit auto-invalidates
  * the prior confirmation (hash mismatch).
  */
+/**
+ * Hidden-in-practice per-card instance token. Keystatic mints a fresh value
+ * every time an entry is CREATED (the function default runs once, on the create
+ * form); an existing entry keeps whatever is already in its file. The panel
+ * binds each language's "reviewed" flag to this token, so deleting a card and
+ * re-creating it under the same slug forces every language to be re-confirmed —
+ * even when the new text is byte-identical. Never edit by hand.
+ * See src/lib/content/panelStore.ts + carsGate.ts (`reviewInstanceMatches`).
+ */
+const bornAtField = () =>
+  fields.text({
+    label: "Технічний код картки (створюється автоматично — не змінювати)",
+    defaultValue: () =>
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+    description:
+      "Внутрішній ідентифікатор цього примірника картки. Використовується панеллю для звірки підтверджень перекладу. Не редагуйте і не очищайте.",
+  });
+
 const galleryLanguage = (label: string) =>
   fields.object(
     {
@@ -272,6 +290,7 @@ export default config({
         uk: carLanguage("Українська"),
         en: carLanguage("English"),
         ru: carLanguage("Русский"),
+        bornAt: bornAtField(),
       },
     }),
 
@@ -330,6 +349,7 @@ export default config({
         uk: galleryLanguage("Українська"),
         en: galleryLanguage("English"),
         ru: galleryLanguage("Русский"),
+        bornAt: bornAtField(),
       },
     }),
 
@@ -395,6 +415,7 @@ export default config({
         uk: serviceLanguage("Українська"),
         en: serviceLanguage("English"),
         ru: serviceLanguage("Русский"),
+        bornAt: bornAtField(),
       },
     }),
 
@@ -450,6 +471,7 @@ export default config({
         uk: promoLanguage("Українська"),
         en: promoLanguage("English"),
         ru: promoLanguage("Русский"),
+        bornAt: bornAtField(),
       },
     }),
   },
@@ -509,6 +531,7 @@ export default config({
         uk: contactLanguage("Українська"),
         en: contactLanguage("English"),
         ru: contactLanguage("Русский"),
+        bornAt: bornAtField(),
       },
     }),
   },

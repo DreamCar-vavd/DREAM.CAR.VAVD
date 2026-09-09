@@ -12,6 +12,7 @@
  */
 import {
   LOCALES,
+  reviewInstanceMatches,
   type ContentLocale,
   type GateContext,
   type GateFailure,
@@ -67,6 +68,7 @@ export function getGalleryLangStatus(
   if (!REQUIRED.every((f) => String(lang?.[f] ?? "").trim())) return "empty";
   const confirmedHash = ctx.review?.[project.id]?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
+  if (!reviewInstanceMatches(ctx, project.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(galleryConfirmedText(lang))) return "needs-review";
   return "reviewed";
 }

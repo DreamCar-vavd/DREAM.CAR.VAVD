@@ -9,6 +9,7 @@
  */
 import {
   LOCALES,
+  reviewInstanceMatches,
   type ContentLocale,
   type GateContext,
   type GateFailure,
@@ -80,6 +81,7 @@ export function getPromoLangStatus(
   if (!requiredFields(p.type).every((f) => String(l?.[f] ?? "").trim())) return "empty";
   const confirmedHash = ctx.review?.[p.id]?.[locale]?.hash;
   if (confirmedHash === undefined) return "needs-review";
+  if (!reviewInstanceMatches(ctx, p.id)) return "needs-review";
   if (ctx.sha256 && confirmedHash !== ctx.sha256(promoConfirmedText(l))) return "needs-review";
   return "reviewed";
 }
