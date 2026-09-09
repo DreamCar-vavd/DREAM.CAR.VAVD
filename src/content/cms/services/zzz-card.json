@@ -1,0 +1,28 @@
+{
+  "id": "zzz-card",
+  "order": 100,
+  "status": "available",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ Card UK",
+    "shortDescription": "kort UK text",
+    "longDescription": "dokl UK text",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Card EN",
+    "shortDescription": "short EN text",
+    "longDescription": "long EN text",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Card RU",
+    "shortDescription": "krat RU text",
+    "longDescription": "podr RU text",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mtuch3x3-ut4noqnx"
+}
