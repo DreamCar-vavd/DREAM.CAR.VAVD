@@ -20,7 +20,7 @@
   - **GitHub CI `Verify`** — success (tsc/eslint/тести + `next build` Turbopack, **без** github-env → `storage.kind='local'` → github-перевірка не спрацьовує).
   - **Vercel Preview build** — `be85c0b` **Ready** (deployment `dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x`, 1m 2s, Preview). 3 давні tracing-warnings `localFs.ts` (Vercel рахує як «3 errors» — доброякісні, були й на зеленому `359c108`). Раніше: `b28bcac` Error (немає секретів), `359c108` Ready (до env).
   - **Перевірка запуску сторінок на Vercel** — ✅ `/`, `/uk|en|ru`, `/panel`, `/keystatic` віддаються (П30).
-  - **Перевірка входу користувача на Vercel** — ⚠️ **вхід не завершується** — OAuth callback → 401 «Authorization failed» (див. П30). Vercel Authentication **не** втручається.
+  - **Перевірка входу користувача на Vercel** — ⚠️ **вхід не завершується** — OAuth `code`→token exchange із GitHub → callback віддає 401 «Authorization failed» (див. П30). Точна помилка GitHub недоступна (Keystatic її ковтає); гіпотеза — хибне збережене `KEYSTATIC_GITHUB_CLIENT_SECRET`. Vercel Authentication цю сесію **не** блокує (не тест для всіх відвідувачів).
 - **Тести:** **276 pass** · tsc 0 · eslint 0 (П29). `npm run build` (Turbopack) —
   Ready на Vercel для `be85c0b`. content:check/guard — зелені (П28).
 - **Preview (Vercel):** `be85c0b` **Ready**; стабільний branch alias
@@ -86,42 +86,89 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 | `KEYSTATIC_GITHUB_REPO_NAME` | `DREAM.CAR.VAVD` | ✅ показано |
 | `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` | `dreamcar-vavd-keystatic` | ✅ показано |
 | `KEYSTATIC_GITHUB_CLIENT_ID` | `Iv23ligKwtoqGEQNKSIk` | ✅ показано — байт-у-байт із `.env` |
-| `KEYSTATIC_GITHUB_CLIENT_SECRET` | Secret (не читається) | ❓ **підозрюваний** — «Added 37m ago», власник лишив без змін |
-| `KEYSTATIC_SECRET` | Secret (не читається) | ✅ **функціонально працює** — OAuth `state` пройшов валідацію (власник виправив о 10:07) |
+| `KEYSTATIC_GITHUB_CLIENT_SECRET` | Secret (не читається) | ❓ значення **не підтверджено** — «Added 37m ago», власник лишив без змін; це єдиний ключ, який token-exchange реально задіює й на якому зупиняється |
+| `KEYSTATIC_SECRET` | Secret (не читається) | ❓ значення **не підтверджено**. (Раніше писав «працює бо state пройшов» — **помилка**: див. розбір коду нижче, `secret` не задіюється, доки token-exchange не вдався) |
 
-**Push:** `b28bcac..be85c0b` (10 комітів). Remote = local = `be85c0b`.
+Уточнення до таблиці: `=github` у стовпці «Значення» — це **очікуване** значення,
+не показане Vercel (reveal завис). Робочу конфігурацію через це не змінюю.
+Область (`Preview` / лише `codex/admin-panel-spike`) і **наявність** 7/7 —
+підтверджено списком. **Правильність** значень: `CLIENT_ID`, `APP_SLUG`,
+`REPO_NAME` — показано й звірено; `STORAGE_KIND`, `REPO_OWNER` — не показано
+(reveal завис), `STORAGE_KIND=github` доведено функціонально; **обидва Secret —
+не звірені**.
+
+**Push:** `b28bcac..be85c0b` (10 комітів). Local HEAD після цього — `3f9341a`
+(журнал П30, **не запушено**), потім `<цей коміт>`. Remote — `be85c0b`.
 
 **Deployment:** `dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x` · `be85c0b` · Preview ·
 **Ready** · 1m 2s · alias `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`.
 
-**Браузер (Chrome власника):**
-- ✅ branch alias віддає цей deployment; **Vercel Authentication не блокує** —
-  сторінки відкриваються напряму.
-- ✅ `/panel` без входу → app-gate «Ви не увійшли через GitHub… Відкрити
-  Keystatic і увійти» (тобто panel-роути активні, github-режим).
+**Браузер (Chrome власника — доводить лише цю авторизовану сесію, не доступ
+для всіх відвідувачів):**
+- ✅ branch alias віддає цей deployment; **Vercel Authentication не блокує цю сесію**.
+- ✅ `/panel` без входу → app-gate «Ви не увійшли через GitHub…» (panel-роути активні).
 - ✅ `/keystatic` → «Log in with GitHub».
 - ✅ Клік «Log in» → GitHub → **callback на правильний Preview-хост**
-  (`dreamcarvavd-git-codex-admin-p-648563-…`, **не** 127.0.0.1) — виправлення
-  redirect-URI працює.
-- ❌ **Callback → 401 «Authorization failed».** Vercel runtime log:
-  `GET /api/keystatic/github/oauth/callback` → 401, зроблено
-  `POST github.com/login/oauth/access_token`, відповідь за 249 мс. Обмін
-  `code`→token із GitHub провалився.
+  (`…648563-…`, **не** 127.0.0.1).
+- ❌ **Callback → 401 «Authorization failed».**
 
-**Діагноз (чим підтверджено):**
-- `state` пройшов → `KEYSTATIC_SECRET` правильний (інакше збій був би **до**
-  token-exchange).
-- `KEYSTATIC_GITHUB_CLIENT_ID` звірено (`Iv23ligKwtoqGEQNKSIk`).
-- `code` свіжий (щойно виданий).
-- → лишається **`KEYSTATIC_GITHUB_CLIENT_SECRET`** — найімовірніше хибне/переплутане
-  значення. (Альтернатива — `redirect_uri_mismatch` у GitHub App; перевірити
-  налаштування App **не можу** — вони під sudo/2FA.)
+**Розбір за кодом установленої версії (`@keystatic/core@0.6.9`,
+`keystatic-core-api-generic.node.js`, `githubOauthCallback`):**
+- Callback повертає **400** (не 401), якщо в параметрах є `error_description`
+  (напр. `redirect_uri_mismatch` на кроці authorize). У нас у callback був
+  чистий `?code=…&iss=…` → крок authorize (і `redirect_uri`) **пройшов**.
+- Далі handler робить `POST https://github.com/login/oauth/access_token` **лише
+  з `client_id`, `client_secret`, `code`** — **`redirect_uri` у цьому запиті НЕ
+  надсилається**. Тому `redirect_uri_mismatch` на цьому кроці неможливий.
+- **401 «Authorization failed»** повертається, якщо: (а) HTTP-статус відповіді
+  GitHub не 2xx, **або** (б) тіло відповіді не має повної форми
+  `{access_token, expires_in, refresh_token, refresh_token_expires_in, scope,
+  token_type:'bearer'}` — тобто GitHub повернув `{error, error_description,
+  error_uri}`. Keystatic цей `error` **не логує й не повертає** (`catch {}`).
+- **`KEYSTATIC_SECRET` (`config.secret`) у token-exchange НЕ бере участі** —
+  він потрібен лише для `encryptValue(refresh_token, secret)` **після** успішного
+  обміну. Тож 401 **нічого не каже** про правильність `KEYSTATIC_SECRET`. `state`
+  теж **не** валідовується — використовується лише для пошуку cookie з шляхом
+  повернення.
+- Джерело значень (звірено за кодом): `route.ts` → `makeRouteHandler({config})`
+  → `@keystatic/next` → `makeGenericAPIRouteHandler(_config,{slugEnvName})` —
+  `clientSecret` **не** передається явно, тож береться
+  `process.env.KEYSTATIC_GITHUB_CLIENT_SECRET`. На Vercel це = значення з
+  dashboard (Secret). Закомічених `.env`/`.env.*` з реальними значеннями в репо
+  немає (лише `.env.example` + `docs/keystatic-app-setup.env` — без секретів).
 
-**Дія власника:** переввести `KEYSTATIC_GITHUB_CLIENT_SECRET` у Vercel зі
-`/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env` (40 символів;
-це значення, яке Keystatic записав під час створення App). Потім redeploy
-`be85c0b` і повторний вхід. Якщо не допоможе — регенерувати client secret у
-GitHub App і звірити, що 2 callback URL на місці (локальний + Preview alias).
+**Точна помилка GitHub — недоступна.** Keystatic її ковтає; у Vercel-логах її
+теж немає. Тому `incorrect_client_credentials` / `bad_verification_code` /
+інше — **не встановлено**.
+
+**Що звужує до `KEYSTATIC_GITHUB_CLIENT_SECRET`:**
+- `redirect_uri_mismatch` — виключено (див. вище, 400 vs 401, немає redirect_uri у POST).
+- `CLIENT_ID` звірено; `code` свіжий у **кожній** із ≥2 спроб (не reused/stale).
+- `.env` (`…-panel-setup-verify/.env`) містить `KEYSTATIC_GITHUB_CLIENT_SECRET`
+  = 40-hex (`65b4…c3`, узгоджується з «одним client secret …c003dac3» App) і
+  `KEYSTATIC_SECRET` = 80-hex. **Локальний вхід на :3010 із цією парою вже
+  проходив** (П19–П22) → `.env`-значення client secret — **відоме робоче**.
+- Історія редагувань у Vercel (обидва Secret додано ~09:43, потім о 10:07
+  «замінено лише `KEYSTATIC_SECRET`») сумісна з тим, що значення спершу
+  переплутали (40-hex ↔ 80-hex), і в `KEYSTATIC_GITHUB_CLIENT_SECRET` досі
+  лежить 80-hex.
+
+**Наступний крок — перевірка гіпотези (не «доведене виправлення»):**
+власник **один раз** переввід `KEYSTATIC_GITHUB_CLIENT_SECRET` у Vercel зі
+`…-panel-setup-verify/.env` (рядок `KEYSTATIC_GITHUB_CLIENT_SECRET=…`, 40
+символів — **відоме робоче** значення). Одне поле. Тип/область не міняти.
+Потім **redeploy `be85c0b`** (зміна лише конфігу) і повторний вхід із
+`/keystatic` (не оновлювати стару callback-сторінку).
+- **Якщо вхід пройшов** — причина була у збереженому значенні client secret.
+- **Якщо ні** — причина на боці GitHub App (secret регенеровано / callback URL
+  прибрано / App suspended). Тоді: діагностичний коміт, що логуватиме `error`
+  GitHub (не токен, не code) в ізольованому worktree + push + build; або
+  власник дивиться GitHub App (client secrets, «last used», Callback URLs) —
+  це під його 2FA.
+
+**Не регенерувати й не відкликати секрети автоматично.** Локальний
+callback URL `http://127.0.0.1:3010/api/keystatic/github/oauth/callback` у App —
+зберегти.
 
 **Не перевірено (чекає завершеного входу):** редактор Keystatic, `/panel` з
 даними 3/8/5/1, гілка в UI, картки/фото/мови, чернетка, банер стану, вихід/
