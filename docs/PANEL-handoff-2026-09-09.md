@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`115520c`** (П39) + пізніші коміти живої перевірки (`zzz-*`, самоскасовуються). Останній НЕ-тестовий SHA — `115520c`. |
+| **Remote HEAD** | **`f80fab7`** (П39 + фікси) + пізніші коміти живої перевірки (`zzz-*`, самоскасовуються). Останній НЕ-тестовий SHA — `f80fab7`. |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `115520c` | success |
-| Vercel Preview на `115520c` | success |
-| Тести / tsc / eslint | **322 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `f80fab7` | success |
+| Vercel Preview на `f80fab7` | success |
+| Тести / tsc / eslint | **326 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -56,7 +56,7 @@
 
 ## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П39)
 
-- **П39 — доопрацювання пайплайну фото + namespace ключів review (задача 17:38), `115520c`:**
+- **П39 — доопрацювання пайплайну фото + namespace ключів review (задача 17:38), `115520c`→`f80fab7`:**
   - **§1** `inSyncIgnoringFrozenPhotos` читає й хешує кожне робоче фото → заміна
     A→B за тим самим шляхом і перестановка тепер = «є неопубліковані зміни».
   - **§2** `planFrozenMedia` (був `freezeItemMedia`) кидає `MediaMissingError` /
@@ -216,7 +216,7 @@ Preview (github-режим, `zzz-photo`):** publish A → `_pub/<hashA>` у зн
 - `src/app/panel/page.tsx` — `<PendingDeletions>` + кнопка «Прибрати старі копії фото»;
   `PanelActions.tsx` — variant `solid`, дії `complete-deletion`/`cleanup-frozen-media`.
 - `scripts/migrate-born-at.mjs`, `migrate-freeze-published-photos.mjs`, `migrate-review-keys.mjs`.
-- `src/lib/content/panelStore.test.ts` — усього **322 pass / 0 todo**.
+- `src/lib/content/panelStore.test.ts` — усього **326 pass / 0 todo**.
 
 **Код попередніх серій (П35–П37):**
 - `src/components/ServicePhotos.tsx`, `src/lib/content/servicePhotos.ts`,

@@ -145,7 +145,7 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
   `scripts/migrate-review-keys.mjs` (ідемпотентний) перейменував 17 рядків —
   лише ключі, хеші не чіпались.
 
-**+17 тестів. 324 pass / 0 todo, tsc 0, lint 0, build OK, content-guard OK.**
+**+21 тест. 326 pass / 0 todo, tsc 0, lint 0, build OK, content-guard OK.**
 
 **Локально на `LocalFsStorage`:** заміна A→B за тим самим шляхом → «modified» +
 публікується; content-aware (повернути байти до A → знову «modified»); відсутнє
@@ -167,12 +167,18 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
   прибрано, `_pub/<hashB>` і чужі `_pub` цілі. Keystatic-delete робочої картки →
   `_pub/<hashB>` опублікованої версії **лишився**.
 
-**Доопрацювання за наслідками Preview (той самий коміт-набір):**
+**Доопрацювання за наслідками Preview:**
 - `completeDeletion` тепер додатково прибирає `_pub/` теку slug, якого немає ні в
   робочих картках, ні в `published.json` (раніше така тека була недосяжна для
   `cleanupFrozenMedia`).
-- `PendingDeletions` (`/panel`): звірка «+ опублікована версія» тепер по bare-slug
-  (ключі стали `kind:slug`).
+- `PendingDeletions` (`/panel`): звірка «+ опублікована версія» тепер по bare-slug.
+- **Баг `GitHubStorage` (знайдено на Preview): contents API не віддає `content`
+  для файлів >1 МБ** (`encoding: "none"`). `getRaw`/`getContent` декодували
+  **порожній** буфер → усі реальні авто/галереї з фото >1 МБ показувались
+  «modified», а github-режимний publish заморозив би 0-байтну копію великого
+  фото. Фікс (`f80fab7`): fallback на `GET /git/blobs/<sha>` (base64 до 100 МБ).
+  Наявні `_pub` файли міграції не постраждали (міграція читала з локальної ФС).
+  +2 тести. Локально всі 17 опублікованих = «in-sync» з content-aware діфом.
 
 ### П38 — життєвий цикл карток і фото: повний фікс (задача 2026-09-09 16:23)
 
