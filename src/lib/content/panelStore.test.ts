@@ -525,6 +525,30 @@ test("a re-created slug does not inherit the deleted card's review status", asyn
   assert.deepEqual(d.staleReviewSlugs, []);
 });
 
+// KNOWN RESIDUAL (task 14:51 item 8): if a card is deleted straight from
+// Keystatic and re-created under the SAME slug with BYTE-IDENTICAL confirmed
+// text BEFORE any other confirm has fired the prune, the leftover row is not
+// stale (the slug is live again) and its stored hash still matches the
+// identical text — so the card shows "reviewed" without a fresh human
+// confirm. Fully closing this needs the review row bound to a card-instance
+// token, not just content (a bigger change than this fix). Recorded as `todo`
+// so it stays visible; the narrower harm is low (the text IS what a human
+// approved before the delete).
+test(
+  "residual: delete + immediate re-create with identical text still shows reviewed",
+  { todo: "needs per-card-instance binding of review rows" },
+  async () => {
+    const s = baseStore();
+    s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+    // delete then immediately re-create c1 with the same bytes, no confirm between
+    s.seedDir("src/content/cms/cars", []);
+    s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson() }]);
+    const d = await getPanelData(s);
+    // desired: "needs-review"; actual today: "reviewed"
+    assert.equal(d.groups[0].rows[0].langStatus.uk, "needs-review");
+  },
+);
+
 test("confirmLocale still writes the confirmation when the cleanup reads fail", async () => {
   const s = baseStore();
   s.seedFile("src/content/cms/review-state.json", JSON.stringify({ "ghost": { uk: { hash: "d", at: "t" } } }));
