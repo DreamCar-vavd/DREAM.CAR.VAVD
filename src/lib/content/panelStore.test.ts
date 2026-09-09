@@ -460,6 +460,90 @@ test("unpublishing an orphan removes exactly that snapshot entry and leaves the 
   assert.deepEqual(snap.cars, []);
 });
 
+// ---------------------------------------------------------------------------
+// Stale review-state rows left by a Keystatic "Delete entry" (П35)
+// ---------------------------------------------------------------------------
+
+test("a review-state row with no working card does not gate or badge the dashboard, and is reported", async () => {
+  const s = baseStore(); // working cars: c1
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      ...carReviewAll, // c1 — real, keep
+      "ghost-service": {
+        uk: { hash: "dead", at: "t" },
+        en: { hash: "dead", at: "t" },
+        ru: { hash: "dead", at: "t" },
+      },
+    }),
+  );
+  const d = await getPanelData(s);
+  assert.deepEqual(d.staleReviewSlugs, ["ghost-service"]);
+  // c1's genuine row is untouched.
+  assert.equal(d.groups[0].rows[0].langStatus.uk, "reviewed");
+});
+
+test("confirmLocale garbage-collects stale review-state rows in its single write", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      "ghost-service": { uk: { hash: "dead", at: "t" } },
+    }),
+  );
+  const v = await versions(s);
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+  assert.equal(r.ok, true, r.message);
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.equal(review["ghost-service"], undefined); // pruned
+  assert.ok(review.c1.uk.hash); // the confirmation still landed
+});
+
+test("a re-created slug does not inherit the deleted card's review status", async () => {
+  const s = baseStore(); // cars: c1, gallery: g1
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ ...carReviewAll, ...galReviewAll }),
+  );
+
+  // c1 is deleted straight from Keystatic — card gone, review row stays behind.
+  s.seedDir("src/content/cms/cars", []);
+  let d = await getPanelData(s);
+  assert.deepEqual(d.staleReviewSlugs, ["c1"]);
+
+  // An unrelated confirm (gallery) triggers the on-disk prune.
+  const v = await versions(s);
+  const r = await confirmLocale(s, "gallery", "g1", "uk", { working: v.gallery, review: v.review });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(JSON.parse(s.files.get("src/content/cms/review-state.json")!).c1, undefined);
+
+  // c1 re-created under the same id with byte-identical text: still needs review.
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson() }]);
+  d = await getPanelData(s);
+  assert.equal(d.groups[0].rows[0].id, "c1");
+  assert.equal(d.groups[0].rows[0].langStatus.uk, "needs-review");
+  assert.deepEqual(d.staleReviewSlugs, []);
+});
+
+test("confirmLocale still writes the confirmation when the cleanup reads fail", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify({ "ghost": { uk: { hash: "d", at: "t" } } }));
+  const v = await versions(s);
+  // Fail every readDir AFTER loadKind's first two (cars + review already read).
+  const realReadDir = s.readDir.bind(s);
+  let calls = 0;
+  s.readDir = async (dir) => {
+    calls += 1;
+    if (calls > 1) throw new StorageUnavailableError("тест: GitHub не відповів");
+    return realReadDir(dir);
+  };
+  const r = await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+  assert.equal(r.ok, true, r.message);
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.ok(review.c1.uk.hash); // confirmation landed
+  assert.ok(review["ghost"]); // cleanup skipped (reads unavailable) — not lost
+});
+
 test("a storage read failure surfaces as an error — never an empty dashboard or a false 'card deleted'", async () => {
   const s = baseStore();
   s.seedFile(

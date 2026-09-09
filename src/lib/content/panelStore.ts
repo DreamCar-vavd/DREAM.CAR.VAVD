@@ -61,6 +61,43 @@ function parseReview(text: string | null): ReviewState {
   return text ? (JSON.parse(text) as ReviewState) : {};
 }
 
+/**
+ * review-state.json is a flat `slug -> { locale: {hash, at} }` map shared by
+ * every kind. Keystatic's "Delete entry" is a direct GitHub commit that removes
+ * the item JSON (and its images) but never touches this file, so deleting a
+ * card through the editor leaves its review row behind. Left alone those rows
+ * accumulate, and — worse — if the same slug is re-created later a leftover hash
+ * could briefly show a language as "перевірено" that was never re-confirmed.
+ *
+ * A row is stale when its slug backs no working card in ANY kind. This is the
+ * one place that decides it; callers pass the union of every kind's working
+ * ids. Pure — no I/O.
+ */
+function staleReviewSlugs(review: ReviewState, workingSlugs: ReadonlySet<string>): string[] {
+  return Object.keys(review).filter((slug) => !workingSlugs.has(slug));
+}
+function pruneReview(review: ReviewState, workingSlugs: ReadonlySet<string>): ReviewState {
+  if (staleReviewSlugs(review, workingSlugs).length === 0) return review;
+  return Object.fromEntries(
+    Object.entries(review).filter(([slug]) => workingSlugs.has(slug)),
+  ) as ReviewState;
+}
+
+/**
+ * Every working-card id across every kind, in one set. Used to spot stale
+ * review-state rows. Best-effort at the call sites that only need it for
+ * cleanup — a read failure here must never sink the surrounding action.
+ */
+async function collectWorkingSlugs(storage: PanelStorage): Promise<Set<string>> {
+  const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
+  const slugs = new Set<string>();
+  KIND_ORDER.forEach((kindKey, i) => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    for (const w of coerceList(kind, dirs[i].data)) slugs.add(w.id);
+  });
+  return slugs;
+}
+
 function coerceList<W extends { id: string; order: number }>(
   kind: ContentKind<W>,
   entries: { name: string; text: string }[],
@@ -134,6 +171,12 @@ export interface PanelData {
   /** Working branch in github mode; `null` for local files. */
   branch: string | null;
   versions: Versions;
+  /**
+   * review-state.json rows whose slug no longer backs any working card (a card
+   * deleted straight from Keystatic — its delete never touches review-state).
+   * They do not colour the dashboard; the next panel write drops them.
+   */
+  staleReviewSlugs: string[];
 }
 
 const COLLECTION_SLUG: Record<KindKey, string> = {
@@ -187,11 +230,19 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   ]);
   const snapshot = parseSnapshot(publishedF.data);
   const review = parseReview(reviewF.data);
-  const ctx = { review, sha256 };
+
+  const workingLists = KIND_ORDER.map((kindKey, i) =>
+    coerceList(KINDS[kindKey] as ContentKind<{ id: string; order: number }>, dirs[i].data),
+  );
+  const workingSlugs = new Set(workingLists.flat().map((w) => w.id));
+  // A review row for a slug with no working card is stale (Keystatic delete).
+  // Don't let it gate or badge anything; report it so it can be tidied.
+  const stale = staleReviewSlugs(review, workingSlugs);
+  const ctx = { review: pruneReview(review, workingSlugs), sha256 };
 
   const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i) => {
     const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
-    const working = coerceList(kind, dirs[i].data);
+    const working = workingLists[i];
     const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
     const publishedById = new Map(publishedList.map((p) => [p.id, p]));
     const workingIds = new Set(working.map((w) => w.id));
@@ -263,6 +314,7 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
     mode: storage.mode,
     branch: storage.branch,
     versions,
+    staleReviewSlugs: stale,
   };
 }
 
@@ -356,10 +408,20 @@ export async function confirmLocale(
     if (kind.langStatus(item, locale, { review, sha256 }) === "empty") {
       return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
     }
+    // This is the only action that writes review-state, so it is also the only
+    // place that can garbage-collect rows left behind by a Keystatic "Delete
+    // entry" (which never touches this file). Best-effort: if the extra reads
+    // fail we still write the confirmation, just without the tidy-up.
+    let base = review;
+    const workingSlugs = await collectWorkingSlugs(storage).catch(() => null);
+    if (workingSlugs) {
+      workingSlugs.add(id); // the card we just re-read is live by definition
+      base = pruneReview(review, workingSlugs);
+    }
     const next: ReviewState = {
-      ...review,
+      ...base,
       [id]: {
-        ...review[id],
+        ...base[id],
         [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
       },
     };
