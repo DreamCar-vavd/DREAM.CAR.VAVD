@@ -3,6 +3,7 @@
   "order": 999,
   "status": "coming-soon",
   "iconSrc": "/images/services/premium-3d/06-auto-moto-special-equipment-premium-3d.png",
+  "priceAmount": "60",
   "priceCurrency": "£",
   "photos": [
     {
