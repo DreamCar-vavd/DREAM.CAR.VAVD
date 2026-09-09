@@ -253,12 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "service:zzz-card": {
-    "instance": "mtuch3x3-ut4noqnx",
-    "uk": {
-      "hash": "a1392b44c16330b95f50ddcf7e0794fe955aed6ebce2692502c5e7f32e98e71b",
-      "at": "2026-09-09T17:01:23.674Z"
-    }
   }
 }
