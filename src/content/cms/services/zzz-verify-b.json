@@ -1,0 +1,28 @@
+{
+  "id": "zzz-verify-b",
+  "order": 100,
+  "status": "available",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ B UK",
+    "shortDescription": "kort UK",
+    "longDescription": "dokl UK",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ B EN",
+    "shortDescription": "short EN",
+    "longDescription": "long EN",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ B RU",
+    "shortDescription": "krat RU",
+    "longDescription": "podr RU",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mtub6fpx-19xpa2s3"
+}
