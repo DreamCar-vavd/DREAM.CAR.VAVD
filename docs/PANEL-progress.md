@@ -14,15 +14,16 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head = remote:** `be85c0b` — **запушено 2026-09-09 ~10:10** (`b28bcac..be85c0b`).
-  PR #26 draft. 10 комітів (`7b8b0e0`…`be85c0b`, П24–П29).
+- **Remote:** `be85c0b` (запушено 2026-09-09 ~10:10). **Local HEAD:** `b038580` —
+  **не запушено**: `3f9341a` `9851f1c` (журнал П30), `b038580` (CSP-фікс, П31),
+  + журнал П31. PR #26 draft.
 - **Сигнали окремо (не плутати):**
-  - **GitHub CI `Verify`** — success (tsc/eslint/тести + `next build` Turbopack, **без** github-env → `storage.kind='local'` → github-перевірка не спрацьовує).
-  - **Vercel Preview build** — `be85c0b` **Ready** (deployment `dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x`, 1m 2s, Preview). 3 давні tracing-warnings `localFs.ts` (Vercel рахує як «3 errors» — доброякісні, були й на зеленому `359c108`). Раніше: `b28bcac` Error (немає секретів), `359c108` Ready (до env).
-  - **Перевірка запуску сторінок на Vercel** — ✅ `/`, `/uk|en|ru`, `/panel`, `/keystatic` віддаються (П30).
-  - **Перевірка входу користувача на Vercel** — ⚠️ **вхід не завершується** — OAuth `code`→token exchange із GitHub → callback віддає 401 «Authorization failed» (див. П30). Точна помилка GitHub недоступна (Keystatic її ковтає); гіпотеза — хибне збережене `KEYSTATIC_GITHUB_CLIENT_SECRET`. Vercel Authentication цю сесію **не** блокує (не тест для всіх відвідувачів).
-- **Тести:** **276 pass** · tsc 0 · eslint 0 (П29). `npm run build` (Turbopack) —
-  Ready на Vercel для `be85c0b`. content:check/guard — зелені (П28).
+  - **GitHub CI `Verify`** — success (tsc/eslint/тести + `next build` Turbopack, **без** github-env).
+  - **Vercel Preview build** — `be85c0b` **Ready** (`dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x`); redeploy того ж SHA після виправлення секрету — **Ready** (`73uaLMwQqhn3gT4Nd8dpdvbnbs3m`, 1m 9s, no-cache). 3 давні `localFs.ts` warnings (доброякісні).
+  - **Перевірка запуску сторінок на Vercel** — ✅ `/`, `/uk|en|ru`, `/panel`, `/keystatic` (П30).
+  - **Перевірка входу користувача на Vercel** — ✅ **вхід ПРАЦЮЄ** після переввода `KEYSTATIC_GITHUB_CLIENT_SECRET` + redeploy (П31). Причина 401 у П30 — саме хибне збережене значення client secret.
+  - **Keystatic-редактор на Vercel** — ⚠️ дашборд + списки колекцій ✅; **редактор окремого запису** падав «TypeError: Failed to fetch» — CSP не пускав `raw.githubusercontent.com` (звідки Keystatic-UI читає вміст файлу). Виправлено `b038580` (чекає збірки Preview).
+- **Тести:** tsc 0 · eslint 0 (П31; `npm run build` локально не запускався — див. П29/П31, збірку робить Vercel). 276 pass на П29. content:check/guard — зелені (П28).
 - **Preview (Vercel):** `be85c0b` **Ready**; стабільний branch alias
   `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
   віддає цей deployment. `/panel` без входу → правильний app-gate
@@ -72,6 +73,63 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П31 — вхід на Vercel запрацював; редактор Keystatic — CSP-фікс `raw.githubusercontent.com`
+
+**2026-09-09 ~10:47–11:05 BST.**
+
+**1. Причина 401 (П30) — підтверджено.** Власник **переввів**
+`KEYSTATIC_GITHUB_CLIENT_SECRET` у Vercel зі `…-panel-setup-verify/.env` (40
+символів; тип/область не мінялися — Vercel показує «Updated», scope
+`Preview`/`codex/admin-panel-spike`). Уточнення історії від власника: спершу той
+самий GitHub Client Secret вставили **в обидва поля**, потім замінили лише
+`KEYSTATIC_SECRET` — тобто в `KEYSTATIC_GITHUB_CLIENT_SECRET` лежало **не те**
+значення. Перестановка ключів не підтверджена; факт — збережене значення було
+хибним.
+
+**2. Один redeploy.** Vercel → deployment `dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x` →
+Deployment Actions → Redeploy (build cache off). Новий deployment
+**`73uaLMwQqhn3gT4Nd8dpdvbnbs3m`** · SHA **`be85c0b`** (той самий — зміна лише
+конфігу) · Preview · **Ready** · 1m 9s. Branch alias
+`dreamcarvavd-git-codex-admin-p-648563-…` веде на нього.
+
+**3. Вхід — ПРАЦЮЄ.** `/api/keystatic/github/logout` → `/keystatic` →
+`/api/keystatic/github/login` → GitHub (без consent) → **callback на Preview-хост**
+→ **дашборд Keystatic** «Hello, DreamCar-vavd!».
+- `/keystatic/branch/main` — 0 entries скрізь (на `main` немає CMS-контенту — очікувано).
+- `/keystatic/branch/codex%2Fadmin-panel-spike` — «ПОТОЧНА ГІЛКА: codex/admin-panel-spike»,
+  «Pull request #26», **Автомобілі 3 · Галерея 8 · Послуги 5 · Банери 0 · Контакти**.
+
+**4. `/panel` на Preview — ПРАЦЮЄ.**
+- «Робоча гілка: **codex/admin-panel-spike** (тестова гілка — не Production)».
+- Банер: «✅ Поточний знімок **на тестовому сайті гілки «codex/admin-panel-spike»**. (Preview)».
+- **3 авто** (Suzuki SX4 S-Cross, Dacia Sandero, Dacia Sandero Comfort) ·
+  **8 галерей** (Мазераті Леванте, Volvo XC60 D5, showcase-01…06) ·
+  **5 послуг** (car-selection, car-service, diagnostics, srs-airbag, detailing) ·
+  **1 контакт**. Банери/акції — 0 («Матеріалів ще немає»). Це **точно 3/8/5/1**.
+- Усі записи «● На сайті», UK/EN/RU «Перевірено», «Неопублікованих змін немає».
+- **Посилання редагування — branch-scoped**: `/keystatic/branch/codex%2Fadmin-panel-spike/collection/<c>/item/<id>`; Create — `.../create`; draft-preview — `/api/panel/preview?path=/uk`. Усе відносне (той самий Preview-хост).
+
+**5. Дефект — редактор окремого запису.** `/keystatic/branch/…/collection/cars/item/suzuki-sx4-s-cross`
+(і будь-який item) → **«TypeError: Failed to fetch»** у `Promise.all`.
+- Списки колекцій (`/collection/services` → 5 slug) і дашборд — **працюють**
+  (GraphQL `api.github.com` → 200).
+- Діагностика в браузері: `fetch('https://raw.githubusercontent.com/…')` → THREW
+  «Failed to fetch»; `fetch('https://api.github.com/…')` → 200. Усі
+  `*.githubusercontent.com` (raw / objects / media / codeload) заблоковані CSP.
+- `@keystatic/core` `keystatic-core-ui.js:550` — **клієнтський** UI редактора
+  читає вміст файлу через `fetch('https://raw.githubusercontent.com/<repo>/<sha>/<path>')`.
+- **Причина:** `panelCsp` у `next.config.ts` — `connect-src` мав лише
+  `api.github.com` + `github.com`, без `raw.githubusercontent.com`.
+- **Виправлення `b038580`:** додано `https://raw.githubusercontent.com` у
+  `connect-src` **і** `img-src` (панельний CSP; публічний CSP не чіпано).
+  Перевірено tsc 0 / lint 0; **локальний build не запускався** (`:3000` ділить
+  `.next` — П29); Turbopack-збірку робить Vercel після push. Чекає deployment
+  цього коміту.
+
+**Не перевірено (чекає збірки `b038580`):** редактор запису з полями/фото/uk-en-ru,
+чернетка, вихід/повторний вхід на Preview, 375 px + клавіатура. Vercel
+Authentication — тільки для авторизованої Chrome-сесії, не для всіх відвідувачів.
 
 ### П30 — Preview запущено; збірка Ready; вхід блокується на OAuth token-exchange
 
