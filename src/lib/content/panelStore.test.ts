@@ -28,6 +28,7 @@ import {
   getPanelData,
   publishItem,
   unpublishItem,
+  type ActionResult,
 } from "./panelStore";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -72,6 +73,12 @@ const galJson = (over: Record<string, unknown> = {}) =>
     ...over,
   });
 
+const gitBlobId = (bytes: Uint8Array) =>
+  createHash("sha1")
+    .update(Buffer.from(`blob ${bytes.length}\0`, "utf8"))
+    .update(bytes)
+    .digest("hex");
+
 /** In-memory file store with real version bumps + conflict checks. */
 class FakeStorage implements PanelStorage {
   readonly mode = "github" as const;
@@ -80,6 +87,11 @@ class FakeStorage implements PanelStorage {
   dirs = new Map<string, DirEntry[]>();
   media = new Map<string, Uint8Array>();
   deploy: DeployStatus = { state: "ready" };
+  /** stand-in for the branch HEAD; every write bumps it. */
+  head = "head-0";
+  private bump() {
+    this.head = `head-${Number(this.head.slice(5)) + 1}`;
+  }
 
   seedDir(dir: AllowedDir, entries: DirEntry[]) {
     this.dirs.set(dir, entries);
@@ -92,11 +104,24 @@ class FakeStorage implements PanelStorage {
     this.media.set(repoPath, bytes);
   }
 
+  async headSha() {
+    return this.head;
+  }
+  async mediaIndex() {
+    const out = new Map<string, { id: string; size: number }>();
+    for (const [p, b] of this.media) {
+      if (p.startsWith("public/images/cms/")) out.set(p, { id: gitBlobId(b), size: b.length });
+    }
+    return out;
+  }
   async readMedia(repoPath: string) {
     return this.media.get(repoPath) ?? null;
   }
   async putPublishedMedia(repoPath: string, bytes: Uint8Array) {
+    const cur = this.media.get(repoPath);
+    if (cur && gitBlobId(cur) === gitBlobId(bytes)) return; // content-addressed no-op
     this.media.set(repoPath, bytes);
+    this.bump();
   }
   async listPublishedMedia(dirPath: string) {
     return [...this.media.keys()]
@@ -104,8 +129,19 @@ class FakeStorage implements PanelStorage {
       .map((k) => k.slice(dirPath.length + 1))
       .sort();
   }
-  async deletePublishedMedia(repoPath: string) {
-    this.media.delete(repoPath);
+  async deletePublishedMediaBatch(paths: string[], expectedHeadSha: string | null) {
+    if (expectedHeadSha !== null && expectedHeadSha !== this.head) {
+      throw new ConflictError("гілка"); // branch moved since the plan
+    }
+    const out: { path: string; outcome: "deleted" | "already-absent" }[] = [];
+    let any = false;
+    for (const p of paths) {
+      const existed = this.media.delete(p);
+      if (existed) any = true;
+      out.push({ path: p, outcome: existed ? "deleted" : "already-absent" });
+    }
+    if (any) this.bump();
+    return out;
   }
 
   async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
@@ -126,6 +162,7 @@ class FakeStorage implements PanelStorage {
     const cur = this.files.get(file) ?? null;
     if ((cur ? hash(cur) : "") !== expected) throw new ConflictError("файл");
     this.files.set(file, text);
+    this.bump();
     return { data: text, version: hash(text) };
   }
   async deployStatus() {
@@ -517,6 +554,13 @@ test("unpublishing an orphan removes exactly that snapshot entry and leaves the 
 
 const jpgBytes = (marker: string) =>
   new Uint8Array([0xff, 0xd8, 0xff, ...Buffer.from(`fake-jpeg:${marker}`), 0xff, 0xd9]);
+
+/** Run the two-phase cleanup: dry run, then confirm against its reported head. */
+async function cleanup(s: FakeStorage): Promise<ActionResult> {
+  const dry = await cleanupFrozenMedia(s, {});
+  if (!dry.ok || !dry.cleanup) return dry; // nothing to do
+  return cleanupFrozenMedia(s, { confirm: true, headSha: dry.cleanup.headSha });
+}
 const svcWithPhoto = (over: Record<string, unknown> = {}) =>
   svcJson({
     photos: [{ image: "/images/cms/services/s1/photos/0/image.jpg", caption: "" }],
@@ -725,8 +769,7 @@ test("replacing a photo with new bytes reads as 'modified', re-publishes, and th
   assert.ok(s.media.has(`public${oldUrl}`)); // deferred — NOT auto-deleted by publish
 
   // The explicit sweep removes the now-unreferenced old copy, keeps the new one.
-  v = await versions(s);
-  const c = await cleanupFrozenMedia(s, { published: v.published });
+  const c = await cleanup(s);
   assert.equal(c.ok, true, c.message);
   assert.equal(s.media.has(`public${oldUrl}`), false);
   assert.ok(s.media.has(`public${newUrl}`));
@@ -813,57 +856,150 @@ test("unpublishing a slug leaves its _pub copies for the explicit cleanup (no pu
   assert.equal(r.ok, true, r.message);
   assert.ok(s.media.has(`public${url}`)); // still there — deferred
 
-  v = await versions(s);
-  const c = await cleanupFrozenMedia(s, { published: v.published });
+  const c = await cleanup(s);
   assert.equal(c.ok, true, c.message);
   assert.equal(s.media.has(`public${url}`), false); // swept — nothing references it
 });
 
-test("a cleanup that races an in-flight re-publish cannot strand the new photo", async () => {
+// Task 2026-09-09 §1 — the controlled cleanup↔publish sequence:
+//   A. cleanup dry-run reads published.json (photo A published; a stale _pub copy exists)
+//      and records the branch head it was computed against.
+//   B. cleanup pauses (we hold its dry result).
+//   C. an INDEPENDENT request fully re-publishes the item — writeFile(published.json)
+//      then writeFrozenMedia — so the branch head advances.
+//   D. the old cleanup resumes and confirms against its OLD head.
+// Expected: the confirm is rejected (head moved); the just-published photo is intact.
+test("§1 cleanup confirmed against a stale branch head deletes nothing; the fresh publish is intact", async () => {
   const s = photoStore();
   let v = await versions(s);
   await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
-  const urlA = svcPhotoUrls(s)[0];
 
-  // Owner changes the photo; a re-publish begins.
+  // Replace the photo and publish B so a stale _pub/<A> copy now exists.
   s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
   s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
-
-  // Inject: right before publish-2 commits the new snapshot, a manual cleanup
-  // runs against the STILL-OLD published.json and deletes the new _pub/<B> file.
-  const realWrite = s.writeFile.bind(s);
-  let injected = false;
-  s.writeFile = async (file, text, expected) => {
-    if (file.endsWith("published.json") && !injected) {
-      injected = true;
-      const cv = (await getPanelData(s)).versions;
-      await cleanupFrozenMedia(s, { published: cv.published }); // deletes _pub/<B>
-    }
-    return realWrite(file, text, expected);
-  };
-
   v = await versions(s);
-  const r = await publishItem(s, "service", "s1", {
-    working: v.service,
-    review: v.review,
-    published: v.published,
-  });
-  s.writeFile = realWrite;
-  assert.equal(r.ok, true, r.message);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
   const urlB = svcPhotoUrls(s)[0];
-  assert.notEqual(urlB, urlA);
-  assert.ok(injected); // the cleanup really ran mid-publish
-  assert.ok(s.media.has(`public${urlB}`)); // publish re-put it after the snapshot write
+
+  // A. dry run — plans to remove the stale _pub/<A>, pinned to the current head.
+  const dry = await cleanupFrozenMedia(s, {});
+  assert.equal(dry.ok, true);
+  assert.ok(dry.cleanup && dry.cleanup.count >= 1);
+  const staleHead = dry.cleanup!.headSha;
+
+  // C. an independent request fully publishes C — head advances.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("C"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "2" }) }]);
+  v = await versions(s);
+  const rc = await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  assert.equal(rc.ok, true, rc.message);
+  const urlC = svcPhotoUrls(s)[0];
+  assert.notEqual(urlC, urlB);
+
+  // D. the stale cleanup resumes and confirms against the OLD head.
+  const late = await cleanupFrozenMedia(s, { confirm: true, headSha: staleHead });
+  assert.equal((late as { conflict?: boolean }).conflict, true);
+
+  // The freshly published photo is untouched and still resolvable.
+  assert.ok(s.media.has(`public${urlC}`));
+  assert.equal(svcPhotoUrls(s)[0], urlC);
 });
 
-test("cleanupFrozenMedia conflicts (deletes nothing) when published.json moved since page load", async () => {
+test("cleanupFrozenMedia confirm is a conflict (deletes nothing) when the branch head moved", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+  v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const url = svcPhotoUrls(s)[0];
+
+  const c = await cleanupFrozenMedia(s, { confirm: true, headSha: "head-does-not-match" });
+  assert.equal((c as { conflict?: boolean }).conflict, true);
+  assert.ok(s.media.has(`public${url}`)); // untouched
+});
+
+test("§4 cleanup surfaces a delete-batch failure as transient — never a false 'прибрано N'", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+  v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const staleUrl = /* _pub/<A> */ [...s.media.keys()].find((k) => k.includes("/_pub/") && !svcPhotoUrls(s).some((u: string) => `public${u}` === k))!;
+
+  s.deletePublishedMediaBatch = async () => {
+    throw new StorageUnavailableError("GitHub недоступний");
+  };
+  const dry = await cleanupFrozenMedia(s, {});
+  assert.ok(dry.ok && dry.cleanup);
+  const c = await cleanupFrozenMedia(s, { confirm: true, headSha: dry.cleanup!.headSha });
+  assert.equal(c.ok, false);
+  assert.equal((c as { transient?: boolean }).transient, true);
+  assert.doesNotMatch(c.message, /[Пп]рибрано \d/);
+  assert.ok(s.media.has(staleUrl)); // nothing deleted
+});
+
+test("§4 cleanup reports the candidate count and size before deleting anything (dry run)", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+  v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+
+  const dry = await cleanupFrozenMedia(s, {});
+  assert.ok(dry.ok && dry.cleanup);
+  assert.equal(dry.cleanup!.count, 1);
+  assert.ok(dry.cleanup!.totalBytes > 0);
+  assert.match(dry.message, /\d+.*(КБ|МБ)/); // count + human size shown
+  // Dry run deleted nothing.
+  assert.equal([...s.media.keys()].filter((k) => k.includes("/_pub/")).length, 2);
+});
+
+test("§4 getPanelData does NOT fall back to 'in-sync' when the media index read fails", async () => {
   const s = photoStore();
   const v = await versions(s);
   await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
-  const url = svcPhotoUrls(s)[0];
-  const c = await cleanupFrozenMedia(s, { published: "stale-token" });
-  assert.equal((c as { conflict?: boolean }).conflict, true);
-  assert.ok(s.media.has(`public${url}`)); // untouched
+  // A byte change that a working index WOULD flag as 'modified'.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.mediaIndex = async () => {
+    throw new StorageUnavailableError("дерево медіафайлів");
+  };
+  await assert.rejects(() => getPanelData(s), /недоступн|дерев|GitHub/i);
+});
+
+test("§4 a photo over 1 MB freezes byte-identically, reads back 'in-sync', and a byte change is caught", async () => {
+  const big = (marker: number) => {
+    const b = new Uint8Array(1_400_000);
+    b[0] = 0xff;
+    b[1] = 0xd8;
+    b[2] = 0xff;
+    b.fill(marker, 3, b.length - 2);
+    b[b.length - 2] = 0xff;
+    b[b.length - 1] = 0xd9;
+    return b;
+  };
+  const s = photoStore();
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", big(0x41));
+  const v = await versions(s);
+  const r = await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  assert.equal(r.ok, true, r.message);
+  const frozen = svcPhotoUrls(s)[0];
+  assert.deepEqual([...s.media.get(`public${frozen}`)!], [...big(0x41)]); // full bytes, not truncated
+  assert.equal(
+    (await getPanelData(s)).groups.find((g) => g.kind === "service")!.rows[0].publishState,
+    "in-sync",
+  );
+  // Same path, new >1 MB bytes -> modified.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", big(0x42));
+  assert.equal(
+    (await getPanelData(s)).groups.find((g) => g.kind === "service")!.rows[0].publishState,
+    "modified",
+  );
 });
 
 test("publishing one slug never touches another slug's frozen _pub folder", async () => {

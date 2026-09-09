@@ -469,3 +469,159 @@ test("readMedia decodes a small file straight from the contents API (no blob cal
   assert.deepEqual([...(bytes ?? [])], [...small]);
   assert.ok(!calls.some((c) => c.url.includes("/git/blobs/")));
 });
+
+// ---------------------------------------------------------------------------
+// headSha / mediaIndex / deletePublishedMediaBatch (task 2026-09-09 §1–§4)
+// ---------------------------------------------------------------------------
+
+test("headSha returns the branch head commit sha", async () => {
+  const { impl } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "HEAD1" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  assert.equal(await gh.headSha(), "HEAD1");
+});
+
+test("headSha throws (not null) when the branch head cannot be determined", async () => {
+  const { impl } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 404, body: { message: "no" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.headSha(), StorageUnavailableError);
+});
+
+test("mediaIndex reads one recursive tree and returns git blob ids + sizes for public/images/cms only", async () => {
+  const { impl, calls } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "HEAD1" } }),
+    "/git/commits/HEAD1": () => ({ status: 200, body: { tree: { sha: "T1" } } }),
+    "/git/trees/T1": () => ({
+      status: 200,
+      body: {
+        truncated: false,
+        tree: [
+          { path: "public/images/cms/services/s1/_pub/abababab.jpg", type: "blob", sha: "BLOB_A", size: 1_200_000 },
+          { path: "public/images/cms/services/s1/photos/0/image.jpg", type: "blob", sha: "BLOB_B", size: 900 },
+          { path: "src/content/cms/published.json", type: "blob", sha: "BLOB_X", size: 10 },
+          { path: "public/images/cms/services/s1", type: "tree", sha: "TREE_Y" },
+        ],
+      },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const idx = await gh.mediaIndex();
+  assert.equal(idx.size, 2);
+  assert.deepEqual(idx.get("public/images/cms/services/s1/_pub/abababab.jpg"), { id: "BLOB_A", size: 1_200_000 });
+  assert.deepEqual(idx.get("public/images/cms/services/s1/photos/0/image.jpg"), { id: "BLOB_B", size: 900 });
+  assert.ok(!idx.has("src/content/cms/published.json"));
+  assert.equal(calls.filter((c) => c.url.includes("/git/trees/")).length, 1); // exactly one tree fetch
+});
+
+test("mediaIndex refuses a truncated tree rather than reporting a partial state as 'in sync'", async () => {
+  const { impl } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "HEAD1" } }),
+    "/git/commits/HEAD1": () => ({ status: 200, body: { tree: { sha: "T1" } } }),
+    "/git/trees/T1": () => ({ status: 200, body: { truncated: true, tree: [] } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.mediaIndex(), StorageUnavailableError);
+});
+
+test("mediaIndex surfaces a GitHub read error — never an empty (='all in sync') index", async () => {
+  const { impl } = fakeGitHub({
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "HEAD1" } }),
+    "/git/commits/HEAD1": () => ({ status: 200, body: { tree: { sha: "T1" } } }),
+    "/git/trees/T1": () => ({ status: 500, body: { message: "boom" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.mediaIndex(), StorageUnavailableError);
+});
+
+function batchRoutes(over: Partial<Record<string, (init?: RequestInit) => { status: number; body: unknown }>> = {}) {
+  return {
+    "/commits/codex%2Ftest": () => ({ status: 200, body: { sha: "HEAD1" } }),
+    "/git/commits": (init?: RequestInit) =>
+      init?.method === "POST"
+        ? { status: 201, body: { sha: "NEWCOMMIT" } }
+        : { status: 200, body: { tree: { sha: "T1" } } },
+    "/git/trees": (init?: RequestInit) =>
+      init?.method === "POST"
+        ? { status: 201, body: { sha: "NEWTREE" } }
+        : {
+            status: 200,
+            body: {
+              tree: [
+                { path: "public/images/cms/services/s1/_pub/aaaaaaaa.jpg", type: "blob" },
+                { path: "public/images/cms/services/s1/_pub/bbbbbbbb.jpg", type: "blob" },
+              ],
+            },
+          },
+    "/git/refs/heads/codex%2Ftest": () => ({ status: 200, body: { object: { sha: "NEWCOMMIT" } } }),
+    ...over,
+  };
+}
+
+test("deletePublishedMediaBatch: atomic commit removes present paths, reports missing ones as already-absent", async () => {
+  const { impl, calls } = fakeGitHub(batchRoutes());
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const out = await gh.deletePublishedMediaBatch(
+    [
+      "public/images/cms/services/s1/_pub/bbbbbbbb.jpg",
+      "public/images/cms/services/s1/_pub/cccccccc.jpg",
+    ],
+    "HEAD1",
+  );
+  assert.deepEqual(out, [
+    { path: "public/images/cms/services/s1/_pub/bbbbbbbb.jpg", outcome: "deleted" },
+    { path: "public/images/cms/services/s1/_pub/cccccccc.jpg", outcome: "already-absent" },
+  ]);
+  const newTree = calls.find((c) => c.url.endsWith("/git/trees") && c.method === "POST");
+  assert.ok(newTree);
+  assert.deepEqual((newTree!.body as { tree: { path: string; sha: null }[] }).tree, [
+    { path: "public/images/cms/services/s1/_pub/bbbbbbbb.jpg", mode: "100644", type: "blob", sha: null },
+  ]);
+  const patch = calls.find((c) => c.url.includes("/git/refs/heads/") && c.method === "PATCH");
+  assert.equal((patch!.body as { force: boolean }).force, false); // non-force = compare-and-swap
+});
+
+test("deletePublishedMediaBatch: expected head stale -> ConflictError, nothing committed", async () => {
+  const { impl, calls } = fakeGitHub(batchRoutes());
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(
+    () => gh.deletePublishedMediaBatch(["public/images/cms/services/s1/_pub/bbbbbbbb.jpg"], "OLDHEAD"),
+    ConflictError,
+  );
+  assert.ok(!calls.some((c) => c.method === "POST")); // no tree/commit writes attempted
+});
+
+test("deletePublishedMediaBatch: a 422 on the non-force ref update is a ConflictError (HEAD moved mid-flight)", async () => {
+  const { impl } = fakeGitHub(
+    batchRoutes({ "/git/refs/heads/codex%2Ftest": () => ({ status: 422, body: { message: "not a fast forward" } }) }),
+  );
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(
+    () => gh.deletePublishedMediaBatch(["public/images/cms/services/s1/_pub/bbbbbbbb.jpg"], "HEAD1"),
+    ConflictError,
+  );
+});
+
+test("deletePublishedMediaBatch: no matching paths -> no commit, all already-absent", async () => {
+  const { impl, calls } = fakeGitHub(batchRoutes());
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const out = await gh.deletePublishedMediaBatch(
+    ["public/images/cms/services/s1/_pub/cccccccc.jpg"],
+    "HEAD1",
+  );
+  assert.deepEqual(out, [
+    { path: "public/images/cms/services/s1/_pub/cccccccc.jpg", outcome: "already-absent" },
+  ]);
+  assert.ok(!calls.some((c) => c.method === "POST"));
+});
+
+test("deletePublishedMediaBatch rejects a non-_pub path before any network call", async () => {
+  const { impl, calls } = fakeGitHub(batchRoutes());
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() =>
+    gh.deletePublishedMediaBatch(["public/images/cms/services/s1/photos/0/image.jpg"], "HEAD1"),
+  );
+  assert.equal(calls.length, 0);
+});

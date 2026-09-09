@@ -78,6 +78,46 @@ export class LocalFsStorage implements PanelStorage {
     return { state: "n/a" };
   }
 
+  async headSha(): Promise<string | null> {
+    return null; // local files: no branch, no concurrency to guard against
+  }
+
+  /** git blob id of `bytes` — matches what GitHub reports in a tree. */
+  private static blobId(bytes: Buffer): string {
+    return createHash("sha1")
+      .update(Buffer.from(`blob ${bytes.length}\0`, "utf8"))
+      .update(bytes)
+      .digest("hex");
+  }
+
+  async mediaIndex(): Promise<Map<string, { id: string; size: number }>> {
+    const root = abs("public/images/cms");
+    const out = new Map<string, { id: string; size: number }>();
+    const walk = async (dir: string): Promise<void> => {
+      let entries: import("node:fs").Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (e.name.startsWith(".")) continue;
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          await walk(full);
+        } else if (e.isFile()) {
+          const bytes = await fs.readFile(full);
+          out.set(path.relative(process.cwd(), full), {
+            id: LocalFsStorage.blobId(bytes),
+            size: bytes.length,
+          });
+        }
+      }
+    };
+    await walk(root);
+    return out;
+  }
+
   async readMedia(repoPath: string): Promise<Uint8Array | null> {
     assertReadableMediaPath(repoPath);
     try {
@@ -111,8 +151,21 @@ export class LocalFsStorage implements PanelStorage {
     }
   }
 
-  async deletePublishedMedia(repoPath: string): Promise<void> {
-    assertPublishedMediaPath(repoPath);
-    await fs.rm(abs(repoPath), { force: true });
+  async deletePublishedMediaBatch(
+    paths: string[],
+    expectedHeadSha: string | null,
+  ): Promise<{ path: string; outcome: "deleted" | "already-absent" }[]> {
+    void expectedHeadSha; // local files: no branch to guard, and `next dev` is single-writer.
+    const out: { path: string; outcome: "deleted" | "already-absent" }[] = [];
+    for (const p of paths) {
+      assertPublishedMediaPath(p);
+      const existed = await fs
+        .stat(abs(p))
+        .then(() => true)
+        .catch(() => false);
+      await fs.rm(abs(p), { force: true });
+      out.push({ path: p, outcome: existed ? "deleted" : "already-absent" });
+    }
+    return out;
   }
 }

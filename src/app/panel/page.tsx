@@ -10,7 +10,7 @@ import {
   StorageForbiddenError,
 } from "@/lib/content/store/adapter";
 import { getPanelData, type PanelData, type PanelGroup, type PanelRow } from "@/lib/content/panelStore";
-import { PanelButton, RefreshButton } from "./PanelActions";
+import { CleanupFrozenMediaButton, PanelButton, RefreshButton } from "./PanelActions";
 
 export const dynamic = "force-dynamic";
 
@@ -522,13 +522,12 @@ export default async function PanelPage() {
       <div className="mt-10 border-t border-neutral-200 pt-4 dark:border-neutral-800">
         <p className="text-xs text-neutral-500">
           Обслуговування: після кількох замін фото на сайті лишаються старі копії
-          зображень (вони нічому не шкодять). Прибрати їх можна тут — коли ніхто
-          нічого не публікує.
+          зображень (вони нічому не шкодять). Натисніть — покаже, скільки їх і на
+          який обсяг; підтвердіть, щоб прибрати. Робіть це, коли ніхто нічого не
+          публікує. Ніколи не чіпає фото, потрібні поточній опублікованій версії.
         </p>
         <div className="mt-2">
-          <PanelButton payload={{ action: "cleanup-frozen-media" }} versions={data.versions}>
-            Прибрати старі копії фото
-          </PanelButton>
+          <CleanupFrozenMediaButton />
         </div>
       </div>
     </main>

@@ -34,6 +34,9 @@ interface Body {
   locale?: string;
   /** version token per kind ("car"/"gallery"/"service"/"contact") + "review" + "published" */
   versions?: Record<string, string | undefined>;
+  /** cleanup-frozen-media: second call — confirm the dry-run against this head. */
+  confirm?: boolean;
+  headSha?: string;
 }
 
 export async function POST(request: Request) {
@@ -63,7 +66,12 @@ export async function POST(request: Request) {
     return respond(await completeDeletion(storage, { review }));
   }
   if (body.action === "cleanup-frozen-media") {
-    return respond(await cleanupFrozenMedia(storage, { published }));
+    return respond(
+      await cleanupFrozenMedia(storage, {
+        confirm: body.confirm === true,
+        headSha: typeof body.headSha === "string" ? body.headSha : undefined,
+      }),
+    );
   }
 
   const kind = body.kind as KindKey;

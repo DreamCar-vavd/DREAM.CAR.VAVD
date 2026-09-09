@@ -262,29 +262,31 @@ async function writeFrozenMedia(
   for (const p of puts) await storage.putPublishedMedia(p.path, p.bytes);
 }
 
-const FROZEN_HASH_RE = /\/_pub\/([a-f0-9]{8,64})\.\w+$/;
+type MediaIndex = Map<string, { id: string; size: number }>;
 
 /**
  * Is the published snapshot entry `pub` still in sync with working card `item`,
  * accounting for frozen photos?
  *
- * Non-photo fields, and photo COUNT / ORDER / CAPTIONS, are compared exactly. A
- * photo slot is in sync only when its published image is the ACTUAL current
- * version of the working file: a frozen `_pub/<hash>` matches when
- * `sha256(working bytes)` still equals `<hash>`; a plain path matches only when
- * identical. So replacing photo A with B at the same path, or re-ordering
- * photos, now reads as an unpublished change. A working file that cannot be read
- * (network / missing) also reads as changed — we cannot prove it is the same.
+ * Non-photo fields, and photo COUNT / ORDER / CAPTIONS, are compared exactly.
+ * For each photo slot the WORKING file's content id (git blob id, from one
+ * consistent branch tree) is compared to the published `_pub/` copy's id — NOT
+ * to the sha-256 in the file name (a different identifier). Equal ids ⇒ same
+ * bytes ⇒ in sync. A byte change at the same path, or a re-order (Keystatic
+ * renumbers the files), gives a different id → "modified". A working file
+ * missing from the tree, or a published `_pub/` file that has vanished, also
+ * reads as "modified".
  *
- * Cost: one image read per still-frozen photo slot (parallel), only for items
- * that are otherwise unchanged. The panel is an admin page, not a public route.
+ * `index` is fetched once per `getPanelData` (one request in github mode). If
+ * it could not be fetched, `getPanelData` rejects — an incomplete tree is never
+ * read as "all in sync".
  */
-async function inSyncIgnoringFrozenPhotos(
-  storage: PanelStorage,
+function inSyncIgnoringFrozenPhotos(
+  index: MediaIndex,
   kindKey: KindKey,
   pub: Record<string, unknown>,
   item: Record<string, unknown>,
-): Promise<boolean> {
+): boolean {
   const stripPhotoUrls = (o: Record<string, unknown>) => {
     if (kindKey === "promo") return { ...o, image: "" };
     const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
@@ -296,38 +298,27 @@ async function inSyncIgnoringFrozenPhotos(
   const iu = itemImageUrls(kindKey, item);
   if (pu.length !== iu.length) return false;
 
-  const slotChanged = await Promise.all(
-    pu.map(async (pubUrl, i): Promise<boolean> => {
-      const wantHash = pubUrl.match(FROZEN_HASH_RE)?.[1];
-      if (wantHash === undefined) return pubUrl !== iu[i]; // plain path — must match exactly
-      if (iu[i].includes(PUB_SEG)) return iu[i].match(FROZEN_HASH_RE)?.[1] !== wantHash;
-      if (!iu[i].startsWith("/images/cms/") || !IMG_EXT_RE.test(iu[i])) return true;
-      const bytes = await storage.readMedia(`public${iu[i]}`).catch(() => null);
-      return !bytes || mediaHash(bytes) !== wantHash;
-    }),
-  );
-  return !slotChanged.some(Boolean);
+  return pu.every((pubUrl, i) => {
+    const workUrl = iu[i];
+    if (!pubUrl.includes(PUB_SEG)) return pubUrl === workUrl; // legacy plain path
+    const pubId = index.get(`public${pubUrl}`)?.id;
+    const workId = index.get(`public${workUrl}`)?.id;
+    return pubId !== undefined && workId !== undefined && pubId === workId;
+  });
 }
 
-/** Every `_pub/` file path referenced anywhere in `snapshot` (public URLs). */
+const FROZEN_PATH_RE = /\/_pub\/[a-f0-9]+\.\w+$/;
+
+/** Every `_pub/` repo path referenced anywhere in `snapshot` (as `public/…`). */
 function referencedFrozenPaths(snapshot: Snapshot): Set<string> {
   const refs = new Set<string>();
   JSON.stringify(snapshot, (_k, v) => {
-    if (typeof v === "string" && v.includes(PUB_SEG) && /\/_pub\/[a-f0-9]+\.\w+$/.test(v)) {
-      refs.add(v);
+    if (typeof v === "string" && v.includes(PUB_SEG) && FROZEN_PATH_RE.test(v)) {
+      refs.add(v.startsWith("/") ? `public${v}` : v);
     }
     return v;
   });
   return refs;
-}
-/** `public/images/cms/<dir>/<slug>/_pub` for every (dir, slug) that appears in the snapshot. */
-function frozenDirsInSnapshot(snapshot: Snapshot): Set<string> {
-  const dirs = new Set<string>();
-  for (const ref of referencedFrozenPaths(snapshot)) {
-    const m = ref.match(/^\/images\/cms\/([^/]+)\/([^/]+)\/_pub\//);
-    if (m) dirs.add(`public/images/cms/${m[1]}/${m[2]}/${PUBLISHED_MEDIA_DIR}`);
-  }
-  return dirs;
 }
 
 // ---------------------------------------------------------------------------
@@ -417,9 +408,12 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   // renders and the banner shows "unknown" (which the banner never styles as a
   // successful build).
   const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
-  const [publishedF, reviewF, deploy] = await Promise.all([
+  const [publishedF, reviewF, mediaIndex, deploy] = await Promise.all([
     storage.readFile(PUBLISHED),
     storage.readFile(REVIEW),
+    // ONE consistent snapshot of every CMS image (git blob ids). NOT caught —
+    // an incomplete tree must never let a stale card read as "in sync".
+    storage.mediaIndex(),
     storage.deployStatus().catch((err): DeployStatus => {
       if (err instanceof StorageBackendError) {
         return { state: "unknown", reason: "не вдалося перевірити стан збірки" };
@@ -446,86 +440,82 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   const ctx = { review: pruneReview(review, liveKeys), sha256 };
   const instances = KIND_ORDER.map((_, i) => instanceMap(dirs[i].data));
 
-  const groups: PanelGroup[] = await Promise.all(
-    KIND_ORDER.map(async (kindKey, i): Promise<PanelGroup> => {
-      const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
-      const working = workingLists[i];
-      const instanceOf = (id: string) => instances[i].get(id) ?? "";
-      const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
-      const publishedById = new Map(publishedList.map((p) => [p.id, p]));
-      const workingIds = new Set(working.map((w) => w.id));
+  const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i): PanelGroup => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    const working = workingLists[i];
+    const instanceOf = (id: string) => instances[i].get(id) ?? "";
+    const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    const publishedById = new Map(publishedList.map((p) => [p.id, p]));
+    const workingIds = new Set(working.map((w) => w.id));
 
-      const emptyLangStatus = () =>
-        Object.fromEntries(LOCALES.map((l) => [l, "empty" as LangReviewStatus])) as Record<
-          ContentLocale,
-          LangReviewStatus
-        >;
+    const emptyLangStatus = () =>
+      Object.fromEntries(LOCALES.map((l) => [l, "empty" as LangReviewStatus])) as Record<
+        ContentLocale,
+        LangReviewStatus
+      >;
 
-      const rows = await Promise.all(
-        working.map(async (item): Promise<PanelRow> => {
-          const pub = publishedById.get(item.id);
-          const itemCtx = {
-            ...ctx,
-            instance: instanceOf(item.id),
-            reviewKey: reviewKeyFor(kindKey, item.id),
-          };
-          const langStatus = Object.fromEntries(
-            LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
-          ) as Record<ContentLocale, LangReviewStatus>;
-          let publishState: ItemPublishState = "not-published";
-          if (pub) {
-            publishState = (await inSyncIgnoringFrozenPhotos(
-              storage,
-              kindKey,
-              pub as unknown as Record<string, unknown>,
-              item as unknown as Record<string, unknown>,
-            ))
-              ? "in-sync"
-              : "modified";
-          }
-          return {
-            id: item.id,
-            title: kind.displayTitle(item),
-            subtitle: subtitleFor(kindKey, item as never),
-            editHref: editHrefFor(kindKey, item.id, storage.branch),
-            langStatus,
-            blockers: kind.publishBlockers(item, itemCtx),
-            publishState,
-            publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
-            publishedExists: Boolean(pub),
-            workingExists: true,
-          };
-        }),
-      );
-
-      // Entries still in the published snapshot whose working card was deleted.
-      // They keep rendering on the public site, so the panel MUST keep a way to
-      // take them down. Read-only: no edit link (nothing to edit), no publish /
-      // confirm actions, and getPanelData never recreates the working file.
-      const orphanRows = publishedList
-        .filter((pub) => !workingIds.has(pub.id))
-        .map((pub): PanelRow => ({
-          id: pub.id,
-          title: kind.displayTitle(pub),
-          subtitle: subtitleFor(kindKey, pub as never),
-          editHref: null,
-          langStatus: emptyLangStatus(),
-          blockers: [],
-          publishState: "orphan-published",
-          publiclyVisible: kind.isRenderable(pub),
-          publishedExists: true,
-          workingExists: false,
-        }));
-
-      return {
-        kind: kindKey,
-        label: kind.label,
-        singleEntry: Boolean(kind.singleEntry),
-        createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
-        rows: [...rows, ...orphanRows],
+    const rows = working.map((item): PanelRow => {
+      const pub = publishedById.get(item.id);
+      const itemCtx = {
+        ...ctx,
+        instance: instanceOf(item.id),
+        reviewKey: reviewKeyFor(kindKey, item.id),
       };
-    }),
-  );
+      const langStatus = Object.fromEntries(
+        LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
+      ) as Record<ContentLocale, LangReviewStatus>;
+      let publishState: ItemPublishState = "not-published";
+      if (pub) {
+        publishState = inSyncIgnoringFrozenPhotos(
+          mediaIndex,
+          kindKey,
+          pub as unknown as Record<string, unknown>,
+          item as unknown as Record<string, unknown>,
+        )
+          ? "in-sync"
+          : "modified";
+      }
+      return {
+        id: item.id,
+        title: kind.displayTitle(item),
+        subtitle: subtitleFor(kindKey, item as never),
+        editHref: editHrefFor(kindKey, item.id, storage.branch),
+        langStatus,
+        blockers: kind.publishBlockers(item, itemCtx),
+        publishState,
+        publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
+        publishedExists: Boolean(pub),
+        workingExists: true,
+      };
+    });
+
+    // Entries still in the published snapshot whose working card was deleted.
+    // They keep rendering on the public site, so the panel MUST keep a way to
+    // take them down. Read-only: no edit link (nothing to edit), no publish /
+    // confirm actions, and getPanelData never recreates the working file.
+    const orphanRows = publishedList
+      .filter((pub) => !workingIds.has(pub.id))
+      .map((pub): PanelRow => ({
+        id: pub.id,
+        title: kind.displayTitle(pub),
+        subtitle: subtitleFor(kindKey, pub as never),
+        editHref: null,
+        langStatus: emptyLangStatus(),
+        blockers: [],
+        publishState: "orphan-published",
+        publiclyVisible: kind.isRenderable(pub),
+        publishedExists: true,
+        workingExists: false,
+      }));
+
+    return {
+      kind: kindKey,
+      label: kind.label,
+      singleEntry: Boolean(kind.singleEntry),
+      createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
+      rows: [...rows, ...orphanRows],
+    };
+  });
 
   const versions = { review: reviewF.version, published: publishedF.version } as Versions;
   KIND_ORDER.forEach((k, i) => {
@@ -549,7 +539,13 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
 // ---------------------------------------------------------------------------
 
 export type ActionResult =
-  | { ok: true; message: string }
+  | {
+      ok: true;
+      message: string;
+      /** Dry-run summary from `cleanupFrozenMedia` — the client re-submits with
+       *  `confirm` + this `headSha` to actually delete. */
+      cleanup?: { count: number; totalBytes: number; headSha: string };
+    }
   | {
       ok: false;
       message: string;
@@ -829,29 +825,34 @@ export async function completeDeletion(
       `${JSON.stringify(pruneReview(review, workingSlugs), null, 2)}\n`,
       expected.review,
     );
-    // A slug that is now neither a working card nor in the published snapshot is
-    // gone for good — its `_pub/` copies are unreachable by the normal cleanup
-    // (which only scans published + working dirs), so drop them here. Best-effort.
+    // A slug now gone from both working cards AND the published snapshot: its
+    // `_pub/` copies are dead. Sweep them with the same branch-guarded batch the
+    // manual cleanup uses. Best-effort — the review rows are already pruned.
+    let mediaNote = "";
     try {
-      const referenced = referencedFrozenPaths(parseSnapshot((await storage.readFile(PUBLISHED)).data));
-      for (const key of stale) {
-        const [kindKey, ...rest] = key.split(":");
-        const slug = rest.join(":");
-        const dir = slug && IMAGE_DIR[kindKey as KindKey];
-        if (!dir) continue;
-        const pubDir = `public/images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}`;
-        for (const name of await storage.listPublishedMedia(pubDir)) {
-          if (!referenced.has(`/images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${name}`)) {
-            await storage.deletePublishedMedia(`${pubDir}/${name}`);
-          }
-        }
+      const [index, headSha, publishedF] = await Promise.all([
+        storage.mediaIndex(),
+        storage.headSha(),
+        storage.readFile(PUBLISHED),
+      ]);
+      const referenced = referencedFrozenPaths(parseSnapshot(publishedF.data));
+      const staleSlugs = new Set(stale.map((k) => (k.includes(":") ? k.slice(k.indexOf(":") + 1) : k)));
+      const dead = [...index.keys()].filter((p) => {
+        const m = p.match(/^public\/images\/cms\/[^/]+\/([^/]+)\/_pub\//);
+        return m && staleSlugs.has(m[1]) && FROZEN_PATH_RE.test(p) && !referenced.has(p);
+      });
+      if (dead.length > 0) {
+        const done = (await storage.deletePublishedMediaBatch(dead, headSha)).filter(
+          (o) => o.outcome === "deleted",
+        ).length;
+        if (done > 0) mediaNote = ` Прибрано ${done} копі(ю/ї/й) фото.`;
       }
     } catch {
-      /* media sweep is best-effort — the review rows are already pruned */
+      mediaNote = " (копії фото прибрати не вдалося — скористайтеся «Прибрати старі копії фото»).";
     }
     return {
       ok: true,
-      message: `Готово — прибрано рядки підтверджень: ${stale.join(", ")}.`,
+      message: `Готово — прибрано рядки підтверджень: ${stale.join(", ")}.${mediaNote}`,
     };
   });
 }
@@ -889,54 +890,86 @@ export async function freezePublishedMedia(storage: PanelStorage): Promise<{ cha
   return { changed };
 }
 
+/** Human "1.2 МБ" / "640 КБ". */
+function humanBytes(n: number): string {
+  return n >= 1024 * 1024 ? `${(n / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1024))} КБ`;
+}
+
+/** The `_pub/` files no current published entry points at, from ONE branch tree. */
+async function frozenMediaCandidates(
+  storage: PanelStorage,
+): Promise<{ paths: string[]; totalBytes: number; headSha: string | null }> {
+  const [publishedF, index, headSha] = await Promise.all([
+    storage.readFile(PUBLISHED),
+    storage.mediaIndex(),
+    storage.headSha(),
+  ]);
+  const referenced = referencedFrozenPaths(parseSnapshot(publishedF.data));
+  const paths: string[] = [];
+  let totalBytes = 0;
+  for (const [path, { size }] of index) {
+    if (FROZEN_PATH_RE.test(path) && !referenced.has(path)) {
+      paths.push(path);
+      totalBytes += size;
+    }
+  }
+  return { paths: paths.sort(), totalBytes, headSha };
+}
+
 /**
- * Explicit, guarded sweep of `_pub/` copies no longer referenced by the CURRENT
- * published.json — the deferred replacement for the old auto-GC, which could
- * race a parallel re-publish and delete a photo it needed. Version-guarded on
- * published.json: if it moved since the caller loaded the page, abort so we
- * never act on a stale view. Only deletes; never writes published.json.
+ * Explicit, guarded sweep of `_pub/` copies no current published entry points
+ * at. The deferred replacement for the old auto-GC, which could race a parallel
+ * re-publish and delete a photo it needed.
+ *
+ *  - Without `confirm`: a DRY RUN — reports how many files (and how many bytes)
+ *    would go, and the branch head they were computed against. Nothing deleted.
+ *  - With `confirm` + that `headSha`: ONE atomic commit removes exactly those
+ *    files, and only while the branch is still at `headSha` (`deletePublishedMediaBatch`
+ *    pushes non-force; a `ConflictError` means a publish landed in between —
+ *    re-run the dry run). The result reports what was actually removed vs what
+ *    was already gone — never "прибрано N" for an unconfirmed delete.
  */
 export async function cleanupFrozenMedia(
   storage: PanelStorage,
-  expected: { published: string },
+  opts: { confirm?: boolean; headSha?: string | null } = {},
 ): Promise<ActionResult> {
   return runAction("Не вдалося прибрати старі копії", async () => {
-    const publishedF = await storage.readFile(PUBLISHED);
-    if ((publishedF.version || "") !== expected.published) {
-      return { ok: false, conflict: true, message: new ConflictError("знімок").message };
-    }
-    const snapshot = parseSnapshot(publishedF.data);
-    const referenced = referencedFrozenPaths(snapshot); // full public URLs kept by the live site
+    const { paths, totalBytes, headSha } = await frozenMediaCandidates(storage);
 
-    // Every `_pub/` folder we can reach: those the snapshot points into, plus
-    // every working card's (a card whose photos were edited down still has old
-    // copies). A slug that is neither published nor a working card is invisible
-    // here — that residue is swept by re-running the migration script.
-    const dirs = new Set(frozenDirsInSnapshot(snapshot));
-    const kindDirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
-    KIND_ORDER.forEach((kindKey, i) => {
-      const imgDir = IMAGE_DIR[kindKey];
-      if (!imgDir) return;
-      for (const e of kindDirs[i].data) {
-        const slug = e.name.replace(/\.json$/, "");
-        dirs.add(`public/images/cms/${imgDir}/${slug}/${PUBLISHED_MEDIA_DIR}`);
-      }
-    });
-
-    let removed = 0;
-    for (const pubDir of dirs) {
-      const urlBase = `/${pubDir.replace(/^public\//, "")}`;
-      for (const name of await storage.listPublishedMedia(pubDir)) {
-        if (!referenced.has(`${urlBase}/${name}`)) {
-          await storage.deletePublishedMedia(`${pubDir}/${name}`);
-          removed += 1;
-        }
-      }
+    if (paths.length === 0) {
+      return { ok: true, message: "Зайвих копій фото немає — усе прибрано." };
     }
+    if (!opts.confirm) {
+      return {
+        ok: true,
+        message: `Можна прибрати ${paths.length} стар(у/і/их) копі(ю/ї/й) фото — ${humanBytes(
+          totalBytes,
+        )}. Натисніть ще раз, щоб підтвердити.`,
+        cleanup: { count: paths.length, totalBytes, headSha: headSha ?? "" },
+      };
+    }
+    if (opts.headSha !== undefined && (opts.headSha ?? "") !== (headSha ?? "")) {
+      return {
+        ok: false,
+        conflict: true,
+        message: new ConflictError("гілка").message,
+      };
+    }
+
+    const outcomes = await storage.deletePublishedMediaBatch(paths, headSha);
+    const deleted = outcomes.filter((o) => o.outcome === "deleted").length;
+    const absent = outcomes.filter((o) => o.outcome === "already-absent").length;
+    if (deleted === 0) {
+      return { ok: true, message: "Прибирати нічого — усі кандидати вже відсутні." };
+    }
+    const tail =
+      storage.mode === "github" ? " Зміни в гілці після наступної збірки." : "";
     return {
       ok: true,
       message:
-        removed === 0 ? "Зайвих копій фото немає." : `Прибрано зайвих копій фото: ${removed}.`,
+        `Прибрано ${deleted} стар(у/і/их) копі(ю/ї/й) фото` +
+        (absent ? ` (ще ${absent} вже були відсутні)` : "") +
+        `.${tail}`,
     };
   });
 }

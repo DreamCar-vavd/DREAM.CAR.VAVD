@@ -292,6 +292,19 @@ export class GitHubStorage implements PanelStorage {
       .digest("hex");
   }
 
+  /** Just `{ sha, size }` for a path — the contents JSON carries the blob sha
+   *  even for large files, so no blob download. null when the path is absent. */
+  private async getMeta(repoPath: string): Promise<{ sha: string; size: number } | null> {
+    const { status, body, headers } = await this.gh(
+      this.repoUrl(`/contents/${repoPath}?ref=${this.ref()}`),
+    );
+    if (status === 404) return null;
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
+    if (status !== 200) throw new Error(`GitHub stat ${repoPath} failed (${status})`);
+    const f = body as { sha: string; size?: number };
+    return { sha: f.sha, size: f.size ?? 0 };
+  }
+
   private async getRaw(repoPath: string): Promise<{ bytes: Uint8Array; sha: string } | null> {
     const { status, body, headers } = await this.gh(
       this.repoUrl(`/contents/${repoPath}?ref=${this.ref()}`),
@@ -321,7 +334,7 @@ export class GitHubStorage implements PanelStorage {
 
   async putPublishedMedia(repoPath: string, bytes: Uint8Array): Promise<void> {
     assertPublishedMediaPath(repoPath);
-    const existing = await this.getRaw(repoPath);
+    const existing = await this.getMeta(repoPath); // sha only — no byte download
     if (existing && existing.sha === GitHubStorage.blobSha(bytes)) return; // already there
     const payload: Record<string, unknown> = {
       message: `panel: publish media ${repoPath}`,
@@ -365,21 +378,103 @@ export class GitHubStorage implements PanelStorage {
       .sort();
   }
 
-  async deletePublishedMedia(repoPath: string): Promise<void> {
-    assertPublishedMediaPath(repoPath);
-    const existing = await this.getRaw(repoPath);
-    if (!existing) return; // already gone
-    const { status, body, headers } = await this.gh(this.repoUrl(`/contents/${repoPath}`), {
-      method: "DELETE",
+  async headSha(): Promise<string | null> {
+    const sha = await this.branchHeadSha();
+    if (!sha) throw new StorageUnavailableError("не вдалося визначити останній коміт гілки");
+    return sha;
+  }
+
+  async mediaIndex(): Promise<Map<string, { id: string; size: number }>> {
+    const head = await this.branchHeadSha();
+    if (!head) throw new StorageUnavailableError("дерево медіафайлів");
+    const commit = await this.gh(this.repoUrl(`/git/commits/${head}`));
+    GitHubStorage.rejectIfUnauthorized(commit.status, commit.headers, commit.body);
+    if (commit.status !== 200) throw new StorageUnavailableError("дерево медіафайлів (коміт)");
+    const treeSha = (commit.body as { tree: { sha: string } }).tree.sha;
+    const tree = await this.gh(this.repoUrl(`/git/trees/${treeSha}?recursive=1`));
+    GitHubStorage.rejectIfUnauthorized(tree.status, tree.headers, tree.body);
+    if (tree.status !== 200) throw new StorageUnavailableError("дерево медіафайлів");
+    const body = tree.body as { tree: { path: string; type: string; sha: string; size?: number }[]; truncated?: boolean };
+    if (body.truncated) {
+      // Very rare (>100k entries). Refuse rather than compare against a partial
+      // tree, which would read as "all in sync".
+      throw new StorageUnavailableError("дерево медіафайлів завелике для одного запиту");
+    }
+    const out = new Map<string, { id: string; size: number }>();
+    for (const e of body.tree) {
+      if (e.type === "blob" && e.path.startsWith("public/images/cms/")) {
+        out.set(e.path, { id: e.sha, size: e.size ?? 0 });
+      }
+    }
+    return out;
+  }
+
+  async deletePublishedMediaBatch(
+    paths: string[],
+    expectedHeadSha: string | null,
+  ): Promise<{ path: string; outcome: "deleted" | "already-absent" }[]> {
+    for (const p of paths) assertPublishedMediaPath(p);
+    if (paths.length === 0) return [];
+
+    const head = await this.branchHeadSha();
+    if (!head) throw new StorageUnavailableError("останній коміт гілки");
+    if (expectedHeadSha && head !== expectedHeadSha) {
+      // The plan was computed against an older tree — a publish (or another
+      // cleanup) has landed since. Refuse; the caller re-plans.
+      throw new ConflictError("гілка");
+    }
+    const commit = await this.gh(this.repoUrl(`/git/commits/${head}`));
+    GitHubStorage.rejectIfUnauthorized(commit.status, commit.headers, commit.body);
+    if (commit.status !== 200) throw new StorageUnavailableError("базовий коміт для видалення");
+    const baseTree = (commit.body as { tree: { sha: string } }).tree.sha;
+
+    // Only paths that actually exist in this tree become deletions; the rest are
+    // reported as already-absent and never touched.
+    const treeRes = await this.gh(this.repoUrl(`/git/trees/${baseTree}?recursive=1`));
+    GitHubStorage.rejectIfUnauthorized(treeRes.status, treeRes.headers, treeRes.body);
+    if (treeRes.status !== 200) throw new StorageUnavailableError("дерево гілки");
+    const present = new Set(
+      (treeRes.body as { tree: { path: string; type: string }[] }).tree
+        .filter((e) => e.type === "blob")
+        .map((e) => e.path),
+    );
+    const toDelete = paths.filter((p) => present.has(p));
+    const outcomes: { path: string; outcome: "deleted" | "already-absent" }[] = paths.map((p) => ({
+      path: p,
+      outcome: present.has(p) ? "deleted" : "already-absent",
+    }));
+    if (toDelete.length === 0) return outcomes;
+
+    const newTree = await this.gh(this.repoUrl(`/git/trees`), {
+      method: "POST",
       body: JSON.stringify({
-        message: `panel: drop unreferenced media ${repoPath}`,
-        sha: existing.sha,
-        branch: this.cfg.branch,
+        base_tree: baseTree,
+        tree: toDelete.map((p) => ({ path: p, mode: "100644", type: "blob", sha: null })),
       }),
     });
-    if (status === 404 || status === 409 || status === 422) return; // raced away — fine
-    GitHubStorage.rejectIfUnauthorized(status, headers, body);
-    if (status !== 200) throw new Error(`GitHub delete ${repoPath} failed (${status})`);
+    GitHubStorage.rejectIfUnauthorized(newTree.status, newTree.headers, newTree.body);
+    if (newTree.status !== 201) throw new StorageUnavailableError("дерево видалення");
+
+    const newCommit = await this.gh(this.repoUrl(`/git/commits`), {
+      method: "POST",
+      body: JSON.stringify({
+        message: `panel: drop ${toDelete.length} unreferenced media file(s)`,
+        tree: (newTree.body as { sha: string }).sha,
+        parents: [head],
+      }),
+    });
+    GitHubStorage.rejectIfUnauthorized(newCommit.status, newCommit.headers, newCommit.body);
+    if (newCommit.status !== 201) throw new StorageUnavailableError("коміт видалення");
+
+    // Non-force ref update: lands ONLY if HEAD is still `head` (fast-forward).
+    const patch = await this.gh(this.repoUrl(`/git/refs/heads/${encodeURIComponent(this.cfg.branch)}`), {
+      method: "PATCH",
+      body: JSON.stringify({ sha: (newCommit.body as { sha: string }).sha, force: false }),
+    });
+    if (patch.status === 422) throw new ConflictError("гілка"); // HEAD moved — not a fast-forward
+    GitHubStorage.rejectIfUnauthorized(patch.status, patch.headers, patch.body);
+    if (patch.status !== 200) throw new StorageUnavailableError(`оновлення гілки не вдалося (${patch.status})`);
+    return outcomes;
   }
 
   private async branchHeadSha(): Promise<string | null> {

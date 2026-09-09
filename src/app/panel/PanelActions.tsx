@@ -17,8 +17,7 @@ type ActionPayload =
   | { action: "confirm-locale"; kind: string; id: string; locale: string }
   | { action: "publish"; kind: string; id: string }
   | { action: "unpublish"; kind: string; id: string }
-  | { action: "complete-deletion" }
-  | { action: "cleanup-frozen-media" };
+  | { action: "complete-deletion" };
 
 export function PanelButton({
   payload,
@@ -118,6 +117,110 @@ export function PanelButton({
               Оновити
             </button>
           )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Two-step "Прибрати старі копії фото": first click is a DRY RUN (server reports
+ * count + size + the branch head it was computed against); the button then turns
+ * into "Підтвердити …" and the second click deletes exactly that set against
+ * that head. A publish landing in between makes the confirm a no-op conflict.
+ */
+export function CleanupFrozenMediaButton() {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "conflict"; text: string } | null>(null);
+  const [pending, setPending] = useState<{ count: number; headSha: string } | null>(null);
+
+  async function call(confirm: boolean, headSha?: string) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/panel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cleanup-frozen-media", confirm, headSha, versions: {} }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        message: string;
+        conflict?: boolean;
+        transient?: boolean;
+        cleanup?: { count: number; totalBytes: number; headSha: string };
+      };
+      if (data.ok && data.cleanup && !confirm) {
+        setPending({ count: data.cleanup.count, headSha: data.cleanup.headSha });
+        setMsg({ kind: "ok", text: data.message });
+      } else {
+        setPending(null);
+        setMsg({
+          kind: data.ok ? "ok" : data.conflict || data.transient ? "conflict" : "err",
+          text: data.message,
+        });
+        if (data.ok) startTransition(() => router.refresh());
+      }
+    } catch {
+      setPending(null);
+      setMsg({
+        kind: "conflict",
+        text: "Помилка мережі — оновіть сторінку й перевірте стан перш ніж повторювати.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const cls =
+    "inline-flex min-h-[36px] items-center rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-40";
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      {pending ? (
+        <span className="inline-flex gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => call(true, pending.headSha)}
+            className={`${cls} border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950`}
+          >
+            {busy ? "…" : `Підтвердити — прибрати ${pending.count}`}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setPending(null);
+              setMsg(null);
+            }}
+            className={`${cls} border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800`}
+          >
+            Скасувати
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => call(false)}
+          className={`${cls} border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800`}
+        >
+          {busy ? "…" : "Прибрати старі копії фото"}
+        </button>
+      )}
+      {msg && (
+        <span
+          className={`text-xs ${
+            msg.kind === "ok"
+              ? "text-green-700 dark:text-green-400"
+              : msg.kind === "conflict"
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-red-600"
+          }`}
+        >
+          {msg.text}
         </span>
       )}
     </span>

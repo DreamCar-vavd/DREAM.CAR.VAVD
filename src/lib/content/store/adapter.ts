@@ -242,6 +242,22 @@ export interface PanelStorage {
    */
   deployStatus(): Promise<DeployStatus>;
 
+  /**
+   * The branch HEAD commit id — the "version" a batch media delete is guarded
+   * against. `null` in local mode (no branch / no concurrency). MUST reject on a
+   * backend failure, never return a stale value.
+   */
+  headSha(): Promise<string | null>;
+
+  /**
+   * Every file under `public/images/cms/` in ONE consistent snapshot of the
+   * branch: `repoPath -> { id, size }` where `id` is a content identity (the git
+   * blob id in github mode). Two paths with the same `id` are byte-identical.
+   * One request in github mode; a filesystem walk in local mode. Rejects on a
+   * backend failure — an incomplete tree must never read as "all in sync".
+   */
+  mediaIndex(): Promise<Map<string, { id: string; size: number }>>;
+
   /** Bytes of a CMS image (any working or published path). null when absent. */
   readMedia(repoPath: string): Promise<Uint8Array | null>;
   /**
@@ -252,8 +268,17 @@ export interface PanelStorage {
   putPublishedMedia(repoPath: string, bytes: Uint8Array): Promise<void>;
   /** File names directly inside a `…/<slug>/_pub` folder. [] when it does not exist. */
   listPublishedMedia(dirPath: string): Promise<string[]>;
-  /** Delete a published-media file. No-op when already gone. */
-  deletePublishedMedia(repoPath: string): Promise<void>;
+  /**
+   * Delete several published-media files in ONE atomic step, guarded by
+   * `expectedHeadSha`: in github mode this is a single commit whose parent is
+   * that sha, pushed non-force, so it lands ONLY while the branch has not moved
+   * (a `ConflictError` otherwise — the plan was built against an older tree).
+   * `paths` not present are reported as `already-absent`, never as `deleted`.
+   */
+  deletePublishedMediaBatch(
+    paths: string[],
+    expectedHeadSha: string | null,
+  ): Promise<{ path: string; outcome: "deleted" | "already-absent" }[]>;
 }
 
 export interface DeployMeta {
