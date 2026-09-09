@@ -253,5 +253,12 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
+  },
+  "service:zzz-photo": {
+    "instance": "mtuclj0u-uh6vpb93",
+    "uk": {
+      "hash": "2262aa99b81332d5d93799f384cb4519a1881feecaa95d7c0ec8fae77fd86c35",
+      "at": "2026-09-09T17:06:10.073Z"
+    }
   }
 }
