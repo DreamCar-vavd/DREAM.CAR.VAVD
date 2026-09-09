@@ -14,20 +14,19 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head:** `38489bc` (код+docs поверх `87fe84a`, див. `git log`); PR #26 draft.
-  Локально **не запушено** (9 комітів `7b8b0e0`…`38489bc`; П26/П27/П28/П29 +
-  docs). **Remote SHA `b28bcac`** — звірено `git ls-remote origin` (мережею),
-  без змін.
+- **Head = remote:** `be85c0b` — **запушено 2026-09-09 ~10:10** (`b28bcac..be85c0b`).
+  PR #26 draft. 10 комітів (`7b8b0e0`…`be85c0b`, П24–П29).
 - **Сигнали окремо (не плутати):**
-  - **GitHub CI `Verify`** — success на `359c108` і `b28bcac` (`gh pr checks 26`). Виконує tsc/eslint/тести + `next build` (Turbopack), але **без** env-змінних Keystatic → `storage.kind='local'` → github-перевірка не спрацьовує. Тому зелений `Verify` ≠ зелена збірка Vercel Preview, де env вже є.
-  - **Vercel Preview build** — на `359c108` **Ready** (`36PPjaFU3fSU8UXG2oVKu6WpYfHe`, збиралось ще до env-змінних); на `b28bcac` **Error** (`8bFFkFtSjXffsi7c22whANajjige`) — Keystatic github-режим уже активний, але без `KEYSTATIC_GITHUB_CLIENT_SECRET` + `KEYSTATIC_SECRET` → див. П24. Очікувано, не регресія коду.
-  - **Перевірка запуску сторінок на Vercel** — ще не робилась (немає успішної збірки з github-env).
-  - **Перевірка входу користувача на Vercel** — ще не робилась.
-- **Тести:** **276 pass** · tsc 0 · eslint 0 (після П29). `npm run build`
-  (**Turbopack**) — зелений на П28 (`699e698`); на П29 (`38489bc`) build
-  **локально не запускався** — `:3000` власника ділить цей `.next` (див. П29);
-  збірку П29 підтвердить Vercel після push. content:check/guard — зелені (П28).
-- **Preview (Vercel):** остання **зелена** збірка — `359c108` (публічні сторінки працюють; `/panel` + `/keystatic` = 404, бо github-env тоді ще не було). `b28bcac` не обслуговується (Error).
+  - **GitHub CI `Verify`** — success (tsc/eslint/тести + `next build` Turbopack, **без** github-env → `storage.kind='local'` → github-перевірка не спрацьовує).
+  - **Vercel Preview build** — `be85c0b` **Ready** (deployment `dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x`, 1m 2s, Preview). 3 давні tracing-warnings `localFs.ts` (Vercel рахує як «3 errors» — доброякісні, були й на зеленому `359c108`). Раніше: `b28bcac` Error (немає секретів), `359c108` Ready (до env).
+  - **Перевірка запуску сторінок на Vercel** — ✅ `/`, `/uk|en|ru`, `/panel`, `/keystatic` віддаються (П30).
+  - **Перевірка входу користувача на Vercel** — ⚠️ **вхід не завершується** — OAuth callback → 401 «Authorization failed» (див. П30). Vercel Authentication **не** втручається.
+- **Тести:** **276 pass** · tsc 0 · eslint 0 (П29). `npm run build` (Turbopack) —
+  Ready на Vercel для `be85c0b`. content:check/guard — зелені (П28).
+- **Preview (Vercel):** `be85c0b` **Ready**; стабільний branch alias
+  `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
+  віддає цей deployment. `/panel` без входу → правильний app-gate
+  «Ви не увійшли через GitHub».
 - **Робочі копії:** код гілки — `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` (тут `git log`, коміти, head `b28bcac`). Локальний dev-сервер :3010 обслуговує окремий worktree `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` (той самий кінець гілки, `359c108`; має додатковий git-ignored `.env`/`.env.local`). Різниця SHA між ними — лише документаційний коміт `b28bcac`; **перезапуск :3010 через це не потрібен** (код сторінок не змінювався).
 
 ### Б1 (GitHub App) — стан на 2026-09-08
@@ -73,6 +72,60 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П30 — Preview запущено; збірка Ready; вхід блокується на OAuth token-exchange
+
+**2026-09-09 ~10:05–10:20 BST.**
+
+**Конфігурація Vercel — 7/7, усі `Preview` / лише гілка `codex/admin-panel-spike`,
+контактні env не зачеплені, дублікатів немає:**
+| Змінна | Значення | Звірка |
+|---|---|---|
+| `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND` | (reveal завис у Vercel) | `=github` — доведено функціонально: panel-роути активні, не 404 |
+| `KEYSTATIC_GITHUB_REPO_OWNER` | (reveal завис) | `DreamCar-vavd` при створенні 22h тому, не «Updated» |
+| `KEYSTATIC_GITHUB_REPO_NAME` | `DREAM.CAR.VAVD` | ✅ показано |
+| `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` | `dreamcar-vavd-keystatic` | ✅ показано |
+| `KEYSTATIC_GITHUB_CLIENT_ID` | `Iv23ligKwtoqGEQNKSIk` | ✅ показано — байт-у-байт із `.env` |
+| `KEYSTATIC_GITHUB_CLIENT_SECRET` | Secret (не читається) | ❓ **підозрюваний** — «Added 37m ago», власник лишив без змін |
+| `KEYSTATIC_SECRET` | Secret (не читається) | ✅ **функціонально працює** — OAuth `state` пройшов валідацію (власник виправив о 10:07) |
+
+**Push:** `b28bcac..be85c0b` (10 комітів). Remote = local = `be85c0b`.
+
+**Deployment:** `dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x` · `be85c0b` · Preview ·
+**Ready** · 1m 2s · alias `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`.
+
+**Браузер (Chrome власника):**
+- ✅ branch alias віддає цей deployment; **Vercel Authentication не блокує** —
+  сторінки відкриваються напряму.
+- ✅ `/panel` без входу → app-gate «Ви не увійшли через GitHub… Відкрити
+  Keystatic і увійти» (тобто panel-роути активні, github-режим).
+- ✅ `/keystatic` → «Log in with GitHub».
+- ✅ Клік «Log in» → GitHub → **callback на правильний Preview-хост**
+  (`dreamcarvavd-git-codex-admin-p-648563-…`, **не** 127.0.0.1) — виправлення
+  redirect-URI працює.
+- ❌ **Callback → 401 «Authorization failed».** Vercel runtime log:
+  `GET /api/keystatic/github/oauth/callback` → 401, зроблено
+  `POST github.com/login/oauth/access_token`, відповідь за 249 мс. Обмін
+  `code`→token із GitHub провалився.
+
+**Діагноз (чим підтверджено):**
+- `state` пройшов → `KEYSTATIC_SECRET` правильний (інакше збій був би **до**
+  token-exchange).
+- `KEYSTATIC_GITHUB_CLIENT_ID` звірено (`Iv23ligKwtoqGEQNKSIk`).
+- `code` свіжий (щойно виданий).
+- → лишається **`KEYSTATIC_GITHUB_CLIENT_SECRET`** — найімовірніше хибне/переплутане
+  значення. (Альтернатива — `redirect_uri_mismatch` у GitHub App; перевірити
+  налаштування App **не можу** — вони під sudo/2FA.)
+
+**Дія власника:** переввести `KEYSTATIC_GITHUB_CLIENT_SECRET` у Vercel зі
+`/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify/.env` (40 символів;
+це значення, яке Keystatic записав під час створення App). Потім redeploy
+`be85c0b` і повторний вхід. Якщо не допоможе — регенерувати client secret у
+GitHub App і звірити, що 2 callback URL на місці (локальний + Preview alias).
+
+**Не перевірено (чекає завершеного входу):** редактор Keystatic, `/panel` з
+даними 3/8/5/1, гілка в UI, картки/фото/мови, чернетка, банер стану, вихід/
+повторний вхід, 375 px + клавіатура.
 
 ### П29 — ризик `.next` серверу власника; 429/Retry-After; передпуш-звірка
 
