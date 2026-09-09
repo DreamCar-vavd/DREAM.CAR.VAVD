@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-09T13:21:45.555Z",
+  "publishedAt": "2026-09-09T13:23:15.228Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1088,6 +1088,59 @@
         ],
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "zzz-test-panel",
+      "order": 999,
+      "status": "coming-soon",
+      "iconSrc": "/images/services/premium-3d/06-auto-moto-special-equipment-premium-3d.png",
+      "priceAmount": "60",
+      "priceCurrency": "£",
+      "photos": [
+        {
+          "image": "/images/cms/services/zzz-test-panel/photos/0/image.jpg",
+          "caption": "zzz-test photo — DELETE ME"
+        }
+      ],
+      "uk": {
+        "title": "ZZZ Тест панелі — видалити",
+        "shortDescription": "Тимчасовий матеріал для перевірки запису. DELETE ME. (правка UK)",
+        "longDescription": "Створено під час hosted-перевірки панелі на гілці codex/admin-panel-spike. Підлягає видаленню одразу після тесту. [зміна 2 — вкладка A]",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "ZZZ Panel test — delete",
+        "shortDescription": "Temporary item to verify writes. DELETE ME.",
+        "longDescription": "Created during hosted panel verification on branch codex/admin-panel-spike. To be deleted right after the test.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "ZZZ Тест панели — удалить",
+        "shortDescription": "Временный материал для проверки записи. DELETE ME.",
+        "longDescription": "Создан во время hosted-проверки панели на ветке codex/admin-panel-spike. Подлежит удалению сразу после теста.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
         "modalSections": [],
         "priceNote": "",
         "seoTitle": "",
