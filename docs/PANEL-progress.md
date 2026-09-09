@@ -14,14 +14,19 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Remote:** `a77d3e4` (запушено 2026-09-09 ~11:00). **Local HEAD:** `0107420`
-  (журнали П32/П33 + сценарій — **не запушено**, щоб не робити зайву збірку).
+- **Remote:** `a77d3e4` (запушено 2026-09-09 ~11:00). **Local HEAD:** `e8d3dba`
+  (журнали П32/П33/П34 + двічі уточнений сценарій — **4 коміти не запушено**
+  станом на підготовку П34; узгоджений push — окремо, разом із П34).
+  Незапушені: `0107420` `4fe9c0e` `48d39d3` `e8d3dba` — **тільки** `docs/`
+  (`git diff --stat a77d3e4..HEAD` = `PANEL-progress.md` + `PANEL-write-publish-scenario.md`).
+  Fast-forward можливий (remote — предок HEAD, розбіжності немає).
   PR #26 draft. `main` = `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` (звірено
-  `git ls-remote origin` 11:20 BST).
+  `git ls-remote origin` 2026-09-09 12:34 BST — не зрушив).
   Deployment `CZREYKxhJC7ziAH93w1x45qp5pKD` (`a77d3e4`, Preview, **Ready**) —
   стабільний branch alias
   `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
-  веде на нього.
+  веде на нього. Код застосунку між `a77d3e4` і `e8d3dba` **не** змінювався —
+  push оновить лише документацію (нова Preview-збірка того самого коду).
 - **hosted Б1 — перевірено (П32, Chrome власника, авторизована сесія):**
   вхід через GitHub (callback на Preview-хост) ✅ · Keystatic-дашборд ✅ ·
   `/panel` на `codex/admin-panel-spike` ✅ · **3 авто / 8 галерей / 5 послуг /
@@ -86,6 +91,111 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П34 — контрольна точка відновлення + сценарій `zzz-test-panel` фіналізовано (Етапи 1–2)
+
+**Дата:** 2026-09-09 ~12:34 BST. **Коміти:** `48d39d3` (уточнення сценарію),
+`e8d3dba` (фіналізація сценарію, Етап 2), цей запис. **Реальні записи в панель
+НЕ робились** — Етапи 3–6 чекають окремого «так» власника.
+
+**Стан Git на момент точки:**
+- Local HEAD `e8d3dba`, робоче дерево чисте.
+- `origin/codex/admin-panel-spike` = `a77d3e4`; незапушені `0107420`, `4fe9c0e`,
+  `48d39d3`, `e8d3dba` — **лише `docs/`**.
+- `main` = `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` (`git ls-remote`, не кеш).
+- Розбіжності гілок немає (fast-forward), reset/force-push не потрібні.
+
+**Робочі копії (призначення):**
+| Шлях | Призначення | Гілка / кінець |
+|---|---|---|
+| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | основна: `git log`, коміти, редагування коду й доків | `codex/admin-panel-spike`, HEAD `e8d3dba` |
+| `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` | worktree setup GitHub App; тримає git-ignored `.env` (секрети) + `.env.local`; dev-сервер :3010 (`next dev --webpack -H 127.0.0.1`, pid у `setup-server.log`) | той самий кінець гілки |
+| `/Users/apple/Projects/DREAM.CAR.VAVD` | канонічний репозиторій сайту (Production/`main`), **цим завданням не чіпається** | `main` |
+
+**Перевірений deployment:** `CZREYKxhJC7ziAH93w1x45qp5pKD` (`a77d3e4`, Preview,
+Ready) через стабільний alias
+`dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`.
+Hosted-перевірка входу/читання/чернетки/виходу — П32.
+
+**Команди запуску / перевірки:**
+```
+# у основній копії
+git fetch origin && git status && git log --oneline origin/codex/admin-panel-spike..HEAD
+git ls-remote origin refs/heads/main refs/heads/codex/admin-panel-spike
+npm ci && npx tsc --noEmit && npm run lint && npm test   # Turbopack build робить Vercel, локально не потрібен
+# setup-worktree (github-режим, окремо):
+cd ../DREAM.CAR.VAVD-panel-setup-verify && npm run dev   # :3010, вантажить .env.local + .env
+```
+
+**Env-змінні (точні назви й область — БЕЗ значень):**
+- Vercel, проєкт `dream.car.vavd`, **Environment = Preview, прив'язка лише до
+  гілки `codex/admin-panel-spike`** (не Production/Development) — 7 шт.:
+  | Назва | Область | Секрет? |
+  |---|---|---|
+  | `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND` (`github`) | Preview/branch | ні |
+  | `KEYSTATIC_GITHUB_REPO_OWNER` (`DreamCar-vavd`) | Preview/branch | ні |
+  | `KEYSTATIC_GITHUB_REPO_NAME` (`DREAM.CAR.VAVD`) | Preview/branch | ні |
+  | `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG` (`dreamcar-vavd-keystatic`) | Preview/branch | ні (публічний slug) |
+  | `KEYSTATIC_GITHUB_CLIENT_ID` | Preview/branch | ідентифікатор (лише в env) |
+  | `KEYSTATIC_GITHUB_CLIENT_SECRET` | Preview/branch | **СЕКРЕТ** |
+  | `KEYSTATIC_SECRET` | Preview/branch | **СЕКРЕТ** (підпис сесії) |
+  Скорочені імена (`CLIENT_ID` тощо) код не читає.
+- Локальний setup-worktree `.env` (git-ignored, права `600`): `KEYSTATIC_GITHUB_CLIENT_ID`
+  (`Iv23…`, 20), `KEYSTATIC_GITHUB_CLIENT_SECRET` (40), `KEYSTATIC_SECRET`
+  (80 hex), `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`. `.env.local` (несекретні):
+  `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`, `KEYSTATIC_GITHUB_REPO_OWNER`,
+  `KEYSTATIC_GITHUB_REPO_NAME`, `PANEL_CONTENT_BRANCH=codex/admin-panel-spike`.
+- Значення секретів у Git / звіти / знімки **не** потрапляють.
+
+**Як відновити цю версію в окремій папці:**
+```
+git clone <origin> DREAM.CAR.VAVD-restore && cd DREAM.CAR.VAVD-restore
+git checkout codex/admin-panel-spike
+git checkout e8d3dba          # або конкретний перевірений SHA
+npm ci
+# для github-режиму: створити .env + .env.local вручну зі свого захищеного
+# сховища секретів (у репозиторії їх немає — див. нижче)
+```
+
+**Що входить у збережений стан (GitHub):** увесь код панелі, гейти, тести,
+контент CMS (`src/content/cms/**` — авто/галерея/послуги/контакти + `published.json`,
+`review-state.json`), **фотографії матеріалів** (`public/images/cms/**` — вони
+закомічені в гілку, не зовнішнє сховище), документи, `keystatic.config.ts`.
+
+**Що GitHub НЕ покриває (тому резервування коду — не «повне»):**
+- **Секрети** — 4 значення у `…-panel-setup-verify/.env` і 7 змінних Vercel
+  Preview. У Git їх немає (правильно). **Погодженої захищеної копії секретів
+  наразі немає.**
+  → **Дія власника:** зберегти ці значення у власному менеджері паролів
+  (окремий запис «DREAM.CAR.VAVD Keystatic Preview», поля = назви змінних вище).
+  Без цього втрата `.env` = повторна генерація Client Secret у GitHub App.
+- **Налаштування зовнішніх сервісів:** сама GitHub App `dreamcar-vavd-keystatic`
+  (App ID, права, встановлення на репозиторій), прив'язка змінних Vercel до
+  гілки, Vercel Deployment Protection — конфігурація в консолях, не в репо.
+- **Не підключені (тому й не резервуються):** Vercel Blob (відео, Б2), Postgres
+  заявок (Б3).
+
+**Що зроблено (Етап 2):** `docs/PANEL-write-publish-scenario.md` доведено до
+готовності — передумова чистоти, `iconSrc` = наявна іконка `premium-3d/06`,
+розділення перевірок фото (завантаження / редактор / публічна сторінка —
+остання: фото послуг UI **не рендерить**, це окрема продуктова задача),
+окремі cookie-контексти редактор/глядач, таблиця «куди дивитись при втраченій
+відповіді» (перевірка за актуальним SHA, не за рухом HEAD), звірка вмісту
+інших матеріалів (не лише назв) із виносом `published.json.publishedAt` як
+штатної зміни.
+
+**Що перевірено:** Git-стан (локально + `ls-remote`), склад незапушених комітів
+(лише docs), наявність іконки `06-auto-moto-special-equipment-premium-3d.png`,
+відсутність рендера `photos` у `ServicesGrid.tsx` та
+`src/app/[locale]/services/[slug]/page.tsx`, `iconSrc` = `fields.text`,
+патерн шляху фото послуг (`keystatic.config.ts` services → `photos.image`
+`directory:"public/images/cms/services"` `publicPath:"/images/cms/services"`).
+
+**Не перевірено (потрібен окремий дозвіл або інструмент):** будь-який реальний
+запис у панель; справжній viewport 375px.
+
+**Залишок:** узгоджений push 4 docs-комітів (нова Preview-збірка того самого
+коду); після «так» власника — Етапи 3–6 сценарію.
 
 ### П33 — 375 px (`/panel`), клавіатура, CSP-заголовки на deployment, сценарій готовий до погодження
 
