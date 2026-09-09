@@ -255,6 +255,64 @@ function Group({ group, versions }: { group: PanelGroup; versions: PanelData["ve
   );
 }
 
+/**
+ * Keystatic "Delete entry" removes the card JSON but never its review-state
+ * row (its delete is a direct commit the panel does not see). This lists the
+ * leftovers and offers ONE button to sweep them — the on-demand version of the
+ * cleanup that otherwise only happens on the next "Позначити перевіреним".
+ * An orphan still on the public site is taken down with its own "Прибрати з
+ * сайту" button in the group below; that is called out per slug here.
+ */
+function PendingDeletions({
+  slugs,
+  groups,
+  versions,
+}: {
+  slugs: string[];
+  groups: PanelGroup[];
+  versions: PanelData["versions"];
+}) {
+  if (slugs.length === 0) return null;
+  const orphanPublished = new Set(
+    groups.flatMap((g) => g.rows.filter((r) => r.publishState === "orphan-published").map((r) => r.id)),
+  );
+  return (
+    <section className="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950">
+      <p className="font-semibold text-amber-900 dark:text-amber-200">Незавершені видалення</p>
+      <p className="mt-1 text-xs text-amber-900 dark:text-amber-200">
+        Ці картки видалено в Keystatic. Залишилось прибрати службові записи, які
+        видалення в Keystatic не чіпає:
+      </p>
+      <ul className="mt-2 list-disc pl-5 text-xs text-amber-900 dark:text-amber-200">
+        {slugs.map((slug) => (
+          <li key={slug}>
+            <code>{slug}</code> — рядок підтверджень перекладу
+            {orphanPublished.has(slug) && (
+              <>
+                {" "}
+                <strong>
+                  + опублікована версія ще на сайті — приберіть її кнопкою «Прибрати з
+                  сайту» нижче
+                </strong>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">
+        Кнопка прибирає лише рядки підтверджень для карток, яких уже немає в
+        Keystatic. Наявні картки та їх підтвердження не змінюються. Якщо картку
+        згодом створити знову — вона все одно потребуватиме нового підтвердження мов.
+      </p>
+      <div className="mt-3">
+        <PanelButton payload={{ action: "complete-deletion" }} versions={versions} variant="solid">
+          Завершити видалення ({slugs.length})
+        </PanelButton>
+      </div>
+    </section>
+  );
+}
+
 function PendingSummary({ groups }: { groups: PanelGroup[] }) {
   const changed: string[] = [];
   const blocked: string[] = [];
@@ -445,6 +503,12 @@ export default async function PanelPage() {
           Остання публікація: {new Date(data.publishedAt).toLocaleString("uk-UA")}
         </p>
       )}
+
+      <PendingDeletions
+        slugs={data.staleReviewSlugs}
+        groups={data.groups}
+        versions={data.versions}
+      />
 
       <PendingSummary groups={data.groups} />
 

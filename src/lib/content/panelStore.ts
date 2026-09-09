@@ -549,3 +549,48 @@ export async function unpublishItem(
     };
   });
 }
+
+/**
+ * Finish a Keystatic "Delete entry": drop every review-state.json row whose slug
+ * no longer backs a working card in ANY kind. Keystatic's delete is a direct
+ * commit that never touches review-state, and until now those rows were only
+ * swept as a side-effect of the next `confirmLocale` on some other item — this
+ * is the on-demand button for it (task 2026-09-09 §4). An orphan still in the
+ * published snapshot is removed separately with "Прибрати з сайту".
+ *
+ * Safety:
+ *  - GET never calls this; nothing is removed by opening the page.
+ *  - The working set is re-read fresh from every kind here — a read failure
+ *    rejects (transient), so "GitHub unreachable" is never mistaken for
+ *    "the card is gone". A slug that has re-appeared as a working card (owner
+ *    re-created it) is kept, and even if it weren't the row's `instance` no
+ *    longer matches the new card so its languages still need review.
+ *  - One version-guarded write; idempotent — a second click finds nothing
+ *    stale and writes nothing.
+ */
+export async function completeDeletion(
+  storage: PanelStorage,
+  expected: { review: string },
+): Promise<ActionResult> {
+  return runAction("Не вдалося завершити видалення", async () => {
+    const workingSlugs = await collectWorkingSlugs(storage);
+    const reviewF = await storage.readFile(REVIEW);
+    if (reviewF.version !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("перевірки перекладів").message };
+    }
+    const review = parseReview(reviewF.data);
+    const stale = staleReviewSlugs(review, workingSlugs);
+    if (stale.length === 0) {
+      return { ok: true, message: "Незавершених видалень немає — рядки підтверджень уже прибрані." };
+    }
+    await storage.writeFile(
+      REVIEW,
+      `${JSON.stringify(pruneReview(review, workingSlugs), null, 2)}\n`,
+      expected.review,
+    );
+    return {
+      ok: true,
+      message: `Готово — прибрано рядки підтверджень: ${stale.join(", ")}.`,
+    };
+  });
+}

@@ -2,11 +2,24 @@ import { NextResponse } from "next/server";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
-import { confirmLocale, publishItem, unpublishItem } from "@/lib/content/panelStore";
+import { completeDeletion, confirmLocale, publishItem, unpublishItem } from "@/lib/content/panelStore";
 import { KINDS, type KindKey } from "@/lib/content/kinds";
+import type { ActionResult } from "@/lib/content/panelStore";
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+
+/** Map a panelStore ActionResult onto the right HTTP status. */
+function respond(r: ActionResult) {
+  if (r.ok) return json(r, 200);
+  if ("conflict" in r && r.conflict) return json(r, 409);
+  if ("auth" in r && r.auth) return json(r, 401); // session ended
+  if ("forbidden" in r && r.forbidden) return json(r, 403); // access refused
+  // `transient` = GitHub unreachable / rate-limited / write outcome unknown;
+  // the message itself tells the user to reload and check before retrying.
+  if ("transient" in r && r.transient) return json(r, 503);
+  return json(r, 400);
+}
 
 interface Body {
   action?: string;
@@ -35,15 +48,22 @@ export async function POST(request: Request) {
     return json({ ok: false, message: "Некоректний запит." }, 400);
   }
 
+  const v = body.versions ?? {};
+  const review = String(v.review ?? "");
+  const published = String(v.published ?? "");
+
+  // "complete-deletion" is item-independent — it sweeps every orphaned
+  // review-state row — so it is handled before the kind/id checks below.
+  if (body.action === "complete-deletion") {
+    return respond(await completeDeletion(storage, { review }));
+  }
+
   const kind = body.kind as KindKey;
   if (!kind || !(kind in KINDS)) return json({ ok: false, message: "Не вказано розділ." }, 400);
   if (!body.id || typeof body.id !== "string") {
     return json({ ok: false, message: "Не вказано елемент." }, 400);
   }
-  const v = body.versions ?? {};
   const workingVersion = String(v[kind] ?? "");
-  const review = String(v.review ?? "");
-  const published = String(v.published ?? "");
 
   let r;
   switch (body.action) {
@@ -65,12 +85,5 @@ export async function POST(request: Request) {
     default:
       return json({ ok: false, message: `Невідома дія «${body.action}».` }, 400);
   }
-  if (r.ok) return json(r, 200);
-  if ("conflict" in r && r.conflict) return json(r, 409);
-  if ("auth" in r && r.auth) return json(r, 401); // 401 — session ended
-  if ("forbidden" in r && r.forbidden) return json(r, 403); // 403 — access refused
-  // `transient` = GitHub unreachable / rate-limited / write outcome unknown;
-  // the message itself tells the user to reload and check before retrying.
-  if ("transient" in r && r.transient) return json(r, 503);
-  return json(r, 400);
+  return respond(r);
 }

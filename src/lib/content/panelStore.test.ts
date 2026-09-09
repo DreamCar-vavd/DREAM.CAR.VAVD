@@ -21,7 +21,13 @@ import {
   type PanelStorage,
   type Versioned,
 } from "./store/adapter";
-import { confirmLocale, getPanelData, publishItem, unpublishItem } from "./panelStore";
+import {
+  completeDeletion,
+  confirmLocale,
+  getPanelData,
+  publishItem,
+  unpublishItem,
+} from "./panelStore";
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -422,6 +428,27 @@ test("orphan published: working card gone, snapshot entry stays -> a read-only r
   assert.deepEqual(row.blockers, []); // no publish/confirm affordance implied
 });
 
+test("a deleted-but-published card shows BOTH an orphan row and a stale review slug (so /panel can point at each leftover)", async () => {
+  const s = baseStore(); // services dir empty
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({
+      publishedAt: "t",
+      cars: [],
+      gallery: [],
+      services: [JSON.parse(svcJson({ id: "zzz-gone" }))],
+    }),
+  );
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ "zzz-gone": { uk: { hash: "x", at: "t" } } }),
+  );
+  const d = await getPanelData(s);
+  assert.deepEqual(d.staleReviewSlugs, ["zzz-gone"]);
+  const row = d.groups.find((g) => g.kind === "service")!.rows.find((r) => r.id === "zzz-gone")!;
+  assert.equal(row.publishState, "orphan-published");
+});
+
 test("working card + published entry for the same id -> one row, not a duplicate orphan", async () => {
   const s = baseStore();
   s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
@@ -524,6 +551,93 @@ test("a re-created slug does not inherit the deleted card's review status", asyn
   assert.equal(d.groups[0].rows[0].id, "c1");
   assert.equal(d.groups[0].rows[0].langStatus.uk, "needs-review");
   assert.deepEqual(d.staleReviewSlugs, []);
+});
+
+// ---------------------------------------------------------------------------
+// completeDeletion — the on-demand "Завершити видалення" button (task §4)
+// ---------------------------------------------------------------------------
+
+test("completeDeletion sweeps every orphaned review row in one version-guarded write", async () => {
+  const s = baseStore(); // working: cars c1, gallery g1
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      ...carReviewAll, // c1 — real, keep
+      "ghost-a": { uk: { hash: "x", at: "t" } },
+      "ghost-b": { en: { hash: "y", at: "t" } },
+    }),
+  );
+  let writes = 0;
+  const realWrite = s.writeFile.bind(s);
+  s.writeFile = (f, t, e) => {
+    writes += 1;
+    return realWrite(f, t, e);
+  };
+
+  const stale = await versions(s); // just to read versions
+  const r = await completeDeletion(s, { review: stale.review });
+  assert.equal(r.ok, true, r.message);
+  assert.match(r.message, /ghost-a/);
+  assert.match(r.message, /ghost-b/);
+  assert.ok(writes <= 1, `wrote ${writes} times`);
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.equal(review["ghost-a"], undefined);
+  assert.equal(review["ghost-b"], undefined);
+  assert.ok(review.c1); // the real row is untouched
+});
+
+test("completeDeletion is idempotent — a second click finds nothing and writes nothing", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll)); // c1 real, no ghosts
+  let writes = 0;
+  const realWrite = s.writeFile.bind(s);
+  s.writeFile = (f, t, e) => {
+    writes += 1;
+    return realWrite(f, t, e);
+  };
+  const v = await versions(s);
+  const r = await completeDeletion(s, { review: v.review });
+  assert.equal(r.ok, true);
+  assert.match(r.message, /немає/i);
+  assert.equal(writes, 0);
+});
+
+test("completeDeletion keeps a row whose slug re-appeared as a working card", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/cars", []); // c1 deleted
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const staleV = await versions(s);
+  // Owner re-creates c1 before clicking the button.
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ bornAt: "fresh" }) }]);
+  const r = await completeDeletion(s, { review: staleV.review });
+  assert.equal(r.ok, true);
+  assert.match(r.message, /немає/i); // nothing stale — c1 is a working card again
+  assert.ok(JSON.parse(s.files.get("src/content/cms/review-state.json")!).c1); // row kept
+});
+
+test("completeDeletion rejects (transient, no write) when a working-dir read fails — never a false 'gone'", async () => {
+  const s = baseStore();
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ ...carReviewAll, ghost: { uk: { hash: "x", at: "t" } } }),
+  );
+  const v = await versions(s);
+  s.readDir = async () => {
+    throw new StorageUnavailableError("тест: GitHub не відповів");
+  };
+  const r = await completeDeletion(s, { review: v.review });
+  assert.equal(r.ok, false);
+  assert.equal((r as { transient?: boolean }).transient, true);
+  assert.ok(JSON.parse(s.files.get("src/content/cms/review-state.json")!).ghost); // nothing removed
+});
+
+test("completeDeletion conflicts (no write) when review-state moved since page load", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/cars", []);
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const r = await completeDeletion(s, { review: "stale-token" });
+  assert.equal((r as { conflict?: boolean }).conflict, true);
+  assert.ok(JSON.parse(s.files.get("src/content/cms/review-state.json")!).c1);
 });
 
 // task 14:51 item 8 — CLOSED by per-instance review binding. A card deleted

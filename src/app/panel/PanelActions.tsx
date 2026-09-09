@@ -16,7 +16,8 @@ export interface PanelVersions {
 type ActionPayload =
   | { action: "confirm-locale"; kind: string; id: string; locale: string }
   | { action: "publish"; kind: string; id: string }
-  | { action: "unpublish"; kind: string; id: string };
+  | { action: "unpublish"; kind: string; id: string }
+  | { action: "complete-deletion" };
 
 export function PanelButton({
   payload,
@@ -30,7 +31,7 @@ export function PanelButton({
   versions: PanelVersions;
   children: React.ReactNode;
   disabled?: boolean;
-  variant?: "default" | "primary" | "danger";
+  variant?: "default" | "primary" | "danger" | "solid";
   confirmText?: string;
 }) {
   const router = useRouter();
@@ -82,6 +83,8 @@ export function PanelButton({
     default: "border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800",
     primary: "border-amber-600 bg-amber-600 text-white hover:bg-amber-700",
     danger: "border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950",
+    solid:
+      "border-neutral-800 bg-neutral-800 text-white hover:bg-neutral-700 dark:border-neutral-200 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white",
   }[variant];
 
   return (
