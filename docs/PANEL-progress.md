@@ -14,16 +14,25 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Remote:** `be85c0b` (запушено 2026-09-09 ~10:10). **Local HEAD:** `b038580` —
-  **не запушено**: `3f9341a` `9851f1c` (журнал П30), `b038580` (CSP-фікс, П31),
-  + журнал П31. PR #26 draft.
-- **Сигнали окремо (не плутати):**
-  - **GitHub CI `Verify`** — success (tsc/eslint/тести + `next build` Turbopack, **без** github-env).
-  - **Vercel Preview build** — `be85c0b` **Ready** (`dpl_87xLXnYFQbv3aQBf8XVCXSuPnh3x`); redeploy того ж SHA після виправлення секрету — **Ready** (`73uaLMwQqhn3gT4Nd8dpdvbnbs3m`, 1m 9s, no-cache). 3 давні `localFs.ts` warnings (доброякісні).
-  - **Перевірка запуску сторінок на Vercel** — ✅ `/`, `/uk|en|ru`, `/panel`, `/keystatic` (П30).
-  - **Перевірка входу користувача на Vercel** — ✅ **вхід ПРАЦЮЄ** після переввода `KEYSTATIC_GITHUB_CLIENT_SECRET` + redeploy (П31). Причина 401 у П30 — саме хибне збережене значення client secret.
-  - **Keystatic-редактор на Vercel** — ⚠️ дашборд + списки колекцій ✅; **редактор окремого запису** падав «TypeError: Failed to fetch» — CSP не пускав `raw.githubusercontent.com` (звідки Keystatic-UI читає вміст файлу). Виправлено `b038580` (чекає збірки Preview).
-- **Тести:** tsc 0 · eslint 0 (П31; `npm run build` локально не запускався — див. П29/П31, збірку робить Vercel). 276 pass на П29. content:check/guard — зелені (П28).
+- **Head = remote:** `a77d3e4` (запушено 2026-09-09 ~11:00). PR #26 draft.
+  Deployment `CZREYKxhJC7ziAH93w1x45qp5pKD` (Preview, **Ready**) — стабільний
+  branch alias `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
+  веде на нього.
+- **hosted Б1 — перевірено (П32, Chrome власника, авторизована сесія):**
+  вхід через GitHub (callback на Preview-хост) ✅ · Keystatic-дашборд ✅ ·
+  `/panel` на `codex/admin-panel-spike` ✅ · **3 авто / 8 галерей / 5 послуг /
+  1 контакт** ✅ · редактор запису з полями + фото + uk/en/ru ✅ (після CSP-фіксу
+  `b038580`) · перегляд чернетки (`/api/panel/preview` → `/uk` на Preview-хості)
+  ✅ · банер «на тестовому сайті гілки codex/admin-panel-spike (Preview)» ✅ ·
+  **вихід** → `/panel`,`/panel/leads` показують app-gate, `/api/panel/preview`
+  → 401 ✅ · **повторний вхід** → доступ відновлено, гілка та 3/8/5/1 ✅.
+  Vercel Authentication цю сесію не блокує (**не** доказ для всіх відвідувачів).
+- **НЕ перевірено:** ширина 375 px (інструмент не змінює viewport — лишається
+  1699 px; CSS відповідний, але візуально не звірено); запис/публікація з панелі
+  (окремий погоджуваний сценарій — `docs/PANEL-write-publish-scenario.md`).
+- **Сигнали:** GitHub CI `Verify` — success; Vercel Preview build `a77d3e4` —
+  **Ready** 39s (3 давні `localFs.ts` warnings, доброякісні). tsc 0 · eslint 0
+  (П31; локальний `npm run build` не запускався — Turbopack робить Vercel).
 - **Preview (Vercel):** `be85c0b` **Ready**; стабільний branch alias
   `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
   віддає цей deployment. `/panel` без входу → правильний app-gate
@@ -73,6 +82,72 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П32 — hosted-перевіркa панелі на Vercel Preview пройдена (вхід/читання/чернетка/вихід/повторний вхід)
+
+**2026-09-09 ~11:00–11:06 BST.** Deployment CSP-фіксу `b038580`+journal —
+**`CZREYKxhJC7ziAH93w1x45qp5pKD`** (`a77d3e4`, Preview, **Ready** 39s). Push
+`be85c0b..a77d3e4`. Branch alias
+`dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
+веде на нього (звірено: у запитах Keystatic-UI `raw.githubusercontent.com/…/a77d3e46…`).
+
+**CSP-фікс `b038580` — підтверджено на Vercel:** редактор запису
+`…/collection/galleryProjects/item/volvo-xc60-d5` → `raw.githubusercontent.com`
+для `gallery/volvo-xc60-d5.json` **200** + 5 фото `photos/0…4/image.jpg` **200**;
+`…/collection/services/item/detailing` — поля + 3 мови рендеряться. До фіксу
+було «TypeError: Failed to fetch» (CSP `connect-src` без `raw.githubusercontent.com`).
+
+**Пройдений сценарій (Chrome власника, авторизована сесія — не тест для всіх відвідувачів):**
+1. `/api/keystatic/github/login` → GitHub (авто-approve) → **callback на
+   Preview-хост** (`…648563-…`, не 127.0.0.1) → **Keystatic-дашборд** «Hello,
+   DreamCar-vavd!».
+2. `/keystatic/branch/codex%2Fadmin-panel-spike` → «ПОТОЧНА ГІЛКА:
+   codex/admin-panel-spike», «Pull request #26», **Автомобілі 3 · Галерея 8 ·
+   Послуги 5 · Банери 0 · Контакти**. (`/branch/main` → 0 скрізь — на `main`
+   немає CMS-контенту, очікувано.)
+3. `/panel` → «Робоча гілка: **codex/admin-panel-spike** (тестова гілка — не
+   Production)»; банер «✅ Поточний знімок **на тестовому сайті гілки
+   «codex/admin-panel-spike»**. (Preview)».
+4. Матеріали: **3** авто (suzuki-sx4-s-cross, dacia-sandero-2022,
+   dacia-sandero-comfort-2019) · **8** галерей (maserati-levante, volvo-xc60-d5,
+   showcase-01…06) · **5** послуг (car-selection, car-service, diagnostics,
+   srs-airbag, detailing) · **1** контакт. Банери — 0. **Точно 3/8/5/1.**
+5. Усі записи «● На сайті», UK/EN/RU «Перевірено», «Неопублікованих змін немає».
+6. Посилання редагування — **branch-scoped**
+   (`/keystatic/branch/codex%2Fadmin-panel-spike/collection/<c>/item/<id>`);
+   Create — `.../create`; draft-preview — `/api/panel/preview?path=/uk`.
+7. **Редактор запису** (gallery `volvo-xc60-d5`): 5 фото, uk «Проведено
+   комплексну перевірку автомобіля…», en «Information to be confirmed», ru
+   «Информация уточняется». Service `detailing`: uk/en/ru bullets («Полірування
+   кузова» / «Bodywork polishing» / «Полировка кузова» тощо). **Нічого не збережено.**
+8. **Чернетка:** `/api/panel/preview?path=/uk` → редірект на `/uk` **на
+   Preview-хості**, повний сайт (hero, Послуги ×6 з «Незабаром», Галерея ×2,
+   FAQ, Контакти).
+9. **Вихід** (`/api/keystatic/github/logout`): `/keystatic` → «Log in with
+   GitHub»; `/panel` та `/panel/leads` → app-gate «Ви не увійшли через GitHub…»
+   (даних немає); `GET /api/panel/preview?path=/uk` → **401**.
+10. **Повторний вхід** (`/api/keystatic/github/login`) → без consent →
+    дашборд; `/panel` знову доступний, гілка `codex/admin-panel-spike`, 3/8/5/1.
+
+**Keyboard:** `/panel` — 67 focusable елементів, усі досяжні з клавіатури;
+у стилях **немає** `outline:none`/`outline:0` (фокус UA-кільцем не придушено);
+кнопки `min-height:36px`.
+
+**НЕ виконано — 375 px:** `resize_window` не змінює CSS-viewport в цьому
+автоматизаційному Chrome (лишається `innerWidth 1699` при `outerWidth 619`).
+CSS панелі responsive (`flex flex-wrap`, `max-w-4xl px-4`, без фіксованих
+ширин), але **візуально при 375 px не звірено** — не видавати за перевірку на
+телефоні.
+
+**Причина 401 (П30) — остаточно:** саме хибне збережене
+`KEYSTATIC_GITHUB_CLIENT_SECRET`. Власник переввів його зі `…-panel-setup-verify/.env`;
+один redeploy `be85c0b` (`73uaLMwQqhn3gT4Nd8dpdvbnbs3m`, Ready) → вхід запрацював.
+Розбір коду Keystatic у П30 лишається чинним (`state`/`KEYSTATIC_SECRET` не
+задіюються, доки token-exchange не вдався; точний код помилки GitHub був
+недоступний).
+
+**Залишок:** 375 px візуально; запис/публікація/видалення з панелі (окремий
+сценарій `docs/PANEL-write-publish-scenario.md` — на погодження, не виконано).
 
 ### П31 — вхід на Vercel запрацював; редактор Keystatic — CSP-фікс `raw.githubusercontent.com`
 
