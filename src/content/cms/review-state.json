@@ -237,18 +237,10 @@
       "at": "2026-09-06T00:00:00.000Z"
     }
   },
-  "zzz-test-panel": {
+  "zzz-prune-check": {
     "uk": {
-      "hash": "a558c6963c5eeeb13a5e6cead3e40477004275f0e241fae5fde9a55d8a28ab49",
-      "at": "2026-09-09T14:31:11.813Z"
-    },
-    "en": {
-      "hash": "5a198bf7910fec0e4648efe4ff869ff2542283ae02b423d7d5a6dfa945f1bd8c",
-      "at": "2026-09-09T14:31:23.165Z"
-    },
-    "ru": {
-      "hash": "ebe7a8ebbab03c0e30ff5f799f8d0b42732f0207176176512628abc0076e28af",
-      "at": "2026-09-09T14:31:33.454Z"
+      "hash": "07fd00b188fc112c068c6b2be923da78600b98fa18774d679227336bf46c3ccf",
+      "at": "2026-09-09T14:38:15.300Z"
     }
   }
 }
