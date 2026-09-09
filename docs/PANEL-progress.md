@@ -14,9 +14,13 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Head = remote:** `a77d3e4` (запушено 2026-09-09 ~11:00). PR #26 draft.
-  Deployment `CZREYKxhJC7ziAH93w1x45qp5pKD` (Preview, **Ready**) — стабільний
-  branch alias `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
+- **Remote:** `a77d3e4` (запушено 2026-09-09 ~11:00). **Local HEAD:** `0107420`
+  (журнали П32/П33 + сценарій — **не запушено**, щоб не робити зайву збірку).
+  PR #26 draft. `main` = `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` (звірено
+  `git ls-remote origin` 11:20 BST).
+  Deployment `CZREYKxhJC7ziAH93w1x45qp5pKD` (`a77d3e4`, Preview, **Ready**) —
+  стабільний branch alias
+  `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
   веде на нього.
 - **hosted Б1 — перевірено (П32, Chrome власника, авторизована сесія):**
   вхід через GitHub (callback на Preview-хост) ✅ · Keystatic-дашборд ✅ ·
@@ -82,6 +86,72 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 ---
 
 ## Завершені пункти (новіші зверху)
+
+### П33 — 375 px (`/panel`), клавіатура, CSP-заголовки на deployment, сценарій готовий до погодження
+
+**2026-09-09 ~11:14–11:30 BST.** Deployment без змін — `CZREYKxhJC7ziAH93w1x45qp5pKD` (`a77d3e4`).
+
+**1. Вузький екран.**
+- **`/panel` при 375 px — перевірено** через CSS-звуження `html{width:375px}`.
+  Це коректно: сторінка панелі має **нуль** width-медіазапитів (звірено в
+  джерелі — `sm:`/`md:`/`lg:` = 0 у `page.tsx`/`PanelActions.tsx`/`layout.tsx`;
+  у `globals.css` лише `prefers-reduced-motion`/`hover`), тож reflow при 375 px
+  визначається лише flexbox-wrap і `max-w`.
+  Результат: `main.scrollWidth === main.clientWidth` (375), `body` overflow = 0
+  — **горизонтального скролу немає**; банер, назви, мовні статуси (`UK … EN …` /
+  `RU …`), nav-«пігулки», кнопки «Опублікувати зміни»/«Прибрати з сайту» —
+  **переносяться, не обрізаються**. Знімок — у звіті.
+- **Keystatic-UI при 375 px — НЕ перевірено.** CSS-звуження на Keystatic не діє
+  (його layout на viewport-одиницях ігнорує `html{width}`), а справжньої
+  device-емуляції в цьому автоматизаційному Chrome немає (`resize_window`
+  лишає `innerWidth 1699`; `Browser`-панель мала б mobile-preset, але потребує
+  окремого GitHub-входу). **Ручна перевірка власнику** (нижче).
+
+**2. Клавіатура на `/panel` (Preview, практично).**
+- 50 tabbable-елементів, **0 позитивних `tabindex`** (немає пасток/дивного
+  порядку); DOM-порядок = порядок читання (Keystatic-лінк → «чернетка» →
+  «Заявки» → «Відео» → nav-пігулки → «Оновити стан» → у картці: «Редагувати» →
+  [«Опублікувати» якщо активна] → «Прибрати з сайту»).
+- **Фокус видимий:** `outline: rgb(212,175,55) solid 2px; outline-offset: 2px`
+  (золоте кільце) на лінках і пігулках; у стилях немає `outline:none`/`0`.
+  На знімку 375 px видно кільце на кнопці «Переглянути чернетку».
+- Кнопки запису/публікації/видалення **не активував**.
+
+**3. CSP-виправлення `b038580` — закрито.**
+- **Копія:** `b038580` зроблено в `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`
+  — **тій, яку обслуговує `:3000`** (pid 13009, cwd збігається; сервер власника
+  за цей час перезапустився — pid змінився з 71636). `next.config.ts` — файл,
+  який дев-сервер читає, — **було змінено й закомічено**; `next dev`
+  перечитує конфіг при таких змінах. Тому **не** стверджую, що файли сервера
+  лишились незмінними. `npm run build` там **не** запускав. **Надалі — правки
+  тільки в ізольованому worktree.**
+- **Сукупний diff `b28bcac..HEAD` для CSP:** лише `next.config.ts` —
+  `raw.githubusercontent.com` додано в `connect-src` + `img-src` **`panelCsp`**.
+  `publicCsp` — **байт-у-байт як на `b28bcac`** (`diff` порожній).
+- **Живі заголовки відповіді на deployment `a77d3e4`:**
+  | Маршрут | `connect-src` | `raw.githubusercontent.com`? |
+  |---|---|---|
+  | `/panel`, `/keystatic`, `/api/keystatic/*` | `'self' api.github.com github.com raw.githubusercontent.com` | ✅ |
+  | `/uk`, `/uk/services/detailing`, `/robots.txt`, `/api/contact` | `'self'` | ❌ (строгий public CSP) |
+- **Редактор + фото на фінальному deployment:** редактор `volvo-xc60-d5` —
+  `raw.githubusercontent.com/…/gallery/volvo-xc60-d5.json` **200** + 5 фото
+  `photos/0…4/image.jpg` **200**; редактор `detailing` — поля + 3 мови. ✅
+
+**4. Сценарій `docs/PANEL-write-publish-scenario.md` — уточнено (той самий файл):**
+- Публічні адреси: `/[locale]/services/<slug>` (`/uk|en|ru/services/zzz-test-panel`);
+  без-локальний `/services/<id>` → **404** (звірено наживо).
+- Шлях фото — **визначає Keystatic при Save**; патерн підтверджено наживо для
+  галереї (`/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg`); фактичний
+  шлях брати з дифу коміту, не з припущення.
+- Незмінність `main` — `git ls-remote origin refs/heads/main` **мережею**, до і
+  після; локальний `origin/main` без `fetch` не доказ.
+- Додано: перелік файлів, які можуть змінитися (лише `services/zzz-test-panel.json`,
+  `public/images/cms/services/zzz-test-panel/…`, `review-state.json`,
+  `published.json` — у гілці контенту); дії при `WriteUncertainError` /
+  `StorageUnavailableError` / `ConflictError` з точними текстами з UI.
+
+**Залишок:** Keystatic-UI при 375 px (ручна перевірка власнику); запис/публікація/
+видалення з панелі — сценарій на погодження.
 
 ### П32 — hosted-перевіркa панелі на Vercel Preview пройдена (вхід/читання/чернетка/вихід/повторний вхід)
 

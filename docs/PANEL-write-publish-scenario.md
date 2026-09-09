@@ -1,14 +1,15 @@
-# Сценарій реального запису + тестової публікації (на окреме погодження)
+# Сценарій реального запису + тестової публікації (готовий до погодження)
 
-**Статус: НЕ виконувати.** Це підготовлений план для наступного етапу. Виконання —
-лише після (а) зеленої Preview-збірки з github-env, (б) пройденого входу/читання/
-виходу на Vercel Preview, (в) окремого «так» власника саме на цей сценарій.
+**Статус: НЕ виконувати.** Виконання — лише після окремого «так» власника саме
+на цей сценарій. Передумови (а) зелена Preview-збірка з github-env і
+(б) пройдений вхід/читання/чернетка/вихід на Vercel Preview — **виконані**
+(П31/П32, deployment `a77d3e4` / `CZREYKxhJC7ziAH93w1x45qp5pKD`).
 
 Межі: тільки гілка `codex/admin-panel-spike`. Production, `main`, DNS, тарифи,
 права доступу, workflow перенесення контенту — не чіпати.
 
-Схему звірено з `keystatic.config.ts` (services — з рядка 336) і `serviceGate.ts`
-станом на `80f8167`.
+Схему звірено з `keystatic.config.ts` (services — з рядка 336) і `serviceGate.ts`;
+маршрути й патерн шляхів фото — звірено наживо на Preview `a77d3e4` (П32).
 
 ---
 
@@ -39,13 +40,20 @@
 ### 0.3. Неперевірені можливості (перевірити під час hosted-тесту, не зараз)
 
 - **Чи можна в самому редакторі Keystatic вибрати гілку `main`.** Посилання з
-  `/panel` — branch-scoped, у `main` не ведуть. Але власний перемикач гілок
-  Keystatic (github-режим) технічно перелічує всі гілки. Очікування: спроба
-  зберегти в захищену `main` → GitHub відхиляє прямий push (правило 0.1), Keystatic
-  за такого сценарію зазвичай пропонує створити нову гілку. **Руками не
+  `/panel` — branch-scoped, у `main` не ведуть (звірено наживо, П32). Але
+  дашборд Keystatic має кнопку «Нова гілка» і власний перемикач гілок, який
+  технічно перелічує всі гілки (у П32 бачив і `/branch/main`, і
+  `/branch/codex%2Fadmin-panel-spike`). Очікування: спроба **зберегти** в
+  захищену `main` → GitHub відхиляє прямий push (правило 0.1), Keystatic
+  зазвичай пропонує створити нову гілку. **Спробу запису в `main` руками не
   перевірено** — крок для hosted-протоколу.
-- Перед сценарієм і після нього: `git rev-parse origin/main` — **однаковий SHA**
-  (зараз `ce1977af`). Це фактична контрольна перевірка, а не припущення.
+- **Контрольна перевірка незмінності `main` — мережею, до і після.** Перед
+  сценарієм: `git ls-remote origin refs/heads/main` → зберегти SHA (станом на
+  2026-09-09 11:20 BST — `ce1977af140b49dce4bb79001c7eeed5e01aa2c2`; на момент
+  старту звірити свіжим `ls-remote`). Після прибирання: `git ls-remote origin
+  refs/heads/main` знову → **той самий SHA**. Локальний `git rev-parse
+  origin/main` без `git fetch`/`ls-remote` **не доводить** незмінності GitHub
+  (це кеш).
 
 ---
 
@@ -54,7 +62,13 @@
 - **Колекція:** Послуги (`services`).
 - **Робочий файл:** `src/content/cms/services/zzz-test-panel.json` (гілка
   `codex/admin-panel-spike`).
-- **Публічна адреса після публікації:** `/services/zzz-test-panel` (Preview-хост).
+- **Публічні адреси після публікації** (звірено наживо на Preview `a77d3e4`:
+  `/uk/services/detailing` → 200, `/services/detailing` → **404**):
+  `/uk/services/zzz-test-panel`, `/en/services/zzz-test-panel`,
+  `/ru/services/zzz-test-panel` на Preview-хості
+  `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`.
+  Маршрут — `/[locale]/services/[slug]`; **без-локальний `/services/<id>` не
+  існує**.
 - Ключі об'єкта — рівно як у наявних послугах: `id, order, status, iconSrc,
   priceAmount, priceCurrency, photos, uk, en, ru`.
 - Кожен мовний блок (`uk`/`en`/`ru`) має ключі: `title, shortDescription,
@@ -124,6 +138,19 @@
 Створювати матеріал під час тесту — тільки через Keystatic (Послуги → Create →
 заповнити три мови → Save). Керований JSON вище — лише еталон для звірки коміту.
 
+### Які файли може змінити цей сценарій (усі — у гілці `codex/admin-panel-spike`, ніде більше)
+
+| Файл / шлях | Коли | Дія панелі/редактора |
+|---|---|---|
+| `src/content/cms/services/zzz-test-panel.json` | Create, кожен Save тексту/фото, Delete | Keystatic коміт |
+| `public/images/cms/services/zzz-test-panel/…` (точний підшлях — з дифу коміту) | додавання/видалення фото | Keystatic коміт |
+| `src/content/cms/review-state.json` | «Позначити перевіреним» (кожна мова) | `confirmLocale` → `PUT /contents` |
+| `src/content/cms/published.json` | «Опублікувати зміни», «Прибрати з сайту» | `publishItem` / `unpublishItem` → `PUT /contents` |
+
+**Не** змінюються: жоден `.ts`/`.tsx`/`.mjs`/`.yml`/`package*.json`, жоден інший
+матеріал CMS, `main`, будь-яка інша гілка. `content-guard.yml` не активний (0.1),
+тож ці коміти в гілку контенту нікуди далі не переносяться.
+
 ## 2. Мовні підтвердження після редагування
 
 1. Після Save у Keystatic відкрити `/panel` → картка `zzz-test-panel`:
@@ -145,12 +172,17 @@
 
 1. У Keystatic → картка `zzz-test-panel` → «Фотографії» → додати **одне**
    зображення. Завантажити JPG ~200–500 КБ.
-2. Очікуваний запис у гілці `codex/admin-panel-spike`:
-   - файл: `public/images/cms/services/zzz-test-panel/photos/0/image.jpg`
-     (шаблон Keystatic `<publicPath>/<slug>/<array-field>/<index>/<field-key>.<ext>`,
-     як у наявних `src/content/cms/gallery/*` →
-     `/images/cms/gallery/showcase-01/photos/0/image.jpg`);
-   - у JSON: `"photos": [{ "image": "/images/cms/services/zzz-test-panel/photos/0/image.jpg", "caption": "" }]`.
+2. **Шлях фото визначає Keystatic при збереженні — не вводити наперед.** Патерн
+   Keystatic для масиву `image`-полів у колекції **підтверджено наживо** для
+   галереї на Preview `a77d3e4` (мережеві запити редактора
+   `volvo-xc60-d5`): `raw.githubusercontent.com/…/public/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg`
+   — тобто `<publicPath>/<slug>/<масив-поле>/<індекс>/<ключ>.<ext>`.
+   За тим самим механізмом для послуг очікується
+   `public/images/cms/services/zzz-test-panel/photos/0/image.<ext>`, а в JSON
+   `"photos": [{ "image": "/images/cms/services/zzz-test-panel/photos/0/image.<ext>", … }]`.
+   **Фактичний шлях і розширення — прочитати з дифу коміту**, який Keystatic
+   зробить при Save (GitHub → Commits гілки), і саме його вживати далі в
+   кроках прибирання.
 3. Позначити нову мову/картку перевіреною (якщо додавання фото зробило потрібним),
    потім опублікувати цю ревізію в кроці 4 **або** перевірити чернетку до
    публікації:
@@ -168,8 +200,26 @@
    банер `/panel` показує стан збірки Preview і текст «на тестовому сайті гілки
    «codex/admin-panel-spike»» (не «в ефірі (Production)»).
 3. Звірити: SHA у банері = HEAD гілки `codex/admin-panel-spike` після коміту
-   публікації (GitHub → Commits).
-4. `git rev-parse origin/main` — **без змін** (`ce1977af`).
+   публікації (`git ls-remote origin refs/heads/codex/admin-panel-spike`).
+4. `git ls-remote origin refs/heads/main` (мережею) — **той самий SHA**, що й
+   зафіксований на старті сценарію.
+
+### Що робити при невизначеному результаті запису
+
+Якщо після «Опублікувати зміни» / «Позначити перевіреним» / «Прибрати з сайту»
+з'явилося **«Відповідь від GitHub не надійшла, тому невідомо, чи збережено … .
+Оновіть сторінку й перевірте поточний стан, перш ніж повторювати дію.»**
+(`WriteUncertainError`):
+1. **Не** тиснути кнопку повторно.
+2. Оновити `/panel` (F5) і подивитися стан картки; звірити гілку через
+   `git ls-remote origin refs/heads/codex/admin-panel-spike` + `git show <sha>:src/content/cms/published.json`.
+3. Якщо коміт стався — дію **не** повторювати. Якщо ні — повторити з
+   актуальними version-токенами (проста F5 їх оновлює).
+
+Якщо натомість «Сховище тимчасово недоступне … зачекайте хвилину й оновіть
+сторінку» (`StorageUnavailableError`) або «GitHub тимчасово обмежив частоту
+запитів …» (`StorageRateLimitedError`) — запис **не** починався; безпечно
+повторити пізніше.
 
 ## 5. Конфлікт двох сесій — відтворюваний варіант
 
@@ -197,6 +247,11 @@
 7. Якщо кнопка B була неактивна від початку або відмова прийшла через
    `blockers`/`needs-review` — сценарій конфлікту **не** зарахований, переналаштувати
    передумову (крок 1) і повторити.
+8. Точний текст конфлікту (`ConflictError`, звірити з UI): «Дані «контент»
+   змінилися відколи ви відкрили сторінку. Можливо, хтось редагує паралельно
+   або зміну вже застосовано. Оновіть сторінку.» + кнопка **«Оновити»** (у
+   `PanelActions` — бурштиновий текст). Правильна дія B: натиснути «Оновити»
+   (F5), побачити версію A, і **не** публікувати поверх.
 
 ## 6. Прибирання — правильний порядок
 
@@ -208,8 +263,9 @@
    `zzz-test-panel`; повідомлення «прибрано з опублікованого знімка».
 2. **Перевірити результат і Preview.** `/panel` → картка показує стан «не
    опубліковано»; `git show origin/codex/admin-panel-spike:src/content/cms/published.json`
-   — без `zzz-test-panel`; після нової збірки Preview `/services/zzz-test-panel`
-   на Preview-хості → 404 (або зникнення зі списку послуг).
+   — без `zzz-test-panel`; після нової збірки Preview
+   `/uk/services/zzz-test-panel` (і `/en/…`, `/ru/…`) на Preview-хості → 404
+   (або зникнення зі списку послуг).
 3. **Видалити робочу картку.** Keystatic → Послуги → `zzz-test-panel` → Delete →
    Save. Коміт видалення `src/content/cms/services/zzz-test-panel.json` у гілку.
 4. **Прибрати тестові фото — лише свої.** Видалити директорію
@@ -246,13 +302,15 @@
 | Стан мовних підтверджень | `git show origin/codex/admin-panel-spike:src/content/cms/review-state.json` | немає ключа `zzz-test-panel` |
 | Тестові медіафайли | `git ls-tree -r origin/codex/admin-panel-spike --name-only -- public/images/cms/services/` | немає шляхів під `zzz-test-panel/` |
 | Гілка в цілому | `git range-diff` / `git log origin/codex/admin-panel-spike` за період тесту | лишилися тільки коміти create/confirm/publish/unpublish/delete `zzz-test-panel`, які взаємно скасовуються за вмістом (кінцевий стан даних = початковий) |
-| `main` | `git rev-parse origin/main` до і після всього сценарію | однаковий SHA (`ce1977af`) |
+| `main` | `git ls-remote origin refs/heads/main` (**мережею**) до старту і після прибирання | той самий SHA (на старті — свіжий `ls-remote`, не кеш `origin/main`) |
 
-Порівняння з **початковим станом**: до сценарію зберегти
-`git rev-parse origin/codex/admin-panel-spike` та вміст трьох файлів
-(`services/`, `published.json`, `review-state.json`); після прибирання —
-`git show` тих самих шляхів має дати той самий вміст (з точністю до
-незначного форматування, якщо Keystatic переупорядкував ключі).
+Порівняння з **початковим станом**: до сценарію зробити
+`git ls-remote origin refs/heads/{main,codex/admin-panel-spike}` і зберегти
+вміст трьох файлів гілки контенту (`git show <branch-sha>:src/content/cms/services/…`,
+`…published.json`, `…review-state.json`); після прибирання —
+`git ls-remote` знову + `git show` тих самих шляхів на новому branch-SHA →
+`main` не зрушив; дані гілки контенту повернулись до початкового вмісту
+(з точністю до незначного форматування, якщо Keystatic переупорядкував ключі).
 
 ---
 
