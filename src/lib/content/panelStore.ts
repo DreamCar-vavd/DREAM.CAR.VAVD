@@ -236,6 +236,31 @@ async function freezeItemMedia(
 }
 
 /**
+ * Is the published snapshot entry `pub` still in sync with working card `item`,
+ * accounting for frozen photos? Every non-photo field (and photo COUNT, ORDER
+ * and CAPTIONS) is compared exactly; a photo's image URL counts as unchanged
+ * when it is byte-for-byte the working URL OR a frozen (`_pub/`) copy sitting in
+ * that slot. Working photo paths are positional (`photos/<i>/…`), so a same-slot
+ * content swap is invisible here — exactly as it was before freezing existed;
+ * the draft preview and changed captions remain the signal for that.
+ */
+function inSyncIgnoringFrozenPhotos(
+  kindKey: KindKey,
+  pub: Record<string, unknown>,
+  item: Record<string, unknown>,
+): boolean {
+  const stripPhotoUrls = (o: Record<string, unknown>) => {
+    if (kindKey === "promo") return { ...o, image: "" };
+    const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
+    return { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
+  };
+  if (stable(stripPhotoUrls(pub)) !== stable(stripPhotoUrls(item))) return false;
+  const pu = itemImageUrls(kindKey, pub);
+  const iu = itemImageUrls(kindKey, item);
+  return pu.length === iu.length && pu.every((p, i) => p === iu[i] || p.includes(PUB_SEG));
+}
+
+/**
  * Delete `_pub/` files for `slug` that nothing in `snapshot` points at any more.
  * Best-effort and safe: it only ever removes a file the just-written snapshot
  * does NOT reference, and only inside the slug's own `_pub/` folder.
@@ -395,7 +420,15 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
         LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
       ) as Record<ContentLocale, LangReviewStatus>;
       let publishState: ItemPublishState = "not-published";
-      if (pub) publishState = stable(pub) === stable(item) ? "in-sync" : "modified";
+      if (pub) {
+        publishState = inSyncIgnoringFrozenPhotos(
+          kindKey,
+          pub as unknown as Record<string, unknown>,
+          item as unknown as Record<string, unknown>,
+        )
+          ? "in-sync"
+          : "modified";
+      }
       return {
         id: item.id,
         title: kind.displayTitle(item),
@@ -617,7 +650,8 @@ export async function publishItem(
       item as unknown as Record<string, unknown>,
     )) as typeof item;
     // Re-freezing an unchanged photo set produces the exact same `_pub/` URLs,
-    // so a republish with no real change is still a no-op.
+    // so re-publishing an item that only DIFFERED by working-vs-frozen photo
+    // paths (e.g. straight after the freeze migration) is a clean no-op.
     if (existing && stable(existing) === stable(frozen)) {
       return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
     }

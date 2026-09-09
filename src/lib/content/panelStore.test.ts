@@ -547,6 +547,44 @@ test("publish copies working photos into the slug's content-addressed _pub/ fold
   assert.ok(s.media.has("public/images/cms/services/s1/photos/0/image.jpg")); // working file untouched
 });
 
+test("after publishing, the dashboard reads 'in-sync' — a frozen _pub/ path is not a phantom change", async () => {
+  const s = photoStore();
+  const v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const grp = (await getPanelData(s)).groups.find((g) => g.kind === "service")!;
+  assert.equal(grp.rows[0].publishState, "in-sync"); // NOT "modified"
+});
+
+test("editing text on an already-frozen item still shows 'modified'", async () => {
+  const s = photoStore();
+  const v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  s.seedDir("src/content/cms/services", [
+    { name: "s1.json", text: svcWithPhoto({ uk: { ...SVC_L, title: "changed" } }) },
+  ]);
+  const grp = (await getPanelData(s)).groups.find((g) => g.kind === "service")!;
+  assert.equal(grp.rows[0].publishState, "modified");
+});
+
+test("adding a photo to an already-frozen item shows 'modified'", async () => {
+  const s = photoStore();
+  const v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  s.seedDir("src/content/cms/services", [
+    {
+      name: "s1.json",
+      text: svcJson({
+        photos: [
+          { image: "/images/cms/services/s1/photos/0/image.jpg", caption: "" },
+          { image: "/images/cms/services/s1/photos/1/image.jpg", caption: "" },
+        ],
+      }),
+    },
+  ]);
+  const grp = (await getPanelData(s)).groups.find((g) => g.kind === "service")!;
+  assert.equal(grp.rows[0].publishState, "modified");
+});
+
 test("a draft photo edit after publishing does NOT change the published image", async () => {
   const s = photoStore();
   const v = await versions(s);
