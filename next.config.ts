@@ -34,8 +34,12 @@ const publicCsp = `
  *    fallback font (still usable), so this is cosmetic; added to remove the
  *    console error.
  *  - connect-src / img-src / form-action add api.github.com + github.com +
- *    avatars.githubusercontent.com — required only in GitHub storage mode
- *    (hosted panel): the API calls that read/write content and the sign-in
+ *    avatars.githubusercontent.com + raw.githubusercontent.com — required only
+ *    in GitHub storage mode (hosted panel): api.github.com is the GraphQL/REST
+ *    API (dashboard + collection lists + writes); raw.githubusercontent.com is
+ *    how Keystatic's item editor fetches a single file's content and image
+ *    blobs (@keystatic/core keystatic-core-ui.js) — without it every item
+ *    editor shows "TypeError: Failed to fetch"; github.com is the sign-in
  *    redirect. Harmless in local mode.
  * `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'` are kept
  * exactly as strict as the public site. `'unsafe-eval'` is added to
@@ -52,10 +56,10 @@ const panelCsp = `
   form-action 'self' https://github.com;
   script-src 'self' 'unsafe-inline'${devUnsafeEval};
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  img-src 'self' data: blob: https://avatars.githubusercontent.com;
+  img-src 'self' data: blob: https://avatars.githubusercontent.com https://raw.githubusercontent.com;
   font-src 'self' data: https://fonts.gstatic.com;
   media-src 'self' blob:;
-  connect-src 'self' https://api.github.com https://github.com;
+  connect-src 'self' https://api.github.com https://github.com https://raw.githubusercontent.com;
   frame-src 'none';
   worker-src 'none';
   manifest-src 'self';
