@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`f6e522f`** (`git ls-remote origin refs/heads/codex/admin-panel-spike`) |
+| **Remote HEAD** | **`1622059`** (вміст == `1214411`; `1622059` = тест-коміти живої перевірки, що скасовуються) |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `f6e522f` | success |
-| Vercel Preview на `f6e522f` | success |
-| Тести / tsc / eslint | **293 pass / 1 todo**, tsc 0, eslint 0, `npm run build` OK |
+| CI `Verify` на `1214411` | success |
+| Vercel Preview на `1214411` | success |
+| Тести / tsc / eslint | **315 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -34,25 +34,46 @@
 
 | Шлях | Стан | Призначення |
 |---|---|---|
-| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | **HEAD `2675c5b` — СТАРИЙ**; `origin` вже підтягнутий до `f6e522f`; dev-сервер `:3000` працює (pid ~71635) | «канонічна» ізольована копія (пам'ять указує на неї). **Синхронізувати:** `git checkout codex/admin-panel-spike && git reset --hard origin/codex/admin-panel-spike`. `2675c5b` — це незапушений коміт фонової сесії; його код **байт-у-байт** дорівнює `981c435` у запушеній історії (`git diff 2675c5b 981c435 -- src/lib/content/panelStore.ts` = порожньо), а його docs-правки перекриті моїм П36-узгодженням. **Нічого не втрачається.** `2675c5b` лишиться в reflog. |
-| `/Users/apple/Projects/dcv-panel-dev-20260909/repo` | HEAD `f6e522f`, гілка `integration`, чисто, є `node_modules` + prod-збірка | моя копія для розробки цієї сесії. Порт для тестів був `:3021` (сервери зупинені). Можна взяти її або зробити свіжий клон. |
+| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | HEAD старий; dev-сервер `:3000` працює (сервер власника) | «канонічна» ізольована копія. **НЕ виконувати тут `git reset --hard`** — там може бути запущений сервер власника `:3000`. Якщо потрібна свіжа копія для роботи — брати `dcv-panel-dev-20260909/repo` або робити новий окремий клон, не чіпаючи цю папку. |
+| `/Users/apple/Projects/dcv-panel-dev-20260909/repo` | HEAD `codex/admin-panel-spike` tip, чисто, є `node_modules` + prod-збірка | робоча копія цієї серії (П38). Локальний dev тесту був `:3011`. `git fetch && git merge --ff-only origin/codex/admin-panel-spike` перед роботою. |
 | `/Users/apple/Projects/dcv-restore-verify-20260909/repo` | HEAD `604c27e` | базовий стан для порівняння + `TEST-LOG.md` + `/baseline/` (знімки `published.json`/`review-state.json`/хеші на момент П35). |
 | `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` | worktree для Б1-setup; `.env` (4 секрети, git-ignored) + `.env.local`; dev `:3010` (pid ~95334) | **не видаляти** доки секрети не покладено у захищене сховище власника. |
 
-**Рекомендація новому чату:** синхронізувати канонічну копію до `f6e522f`
-(команда вище) АБО зробити свіжий клон. Працювати в одній копії, `npm ci`.
+**Рекомендація новому чату:** працювати в `dcv-panel-dev-20260909/repo`
+(`git fetch && git merge --ff-only origin/codex/admin-panel-spike`) АБО зробити
+свіжий окремий клон. **Не** робити `reset --hard` у папці сервера власника
+`…-admin-panel-20260906`.
 
 ---
 
 ## 3. Запущені сервери — НЕ ЧІПАТИ
 
-- **`:3000`** — `next dev` у `DREAM.CAR.VAVD-admin-panel-20260906` (pid ~71635). Сервер власника.
-- **`:3010`** — `next dev --webpack -H 127.0.0.1` у `…-panel-setup-verify` (pid ~95334). Б1-setup-сервер, github-режим.
-- Свої dev-сервери піднімати на **іншому порту** (напр. `:3021`, `:3022`). У `next dev` публічні сторінки мають строгий CSP без `unsafe-eval` → клієнтський JS (лайтбокси) **не працює в dev**; для перевірки інтерактиву робити `npm run build && npx next start --port <вільний>`.
+- **`:3000`** — `next dev` у `DREAM.CAR.VAVD-admin-panel-20260906`. Сервер власника. **НЕ чіпати, НЕ `reset --hard` у цій папці.**
+- **`:3010`** — `next dev` у `…-panel-setup-verify`. Б1-setup-сервер, github-режим.
+- Свої dev-сервери піднімати на **іншому порту** (напр. `:3011`, `:3012`). У `next dev` публічні сторінки мають строгий CSP без `unsafe-eval` → клієнтський JS (лайтбокси) **не працює в dev**; для перевірки інтерактиву робити `npm run build && npx next start --port <вільний>`.
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П37)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П38)
+
+- **П38 — життєвий цикл карток і фото (задача 16:23), 3 частини:**
+  - **§3** прив'язка підтверджень до **примірника** картки: поле `bornAt`
+    (Keystatic генерує токен на створенні) + `instance` у рядку `review-state`.
+    Видалити+створити наново з тим самим slug і текстом → потребує нового
+    підтвердження. Міграція `scripts/migrate-born-at.mjs` (`legacy-<slug>`).
+    Коміт `431b0d8`. Закрито `todo` п. 8.
+  - **§4** `panelStore.completeDeletion` + `/panel` блок «Незавершені видалення»
+    + кнопка «Завершити видалення» + `/api/panel` дія `complete-deletion`.
+    Коміт `20c93e7`.
+  - **§5–6** заморозка опублікованих фото: `store/adapter.ts` published-media
+    (regex-обмежений `_pub/`), `freezeItemMedia`/`gcFrozenMedia` у `publishItem`/
+    `unpublishItem`, `inSyncIgnoringFrozenPhotos` у `getPanelData`. Міграція
+    `scripts/migrate-freeze-published-photos.mjs` (11 items, +~31 МБ). Коміти
+    `4a34df9`+`ab3565c`+`1214411`.
+  - Наживо на Preview (github-режим): §3 create/confirm, §4 повний цикл
+    delete→«Завершити видалення», відсутність фантомних «є зміни». §5–6 —
+    лише локально (`LocalFsStorage`).
+
 
 - **П35 — реальний тест `zzz-test-panel` на Preview** (з дозволу власника). Повний
   цикл: створення через Keystatic → мовний гейт → фото (окремий файл
@@ -89,15 +110,11 @@
 
 ## 5. ВІДКРИТІ ПУНКТИ / наступна робота
 
-### 5.1. Залишок фіксу review-state (пункт 8 чек-листа 14:51) — НЕ закрито
-`todo`-тест `residual: delete + immediate re-create with identical text still shows
-reviewed` у `src/lib/content/panelStore.test.ts`. Сценарій: картку видалили через
-Keystatic і **одразу** створили наново з **тим самим slug і байт-ідентичним
-підтвердженим текстом**, **до** будь-якого наступного `confirm` → картка
-показується «Перевірено» без нового підтвердження (рядок не «стале» — slug знову
-живий; хеш збігається). Повне усунення потребує прив'язки рядка review до
-**екземпляра** картки (напр. `bornAt`/instance-token у рядку review), а не лише
-slug+hash. Практична шкода мала (текст — це те, що людина вже підтверджувала).
+### 5.1. ✅ Залишок фіксу review-state (пункт 8) — ЗАКРИТО у П38 §3
+Реалізовано прив'язку до примірника (`bornAt` / `instance`). `todo`-тест став
+робочим. Залишковий нюанс: рядки, підтверджені **до** П38 і не мігровані,
+трактуються як legacy (`instance:""`) — але міграція проставила `legacy-<slug>`
+усім наявним, тож у продакшені їх немає.
 
 ### 5.2. Захищена копія секретів — дія власника (не зроблено)
 7 змінних Vercel Preview + 4 значення у `…-panel-setup-verify/.env` — у Git їх
@@ -117,11 +134,15 @@ slug+hash. Практична шкода мала (текст — це те, щ�
 сторінки послуги; вікно `confirm`; повний цикл інших колекцій (авто/галерея/
 банери/контакти) — на Vercel не проганявся (лише юніт-тести з `FakeStorage mode="github"`).
 
-### 5.5. Продуктове (з П35, поза цим завданням)
-- Публічний показ фото **авто/галереї** має ту саму міждеплойну властивість, що й
-  послуги (Keystatic перенумеровує/видаляє файли фото при правці → опублікована
-  сторінка на наступному deployment може 404-ити шлях; пом'якшено `onError`).
-  Повне усунення = копіювати файли знімка в стабільну теку при публікації — окреме рішення.
+### 5.5. ✅ Міждеплойна властивість фото — ЗАКРИТО у П38 §5–6
+Заморозка у `_pub/` діє для авто, галереї, послуг і банерів (одна реалізація).
+**Лишилось на Preview:** повний цикл заморозки на github-режимному `publish` +
+A→B між двома реальними збірками Vercel (локально пройдено).
+
+### 5.6. Б4 / content-guard для `main` — врахувати `_pub/`
+`published.json` тепер посилається на `_pub/<hash>` замість `photos/*`. Маніфест
+`content-guard` містить `_pub/…` (проходять `MEDIA_RE`); git-level enforcement
+дозволяє все під `public/images/cms/**`. Наступна сесія Б4 має це врахувати.
 
 ---
 
@@ -157,13 +178,25 @@ slug+hash. Практична шкода мала (текст — це те, щ�
 
 ## 8. Карта ключових файлів
 
-**Код цієї серії:**
-- `src/components/ServicePhotos.tsx` — фото послуг (клієнт).
-- `src/lib/content/servicePhotos.ts` (+`.test.ts`) — чисті хелпери фото.
-- `src/app/[locale]/services/[slug]/page.tsx` — підключення `<ServicePhotos>`.
-- `src/lib/content/panelStore.ts` — фікс review-state (`staleReviewSlugs`/`pruneReview`,
-  `getPanelData`, `confirmLocale`); `PanelData.staleReviewSlugs` — нове поле.
-- `src/lib/content/panelStore.test.ts` — +12 тестів (review-state + інші колекції) + 1 `todo`.
+**Код П38:**
+- `keystatic.config.ts` — `bornAtField()` у 4 колекціях + сінглтоні.
+- `src/lib/content/carsGate.ts` — `ReviewRow.instance`, `reviewInstanceMatches`,
+  `GateContext.instance`; 4 інші гейти викликають `reviewInstanceMatches`.
+- `src/lib/content/panelStore.ts` — `instanceToken`/`instanceMap`,
+  `freezeItemMedia`/`gcFrozenMedia`/`inSyncIgnoringFrozenPhotos`,
+  `completeDeletion`, `freezePublishedMedia`; `getPanelData`/`confirmLocale`/
+  `publishItem`/`unpublishItem` оновлені.
+- `src/lib/content/store/adapter.ts` — `assert{Readable,Published}MediaPath`,
+  `readMedia`/`putPublishedMedia`/`listPublishedMedia`/`deletePublishedMedia` у
+  інтерфейсі; `localFs.ts` + `github.ts` реалізують.
+- `src/app/api/panel/route.ts` — дія `complete-deletion` + `respond()`.
+- `src/app/panel/page.tsx` — `<PendingDeletions>`; `PanelActions.tsx` — variant `solid`.
+- `scripts/migrate-born-at.mjs`, `scripts/migrate-freeze-published-photos.mjs`.
+- `src/lib/content/panelStore.test.ts` — +23 тестів (усього 315 pass / 0 todo).
+
+**Код попередніх серій (П35–П37):**
+- `src/components/ServicePhotos.tsx`, `src/lib/content/servicePhotos.ts`,
+  `src/app/[locale]/services/[slug]/page.tsx`.
 
 **Панель (довідково):**
 - `src/lib/content/panelStore.ts` — `getPanelData` / `confirmLocale` / `publishItem` / `unpublishItem`
@@ -194,8 +227,12 @@ slug+hash. Практична шкода мала (текст — це те, щ�
 
 ## 9. Перший крок нового чату (пропозиція)
 
-1. Синхронізувати робочу копію до `f6e522f` (розд. 2) або свіжий клон + `npm ci`.
-2. `git ls-remote origin refs/heads/codex/admin-panel-spike` (= `f6e522f`) і
-   `refs/heads/main` (= `ce1977af`) — звірити, що нічого не зрушилось.
-3. `npm test && npx tsc --noEmit && npm run lint` — має бути 293 pass / 1 todo, 0, 0.
-4. Уточнити з власником, який із відкритих пунктів (розд. 5) робити далі.
+1. У `dcv-panel-dev-20260909/repo`: `git fetch && git merge --ff-only
+   origin/codex/admin-panel-spike`. **Не** `reset --hard` у папці сервера
+   власника.
+2. `git ls-remote origin refs/heads/codex/admin-panel-spike` і
+   `refs/heads/main` (= `ce1977af`) — звірити, що `main` не зрушився.
+3. `npm test && npx tsc --noEmit && npm run lint && npm run content:guard` —
+   315 pass / 0 todo, 0, 0, OK.
+4. Найближче: (а) жива перевірка заmorозки фото на Preview (розд. 5.5);
+   (б) блокери власника Б1–Б5 (розд. `PANEL-progress.md`).
