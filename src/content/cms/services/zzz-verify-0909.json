@@ -1,0 +1,28 @@
+{
+  "id": "zzz-verify-0909",
+  "order": 100,
+  "status": "available",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ Verify UK",
+    "shortDescription": "korotkyi UK",
+    "longDescription": "dokladnyi UK",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Verify EN",
+    "shortDescription": "short EN",
+    "longDescription": "long EN",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Verify RU",
+    "shortDescription": "kratko RU",
+    "longDescription": "podrobno RU",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mtub22jg-plq1qw4d"
+}
