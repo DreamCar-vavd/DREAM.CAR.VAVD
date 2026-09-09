@@ -1093,59 +1093,6 @@
         "seoTitle": "",
         "seoDescription": ""
       }
-    },
-    {
-      "id": "zzz-test-panel",
-      "order": 100,
-      "status": "available",
-      "iconSrc": "/images/services/premium-3d/06-auto-moto-special-equipment-premium-3d.png",
-      "priceAmount": "",
-      "priceCurrency": "£",
-      "photos": [
-        {
-          "image": "/images/cms/services/zzz-test-panel/photos/0/image.jpg",
-          "caption": "zzz photo — DELETE ME"
-        }
-      ],
-      "uk": {
-        "title": "ZZZ Тест панелі — видалити",
-        "shortDescription": "Тимчасовий матеріал для перевірки фото й видалення. DELETE ME.",
-        "longDescription": "Синтетичний матеріал для перевірки показу фото послуги на Preview і завершення видалення. Підлягає видаленню.",
-        "cardDescription": "",
-        "bullets": [],
-        "modalLead": "",
-        "modalDescription": "",
-        "modalSections": [],
-        "priceNote": "",
-        "seoTitle": "",
-        "seoDescription": ""
-      },
-      "en": {
-        "title": "ZZZ Panel test — delete",
-        "shortDescription": "Synthetic item to verify service photo rendering + delete cleanup on Preview. DELETE ME.",
-        "longDescription": "Local synthetic item for the Preview photo + delete-cleanup check. To be deleted.",
-        "cardDescription": "",
-        "bullets": [],
-        "modalLead": "",
-        "modalDescription": "",
-        "modalSections": [],
-        "priceNote": "",
-        "seoTitle": "",
-        "seoDescription": ""
-      },
-      "ru": {
-        "title": "ZZZ Тест панели — удалить",
-        "shortDescription": "Синтетический материал для проверки показа фото и очистки после удаления на Preview. DELETE ME.",
-        "longDescription": "Локальный синтетический материал для проверки фото и очистки на Preview. Подлежит удалению.",
-        "cardDescription": "",
-        "bullets": [],
-        "modalLead": "",
-        "modalDescription": "",
-        "modalSections": [],
-        "priceNote": "",
-        "seoTitle": "",
-        "seoDescription": ""
-      }
     }
   ],
   "contact": [
