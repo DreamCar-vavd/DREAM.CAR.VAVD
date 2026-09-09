@@ -14,19 +14,16 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Remote:** `a77d3e4` (запушено 2026-09-09 ~11:00). **Local HEAD:** `e8d3dba`
-  (журнали П32/П33/П34 + двічі уточнений сценарій — **4 коміти не запушено**
-  станом на підготовку П34; узгоджений push — окремо, разом із П34).
-  Незапушені: `0107420` `4fe9c0e` `48d39d3` `e8d3dba` — **тільки** `docs/`
-  (`git diff --stat a77d3e4..HEAD` = `PANEL-progress.md` + `PANEL-write-publish-scenario.md`).
-  Fast-forward можливий (remote — предок HEAD, розбіжності немає).
+- **Remote:** `d6e4da3` (запушено 2026-09-09 12:4x BST, П34 — 5 docs-комітів
+  `0107420`→`d6e4da3`, fast-forward від `a77d3e4`). **Local HEAD:** `d6e4da3`
+  (синхронно). Зміни — **тільки** `docs/PANEL-progress.md` +
+  `docs/PANEL-write-publish-scenario.md`; код застосунку не змінювався.
   PR #26 draft. `main` = `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` (звірено
   `git ls-remote origin` 2026-09-09 12:34 BST — не зрушив).
-  Deployment `CZREYKxhJC7ziAH93w1x45qp5pKD` (`a77d3e4`, Preview, **Ready**) —
-  стабільний branch alias
-  `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`
-  веде на нього. Код застосунку між `a77d3e4` і `e8d3dba` **не** змінювався —
-  push оновить лише документацію (нова Preview-збірка того самого коду).
+  CI `Verify` на `d6e4da3` — success; Vercel Preview build `d6e4da3`
+  (deployment `C1AgmVXdhHT4bpYnvewnrSJSYy1e`) — **success**, той самий код, що
+  й `a77d3e4` / `CZREYKxhJC7ziAH93w1x45qp5pKD`. Стабільний branch alias
+  `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app`.
 - **hosted Б1 — перевірено (П32, Chrome власника, авторизована сесія):**
   вхід через GitHub (callback на Preview-хост) ✅ · Keystatic-дашборд ✅ ·
   `/panel` на `codex/admin-panel-spike` ✅ · **3 авто / 8 галерей / 5 послуг /
@@ -194,8 +191,8 @@ npm ci
 **Не перевірено (потрібен окремий дозвіл або інструмент):** будь-який реальний
 запис у панель; справжній viewport 375px.
 
-**Залишок:** узгоджений push 4 docs-комітів (нова Preview-збірка того самого
-коду); після «так» власника — Етапи 3–6 сценарію.
+**Залишок:** push виконано (`d6e4da3`, Vercel + CI success); після «так»
+власника саме на сценарій `zzz-test-panel` — Етапи 3–6.
 
 ### П33 — 375 px (`/panel`), клавіатура, CSP-заголовки на deployment, сценарій готовий до погодження
 
