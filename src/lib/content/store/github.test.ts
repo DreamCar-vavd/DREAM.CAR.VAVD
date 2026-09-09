@@ -437,3 +437,35 @@ test("conflict, allowlist and branch guarantees are unchanged with timeouts on",
   );
   assert.match(calls[0].url, /ref=codex%2Ftest|contents\/src\/content\/cms\/published\.json/);
 });
+
+test("readMedia falls back to the blob API for a file over 1 MB (contents API drops `content`)", async () => {
+  const big = Buffer.alloc(1_500_000, 7); // >1 MB
+  const { impl, calls } = fakeGitHub({
+    "/contents/public/images/cms/cars/x/photos/0/image.jpg": () => ({
+      status: 200,
+      body: { sha: "bigsha", encoding: "none", size: big.length }, // no `content`
+    }),
+    "/git/blobs/bigsha": () => ({
+      status: 200,
+      body: { content: big.toString("base64"), encoding: "base64", sha: "bigsha" },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const bytes = await gh.readMedia("public/images/cms/cars/x/photos/0/image.jpg");
+  assert.equal(bytes?.length, big.length);
+  assert.ok(calls.some((c) => c.url.includes("/git/blobs/bigsha")));
+});
+
+test("readMedia decodes a small file straight from the contents API (no blob call)", async () => {
+  const small = Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3]);
+  const { impl, calls } = fakeGitHub({
+    "/contents/public/images/cms/cars/x/photos/0/image.jpg": () => ({
+      status: 200,
+      body: { sha: "s1", encoding: "base64", content: small.toString("base64") },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const bytes = await gh.readMedia("public/images/cms/cars/x/photos/0/image.jpg");
+  assert.deepEqual([...(bytes ?? [])], [...small]);
+  assert.ok(!calls.some((c) => c.url.includes("/git/blobs/")));
+});

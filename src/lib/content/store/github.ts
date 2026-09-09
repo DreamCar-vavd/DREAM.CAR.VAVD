@@ -198,8 +198,15 @@ export class GitHubStorage implements PanelStorage {
     if (status === 404) return { text: null, sha: "" };
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200) throw new Error(`GitHub read ${repoPath} failed (${status})`);
-    const f = body as { content: string; sha: string; encoding: string };
-    return { text: f.encoding === "base64" ? b64decode(f.content) : f.content, sha: f.sha };
+    const f = body as { content?: string; sha: string; encoding?: string };
+    if (f.encoding === "base64" && f.content) return { text: b64decode(f.content), sha: f.sha };
+    if (f.encoding !== "none" && typeof f.content === "string") return { text: f.content, sha: f.sha };
+    // >1 MB: contents API drops `content` — read it from the blob API by SHA.
+    const blob = await this.gh(this.repoUrl(`/git/blobs/${f.sha}`));
+    GitHubStorage.rejectIfUnauthorized(blob.status, blob.headers, blob.body);
+    if (blob.status !== 200) throw new Error(`GitHub blob ${repoPath} read failed (${blob.status})`);
+    const b = blob.body as { content: string };
+    return { text: b64decode(b.content), sha: f.sha };
   }
 
   async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
@@ -292,8 +299,19 @@ export class GitHubStorage implements PanelStorage {
     if (status === 404) return null;
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200) throw new Error(`GitHub read ${repoPath} failed (${status})`);
-    const f = body as { content: string; sha: string; encoding: string };
-    return { bytes: new Uint8Array(Buffer.from(f.content, "base64")), sha: f.sha };
+    const f = body as { content?: string; sha: string; encoding?: string; size?: number };
+    // The contents API omits `content` for files over 1 MB (`encoding: "none"`).
+    // Photos routinely exceed that, so fall back to the blob API by SHA — it
+    // serves base64 up to 100 MB. Without this a big photo reads as 0 bytes:
+    // "modified" forever, and a publish would freeze an EMPTY copy.
+    if (f.encoding === "base64" && f.content) {
+      return { bytes: new Uint8Array(Buffer.from(f.content, "base64")), sha: f.sha };
+    }
+    const blob = await this.gh(this.repoUrl(`/git/blobs/${f.sha}`));
+    GitHubStorage.rejectIfUnauthorized(blob.status, blob.headers, blob.body);
+    if (blob.status !== 200) throw new Error(`GitHub blob ${repoPath} read failed (${blob.status})`);
+    const b = blob.body as { content: string; encoding: string };
+    return { bytes: new Uint8Array(Buffer.from(b.content, "base64")), sha: f.sha };
   }
 
   async readMedia(repoPath: string): Promise<Uint8Array | null> {
