@@ -5,6 +5,9 @@ import {
   ConflictError,
   assertAllowedDir,
   assertAllowedFile,
+  assertPublishedMediaDir,
+  assertPublishedMediaPath,
+  assertReadableMediaPath,
   type AllowedDir,
   type AllowedFile,
   type DeployStatus,
@@ -73,5 +76,43 @@ export class LocalFsStorage implements PanelStorage {
 
   async deployStatus(): Promise<DeployStatus> {
     return { state: "n/a" };
+  }
+
+  async readMedia(repoPath: string): Promise<Uint8Array | null> {
+    assertReadableMediaPath(repoPath);
+    try {
+      return new Uint8Array(await fs.readFile(abs(repoPath)));
+    } catch {
+      return null;
+    }
+  }
+
+  async putPublishedMedia(repoPath: string, bytes: Uint8Array): Promise<void> {
+    assertPublishedMediaPath(repoPath);
+    const target = abs(repoPath);
+    try {
+      const existing = await fs.readFile(target);
+      if (Buffer.from(bytes).equals(existing)) return; // content-addressed no-op
+    } catch {
+      /* not there yet */
+    }
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    const tmp = `${target}.tmp-${process.pid}-${Date.now()}`;
+    await fs.writeFile(tmp, bytes);
+    await fs.rename(tmp, target);
+  }
+
+  async listPublishedMedia(dirPath: string): Promise<string[]> {
+    assertPublishedMediaDir(dirPath);
+    try {
+      return (await fs.readdir(abs(dirPath))).filter((n) => !n.startsWith(".")).sort();
+    } catch {
+      return [];
+    }
+  }
+
+  async deletePublishedMedia(repoPath: string): Promise<void> {
+    assertPublishedMediaPath(repoPath);
+    await fs.rm(abs(repoPath), { force: true });
   }
 }

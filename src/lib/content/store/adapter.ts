@@ -38,6 +38,50 @@ export function assertAllowedFile(file: string): asserts file is AllowedFile {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Published media store
+//
+// On "Опублікувати" the panel copies each referenced working image into a
+// content-addressed file the editor (Keystatic) never touches, and points the
+// snapshot at that copy. Keystatic renumbering / deleting a working photo then
+// cannot 404 the live page: the published copy keeps existing until the next
+// publish drops it. The panel may READ any CMS image but may only WRITE or
+// DELETE inside a `/_pub/` folder whose name is a hex content hash — a bug or a
+// crafted request still cannot reach a working photo or anything outside the
+// tree.
+// ---------------------------------------------------------------------------
+
+/** The per-slug subfolder the publish pipeline owns. */
+export const PUBLISHED_MEDIA_DIR = "_pub" as const;
+
+/** `public/images/cms/{cars|gallery|services|promos}/<slug>/…/<name>.<img ext>` */
+const READABLE_MEDIA_RE =
+  /^public\/images\/cms\/(?:cars|gallery|services|promos)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._/-]*\.(?:jpe?g|png|webp)$/;
+/** Only `…/<slug>/_pub/<8–64 hex>.<img ext>` is writable / deletable. */
+const PUBLISHED_MEDIA_RE =
+  /^public\/images\/cms\/(?:cars|gallery|services|promos)\/[A-Za-z0-9][A-Za-z0-9._-]*\/_pub\/[a-f0-9]{8,64}\.(?:jpe?g|png|webp)$/;
+/** `…/<slug>/_pub` — the only directory listings the pipeline needs. */
+const PUBLISHED_MEDIA_DIR_RE =
+  /^public\/images\/cms\/(?:cars|gallery|services|promos)\/[A-Za-z0-9][A-Za-z0-9._-]*\/_pub$/;
+
+const noTraversal = (p: string) => !p.includes("..") && !p.includes("//") && !p.includes("\\");
+
+export function assertReadableMediaPath(p: string): void {
+  if (!noTraversal(p) || !READABLE_MEDIA_RE.test(p)) {
+    throw new Error(`Panel storage: "${p}" is not a readable CMS media path`);
+  }
+}
+export function assertPublishedMediaPath(p: string): void {
+  if (!noTraversal(p) || !PUBLISHED_MEDIA_RE.test(p)) {
+    throw new Error(`Panel storage: "${p}" is not a writable published-media path`);
+  }
+}
+export function assertPublishedMediaDir(p: string): void {
+  if (!noTraversal(p) || !PUBLISHED_MEDIA_DIR_RE.test(p)) {
+    throw new Error(`Panel storage: "${p}" is not a published-media directory`);
+  }
+}
+
 export interface Versioned<T> {
   data: T;
   /** Opaque optimistic-concurrency token. "" means "does not exist". */
@@ -179,6 +223,19 @@ export interface PanelStorage {
    * Vercel created for the branch HEAD.
    */
   deployStatus(): Promise<DeployStatus>;
+
+  /** Bytes of a CMS image (any working or published path). null when absent. */
+  readMedia(repoPath: string): Promise<Uint8Array | null>;
+  /**
+   * Write bytes to a published-media path (`…/<slug>/_pub/<hash>.<ext>`).
+   * Content-addressed, so idempotent: a byte-identical file already there is
+   * left untouched (no commit).
+   */
+  putPublishedMedia(repoPath: string, bytes: Uint8Array): Promise<void>;
+  /** File names directly inside a `…/<slug>/_pub` folder. [] when it does not exist. */
+  listPublishedMedia(dirPath: string): Promise<string[]>;
+  /** Delete a published-media file. No-op when already gone. */
+  deletePublishedMedia(repoPath: string): Promise<void>;
 }
 
 export interface DeployMeta {

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   ConflictError,
   StorageAuthError,
@@ -8,6 +9,9 @@ import {
   WriteUncertainError,
   assertAllowedDir,
   assertAllowedFile,
+  assertPublishedMediaDir,
+  assertPublishedMediaPath,
+  assertReadableMediaPath,
   type AllowedDir,
   type AllowedFile,
   type DeployStatus,
@@ -269,6 +273,83 @@ export class GitHubStorage implements PanelStorage {
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
     if (status !== 200 && status !== 201) throw new Error(`GitHub write ${file} failed (${status})`);
     return { data: text, version: (body as { content: { sha: string } }).content.sha };
+  }
+
+  // ---- published-media store (see adapter.ts) --------------------------------
+
+  /** git blob SHA-1 of `bytes` — lets us skip a PUT for a byte-identical file. */
+  private static blobSha(bytes: Uint8Array): string {
+    return createHash("sha1")
+      .update(Buffer.from(`blob ${bytes.length}\0`, "utf8"))
+      .update(bytes)
+      .digest("hex");
+  }
+
+  private async getRaw(repoPath: string): Promise<{ bytes: Uint8Array; sha: string } | null> {
+    const { status, body, headers } = await this.gh(
+      this.repoUrl(`/contents/${repoPath}?ref=${this.ref()}`),
+    );
+    if (status === 404) return null;
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
+    if (status !== 200) throw new Error(`GitHub read ${repoPath} failed (${status})`);
+    const f = body as { content: string; sha: string; encoding: string };
+    return { bytes: new Uint8Array(Buffer.from(f.content, "base64")), sha: f.sha };
+  }
+
+  async readMedia(repoPath: string): Promise<Uint8Array | null> {
+    assertReadableMediaPath(repoPath);
+    return (await this.getRaw(repoPath))?.bytes ?? null;
+  }
+
+  async putPublishedMedia(repoPath: string, bytes: Uint8Array): Promise<void> {
+    assertPublishedMediaPath(repoPath);
+    const existing = await this.getRaw(repoPath);
+    if (existing && existing.sha === GitHubStorage.blobSha(bytes)) return; // already there
+    const payload: Record<string, unknown> = {
+      message: `panel: publish media ${repoPath}`,
+      content: Buffer.from(bytes).toString("base64"),
+      branch: this.cfg.branch,
+    };
+    if (existing) payload.sha = existing.sha;
+    const { status, body, headers } = await this.gh(this.repoUrl(`/contents/${repoPath}`), {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
+    if (status !== 200 && status !== 201) {
+      throw new Error(`GitHub write ${repoPath} failed (${status})`);
+    }
+  }
+
+  async listPublishedMedia(dirPath: string): Promise<string[]> {
+    assertPublishedMediaDir(dirPath);
+    const { status, body, headers } = await this.gh(
+      this.repoUrl(`/contents/${dirPath}?ref=${this.ref()}`),
+    );
+    if (status === 404) return [];
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
+    if (status !== 200 || !Array.isArray(body)) return [];
+    return (body as { name: string; type: string }[])
+      .filter((e) => e.type === "file" && !e.name.startsWith("."))
+      .map((e) => e.name)
+      .sort();
+  }
+
+  async deletePublishedMedia(repoPath: string): Promise<void> {
+    assertPublishedMediaPath(repoPath);
+    const existing = await this.getRaw(repoPath);
+    if (!existing) return; // already gone
+    const { status, body, headers } = await this.gh(this.repoUrl(`/contents/${repoPath}`), {
+      method: "DELETE",
+      body: JSON.stringify({
+        message: `panel: drop unreferenced media ${repoPath}`,
+        sha: existing.sha,
+        branch: this.cfg.branch,
+      }),
+    });
+    if (status === 404 || status === 409 || status === 422) return; // raced away — fine
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
+    if (status !== 200) throw new Error(`GitHub delete ${repoPath} failed (${status})`);
   }
 
   private async branchHeadSha(): Promise<string | null> {

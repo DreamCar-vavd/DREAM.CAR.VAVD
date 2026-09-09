@@ -9,6 +9,7 @@ import {
 import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
 import {
   ConflictError,
+  PUBLISHED_MEDIA_DIR,
   StorageAuthError,
   StorageBackendError,
   StorageForbiddenError,
@@ -18,6 +19,15 @@ import {
 } from "./store/adapter";
 
 export const sha256 = (input: string) => createHash("sha256").update(input).digest("hex");
+
+/** `public/images/cms/<dir>` base per kind; `null` for kinds with no photos. */
+const IMAGE_DIR: Record<KindKey, string | null> = {
+  car: "cars",
+  gallery: "gallery",
+  service: "services",
+  contact: null,
+  promo: "promos",
+};
 
 const PUBLISHED = "src/content/cms/published.json" as const;
 const REVIEW = "src/content/cms/review-state.json" as const;
@@ -148,6 +158,110 @@ function rebuildSnapshot(prev: Snapshot, kindKey: KindKey, nextList: unknown[]):
     }
   }
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// published-media freezing
+//
+// Keystatic edits the WORKING photo files (`…/<slug>/photos/<i>/image.<ext>`) —
+// re-ordering renumbers them and a removal deletes one, both as direct commits
+// the panel never sees. If published.json still pointed at a working path, the
+// NEXT deployment (any commit) would 404 that image even though the material was
+// never re-published. So on publish every referenced working image is copied,
+// content-addressed, into `…/<slug>/_pub/<hash>.<ext>` — a folder Keystatic does
+// not know about — and the snapshot points there instead. The copy lives until
+// a later publish of the same slug no longer references it.
+// ---------------------------------------------------------------------------
+
+const IMG_EXT_RE = /\.(jpe?g|png|webp)$/i;
+const PUB_SEG = `/${PUBLISHED_MEDIA_DIR}/`;
+
+/** Public image URLs a snapshot item points at (photos[] for most kinds; the
+ *  single `image` for promos). */
+function itemImageUrls(kindKey: KindKey, item: Record<string, unknown>): string[] {
+  if (kindKey === "promo") return [String(item.image ?? "")].filter(Boolean);
+  const photos = Array.isArray(item.photos) ? (item.photos as Record<string, unknown>[]) : [];
+  return photos.map((p) => String(p?.image ?? "")).filter(Boolean);
+}
+/** A copy of `item` with each image URL swapped per `rewrite` (old -> new). */
+function withRewrittenImages(
+  kindKey: KindKey,
+  item: Record<string, unknown>,
+  rewrite: Map<string, string>,
+): Record<string, unknown> {
+  if (rewrite.size === 0) return item;
+  if (kindKey === "promo") {
+    const next = rewrite.get(String(item.image ?? ""));
+    return next ? { ...item, image: next } : item;
+  }
+  const photos = Array.isArray(item.photos) ? (item.photos as Record<string, unknown>[]) : [];
+  return {
+    ...item,
+    photos: photos.map((p) => {
+      const next = rewrite.get(String(p?.image ?? ""));
+      return next ? { ...p, image: next } : p;
+    }),
+  };
+}
+
+/**
+ * Copy each still-working image this item references into its content-addressed
+ * `_pub/` folder and return the item with those URLs rewritten. Idempotent: an
+ * image already under `_pub/` is left as-is, and `putPublishedMedia` skips a
+ * byte-identical file. A working file that is already gone is left pointing
+ * where it was — publish still proceeds; that single tile is the `onError`
+ * case, not a blocked publish.
+ */
+async function freezeItemMedia(
+  storage: PanelStorage,
+  kindKey: KindKey,
+  item: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const dir = IMAGE_DIR[kindKey];
+  if (!dir) return item;
+  const slug = String(item.id ?? "");
+  const rewrite = new Map<string, string>();
+  for (const url of itemImageUrls(kindKey, item)) {
+    if (url.includes(PUB_SEG)) continue; // already frozen
+    if (!url.startsWith("/images/cms/") || !IMG_EXT_RE.test(url)) continue;
+    const bytes = await storage.readMedia(`public${url}`).catch(() => null);
+    if (!bytes) continue; // working file already gone — keep the old URL
+    const ext = url.match(IMG_EXT_RE)![1].toLowerCase();
+    const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 24);
+    const rel = `images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${hash}.${ext}`;
+    await storage.putPublishedMedia(`public/${rel}`, bytes);
+    rewrite.set(url, `/${rel}`);
+  }
+  return withRewrittenImages(kindKey, item, rewrite);
+}
+
+/**
+ * Delete `_pub/` files for `slug` that nothing in `snapshot` points at any more.
+ * Best-effort and safe: it only ever removes a file the just-written snapshot
+ * does NOT reference, and only inside the slug's own `_pub/` folder.
+ */
+async function gcFrozenMedia(
+  storage: PanelStorage,
+  kindKey: KindKey,
+  slug: string,
+  snapshot: Snapshot,
+): Promise<void> {
+  const dir = IMAGE_DIR[kindKey];
+  if (!dir) return;
+  const pubDir = `public/images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}`;
+  const present = await storage.listPublishedMedia(pubDir);
+  if (present.length === 0) return;
+  const referenced = new Set<string>();
+  JSON.stringify(snapshot, (_k, v) => {
+    if (typeof v === "string" && v.includes(`${PUB_SEG}`)) {
+      const m = v.match(/\/_pub\/([^/]+)$/);
+      if (m && v.includes(`/images/cms/${dir}/${slug}/`)) referenced.add(m[1]);
+    }
+    return v;
+  });
+  for (const name of present) {
+    if (!referenced.has(name)) await storage.deletePublishedMedia(`${pubDir}/${name}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +607,22 @@ export async function publishItem(
       return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
     }
 
-    const nextList = [...current.filter((p) => p.id !== id), item].sort(
+    // Copy every referenced working image into the slug's content-addressed
+    // `_pub/` folder and publish THAT — a later Keystatic edit to the working
+    // photos can no longer 404 the live page. Idempotent; a working file that
+    // is already gone stays pointing where it was.
+    const frozen = (await freezeItemMedia(
+      storage,
+      kindKey,
+      item as unknown as Record<string, unknown>,
+    )) as typeof item;
+    // Re-freezing an unchanged photo set produces the exact same `_pub/` URLs,
+    // so a republish with no real change is still a no-op.
+    if (existing && stable(existing) === stable(frozen)) {
+      return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
+    }
+
+    const nextList = [...current.filter((p) => p.id !== id), frozen].sort(
       (a, b) => a.order - b.order || a.id.localeCompare(b.id),
     );
     const nextSnapshot = rebuildSnapshot(snapshot, kindKey, nextList as unknown[]);
@@ -506,6 +635,10 @@ export async function publishItem(
     }
 
     await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
+    // The snapshot is committed; now drop `_pub/` copies it no longer points at.
+    // Best-effort — a failure here leaves only unreferenced files, never a
+    // broken page, and the next publish sweeps them.
+    await gcFrozenMedia(storage, kindKey, id, nextSnapshot).catch(() => {});
     const tail =
       storage.mode === "github"
         ? " Очікуйте завершення збірки (1–3 хв), стан — угорі сторінки."
@@ -542,6 +675,8 @@ export async function unpublishItem(
       current.filter((p) => p.id !== id) as unknown[],
     );
     await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
+    // Nothing points at this slug's frozen images any more — drop them.
+    await gcFrozenMedia(storage, kindKey, id, nextSnapshot).catch(() => {});
     const tail = storage.mode === "github" ? " Опубліковану версію буде знято після наступної збірки." : "";
     return {
       ok: true,
@@ -593,4 +728,41 @@ export async function completeDeletion(
       message: `Готово — прибрано рядки підтверджень: ${stale.join(", ")}.`,
     };
   });
+}
+
+/**
+ * Freeze EVERY item already in published.json: copy each still-working image it
+ * references into the slug's `_pub/` folder and repoint the snapshot there.
+ * Idempotent — an item already fully frozen produces byte-identical paths and is
+ * skipped. Used by scripts/migrate-freeze-published-photos.mjs to close the gap
+ * for items published before this pipeline existed; a no-op afterwards.
+ * Returns the number of items whose paths changed.
+ */
+export async function freezePublishedMedia(storage: PanelStorage): Promise<{ changed: number }> {
+  const publishedF = await storage.readFile(PUBLISHED);
+  const snapshot = parseSnapshot(publishedF.data);
+  let changed = 0;
+  for (const kindKey of KIND_ORDER) {
+    const key = KEY_FOR_KIND[kindKey];
+    const list = snapshot[key];
+    for (let i = 0; i < list.length; i += 1) {
+      const before = stable(list[i]);
+      list[i] = await freezeItemMedia(storage, kindKey, list[i] as Record<string, unknown>);
+      if (stable(list[i]) !== before) changed += 1;
+    }
+  }
+  if (changed === 0) return { changed: 0 };
+  await storage.writeFile(
+    PUBLISHED,
+    `${JSON.stringify(snapshot, null, 2)}\n`,
+    publishedF.version,
+  );
+  for (const kindKey of KIND_ORDER) {
+    for (const raw of snapshot[KEY_FOR_KIND[kindKey]]) {
+      await gcFrozenMedia(storage, kindKey, String((raw as { id?: unknown }).id ?? ""), snapshot).catch(
+        () => {},
+      );
+    }
+  }
+  return { changed };
 }

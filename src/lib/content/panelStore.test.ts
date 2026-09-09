@@ -77,6 +77,7 @@ class FakeStorage implements PanelStorage {
   branch: string | null = null;
   files = new Map<string, string>();
   dirs = new Map<string, DirEntry[]>();
+  media = new Map<string, Uint8Array>();
   deploy: DeployStatus = { state: "ready" };
 
   seedDir(dir: AllowedDir, entries: DirEntry[]) {
@@ -84,6 +85,26 @@ class FakeStorage implements PanelStorage {
   }
   seedFile(file: AllowedFile, text: string) {
     this.files.set(file, text);
+  }
+  /** Seed a working image (path like "public/images/cms/services/x/photos/0/image.jpg"). */
+  seedMedia(repoPath: string, bytes: Uint8Array) {
+    this.media.set(repoPath, bytes);
+  }
+
+  async readMedia(repoPath: string) {
+    return this.media.get(repoPath) ?? null;
+  }
+  async putPublishedMedia(repoPath: string, bytes: Uint8Array) {
+    this.media.set(repoPath, bytes);
+  }
+  async listPublishedMedia(dirPath: string) {
+    return [...this.media.keys()]
+      .filter((k) => k.startsWith(`${dirPath}/`) && !k.slice(dirPath.length + 1).includes("/"))
+      .map((k) => k.slice(dirPath.length + 1))
+      .sort();
+  }
+  async deletePublishedMedia(repoPath: string) {
+    this.media.delete(repoPath);
   }
 
   async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
@@ -486,6 +507,175 @@ test("unpublishing an orphan removes exactly that snapshot entry and leaves the 
   );
   // The other kinds' arrays are untouched.
   assert.deepEqual(snap.cars, []);
+});
+
+// ---------------------------------------------------------------------------
+// Published-media freezing on publish (task §5–6)
+// ---------------------------------------------------------------------------
+
+const jpgBytes = (marker: string) =>
+  new Uint8Array([0xff, 0xd8, 0xff, ...Buffer.from(`fake-jpeg:${marker}`), 0xff, 0xd9]);
+const svcWithPhoto = (over: Record<string, unknown> = {}) =>
+  svcJson({
+    photos: [{ image: "/images/cms/services/s1/photos/0/image.jpg", caption: "" }],
+    ...over,
+  });
+
+function photoStore() {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto() }]);
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(svcReviewAll));
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("A"));
+  return s;
+}
+const snap = (s: FakeStorage) => JSON.parse(s.files.get("src/content/cms/published.json")!);
+const svcPhotoUrls = (s: FakeStorage) =>
+  snap(s).services[0].photos.map((p: { image: string }) => p.image);
+
+test("publish copies working photos into the slug's content-addressed _pub/ folder", async () => {
+  const s = photoStore();
+  const v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, true, r.message);
+  const [url] = svcPhotoUrls(s);
+  assert.match(url, /^\/images\/cms\/services\/s1\/_pub\/[a-f0-9]{24}\.jpg$/);
+  assert.ok(s.media.has(`public${url}`)); // the frozen copy exists
+  assert.ok(s.media.has("public/images/cms/services/s1/photos/0/image.jpg")); // working file untouched
+});
+
+test("a draft photo edit after publishing does NOT change the published image", async () => {
+  const s = photoStore();
+  const v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const publishedUrl = svcPhotoUrls(s)[0];
+  const publishedBytes = s.media.get(`public${publishedUrl}`)!;
+
+  // Owner edits the photo in Keystatic (new bytes at the same working path) but
+  // does NOT re-publish.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+
+  // The published snapshot still points at the frozen A copy, and its bytes are
+  // unchanged — a new deployment would serve exactly what was published.
+  assert.equal(svcPhotoUrls(s)[0], publishedUrl);
+  assert.deepEqual([...s.media.get(`public${publishedUrl}`)!], [...publishedBytes]);
+});
+
+test("re-publishing a changed photo swaps the _pub file and GCs the old one", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const oldUrl = svcPhotoUrls(s)[0];
+
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [
+    { name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }, // bump working version
+  ]);
+  v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, true, r.message);
+  const newUrl = svcPhotoUrls(s)[0];
+  assert.notEqual(newUrl, oldUrl);
+  assert.ok(s.media.has(`public${newUrl}`));
+  assert.equal(s.media.has(`public${oldUrl}`), false); // old copy garbage-collected
+});
+
+test("re-publishing an unchanged photo set is a no-op — no churn", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const url = svcPhotoUrls(s)[0];
+  v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, true);
+  assert.match(r.message, /вже опубліков/);
+  assert.equal(svcPhotoUrls(s)[0], url);
+});
+
+test("publish still succeeds when a working photo file is already gone — the URL is kept, not blocked", async () => {
+  const s = photoStore();
+  s.media.delete("public/images/cms/services/s1/photos/0/image.jpg"); // Keystatic already removed it
+  const v = await versions(s);
+  const r = await publishItem(s, "service", "s1", {
+    working: v.service,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(r.ok, true, r.message);
+  // Nothing to freeze — the snapshot keeps the working path (that one tile is
+  // the onError case; the publish is not blocked).
+  assert.equal(svcPhotoUrls(s)[0], "/images/cms/services/s1/photos/0/image.jpg");
+});
+
+test("unpublishing a slug garbage-collects its frozen _pub images", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const url = svcPhotoUrls(s)[0];
+  assert.ok(s.media.has(`public${url}`));
+  v = await versions(s);
+  const r = await unpublishItem(s, "service", "s1", { published: v.published });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(s.media.has(`public${url}`), false); // frozen copy dropped
+});
+
+test("publishing one slug never touches another slug's frozen _pub folder", async () => {
+  const s = photoStore();
+  // s1 already published with a frozen photo.
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const s1Url = svcPhotoUrls(s)[0];
+
+  // A second service s2 with its own photo.
+  s.seedDir("src/content/cms/services", [
+    { name: "s1.json", text: svcWithPhoto() },
+    {
+      name: "s2.json",
+      text: svcJson({ id: "s2", photos: [{ image: "/images/cms/services/s2/photos/0/image.jpg", caption: "" }] }),
+    },
+  ]);
+  s.seedMedia("public/images/cms/services/s2/photos/0/image.jpg", jpgBytes("S2"));
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      ...svcReviewAll,
+      s2: {
+        uk: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        en: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        ru: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+      },
+    }),
+  );
+  v = await versions(s);
+  await publishItem(s, "service", "s2", { working: v.service, review: v.review, published: v.published });
+  assert.ok(s.media.has(`public${s1Url}`)); // s1's frozen photo survived
+});
+
+test("adapter rejects a media write outside a _pub folder / with traversal", async () => {
+  const { assertPublishedMediaPath, assertReadableMediaPath } = await import("./store/adapter");
+  assert.throws(
+    () => assertPublishedMediaPath("public/images/cms/services/s1/photos/0/image.jpg"),
+    /published-media/,
+  );
+  assert.throws(
+    () => assertPublishedMediaPath("public/images/cms/services/s1/_pub/../../evil.jpg"),
+    /published-media/,
+  );
+  assert.throws(() => assertReadableMediaPath("public/proxy.ts"), /media path/);
+  assert.doesNotThrow(() =>
+    assertPublishedMediaPath("public/images/cms/gallery/x/_pub/abcdef01.webp"),
+  );
 });
 
 // ---------------------------------------------------------------------------
