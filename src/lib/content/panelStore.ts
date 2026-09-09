@@ -829,6 +829,26 @@ export async function completeDeletion(
       `${JSON.stringify(pruneReview(review, workingSlugs), null, 2)}\n`,
       expected.review,
     );
+    // A slug that is now neither a working card nor in the published snapshot is
+    // gone for good — its `_pub/` copies are unreachable by the normal cleanup
+    // (which only scans published + working dirs), so drop them here. Best-effort.
+    try {
+      const referenced = referencedFrozenPaths(parseSnapshot((await storage.readFile(PUBLISHED)).data));
+      for (const key of stale) {
+        const [kindKey, ...rest] = key.split(":");
+        const slug = rest.join(":");
+        const dir = slug && IMAGE_DIR[kindKey as KindKey];
+        if (!dir) continue;
+        const pubDir = `public/images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}`;
+        for (const name of await storage.listPublishedMedia(pubDir)) {
+          if (!referenced.has(`/images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${name}`)) {
+            await storage.deletePublishedMedia(`${pubDir}/${name}`);
+          }
+        }
+      }
+    } catch {
+      /* media sweep is best-effort — the review rows are already pruned */
+    }
     return {
       ok: true,
       message: `Готово — прибрано рядки підтверджень: ${stale.join(", ")}.`,

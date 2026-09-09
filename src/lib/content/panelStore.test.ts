@@ -1012,6 +1012,53 @@ test("completeDeletion sweeps every orphaned review row in one version-guarded w
   assert.ok(review.c1); // the real row is untouched
 });
 
+test("completeDeletion also drops the _pub copies of a slug that is gone from both working AND published", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", []); // no working card
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [], contact: [], promos: [] }),
+  );
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ "service:ghost": { uk: { hash: "x", at: "t" } } }),
+  );
+  s.seedMedia("public/images/cms/services/ghost/_pub/deadbeef12345678.jpg", jpgBytes("ghost"));
+  const v = await versions(s);
+  const r = await completeDeletion(s, { review: v.review });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(JSON.parse(s.files.get("src/content/cms/review-state.json")!)["service:ghost"], undefined);
+  assert.equal(s.media.has("public/images/cms/services/ghost/_pub/deadbeef12345678.jpg"), false);
+});
+
+test("completeDeletion does NOT drop _pub copies a still-published orphan needs", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/services", []);
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({
+      publishedAt: "t",
+      cars: [],
+      gallery: [],
+      services: [
+        JSON.parse(
+          svcJson({ id: "orph", photos: [{ image: "/images/cms/services/orph/_pub/abcdef01.jpg", caption: "" }] }),
+        ),
+      ],
+      contact: [],
+      promos: [],
+    }),
+  );
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ "service:orph": { uk: { hash: "x", at: "t" } } }),
+  );
+  s.seedMedia("public/images/cms/services/orph/_pub/abcdef01.jpg", jpgBytes("orph"));
+  const v = await versions(s);
+  await completeDeletion(s, { review: v.review });
+  assert.ok(s.media.has("public/images/cms/services/orph/_pub/abcdef01.jpg")); // still referenced by the orphan
+});
+
 test("completeDeletion is idempotent — a second click finds nothing and writes nothing", async () => {
   const s = baseStore();
   s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll)); // c1 real, no ghosts

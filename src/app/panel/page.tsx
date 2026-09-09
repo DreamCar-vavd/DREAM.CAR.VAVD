@@ -276,6 +276,8 @@ function PendingDeletions({
   const orphanPublished = new Set(
     groups.flatMap((g) => g.rows.filter((r) => r.publishState === "orphan-published").map((r) => r.id)),
   );
+  // stale keys are `kind:slug`; the orphan rows are keyed by the bare slug.
+  const bareSlug = (key: string) => (key.includes(":") ? key.slice(key.indexOf(":") + 1) : key);
   return (
     <section className="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950">
       <p className="font-semibold text-amber-900 dark:text-amber-200">Незавершені видалення</p>
@@ -286,8 +288,8 @@ function PendingDeletions({
       <ul className="mt-2 list-disc pl-5 text-xs text-amber-900 dark:text-amber-200">
         {slugs.map((slug) => (
           <li key={slug}>
-            <code>{slug}</code> — рядок підтверджень перекладу
-            {orphanPublished.has(slug) && (
+            <code>{bareSlug(slug)}</code> — рядок підтверджень перекладу
+            {orphanPublished.has(bareSlug(slug)) && (
               <>
                 {" "}
                 <strong>

@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`1622059`** (вміст == `1214411`; `1622059` = тест-коміти живої перевірки, що скасовуються) |
+| **Remote HEAD** | **`115520c`** (П39) + пізніші коміти живої перевірки (`zzz-*`, самоскасовуються). Останній НЕ-тестовий SHA — `115520c`. |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `1214411` | success |
-| Vercel Preview на `1214411` | success |
-| Тести / tsc / eslint | **315 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `115520c` | success |
+| Vercel Preview на `115520c` | success |
+| Тести / tsc / eslint | **322 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -54,7 +54,23 @@
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П38)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П39)
+
+- **П39 — доопрацювання пайплайну фото + namespace ключів review (задача 17:38), `115520c`:**
+  - **§1** `inSyncIgnoringFrozenPhotos` читає й хешує кожне робоче фото → заміна
+    A→B за тим самим шляхом і перестановка тепер = «є неопубліковані зміни».
+  - **§2** `planFrozenMedia` (був `freezeItemMedia`) кидає `MediaMissingError` /
+    типізовану помилку замість тихо публікувати неповну картку; `published.json`
+    не чіпається, попередні фото цілі.
+  - **§3** авто-GC прибрано; `cleanupFrozenMedia` — окрема version-guarded дія +
+    кнопка «Прибрати старі копії фото»; `publishItem` re-put копій після знімка
+    (гонка з очищенням безпечна). `review-state.json` ключі namespaced
+    (`car:foo`) — `cars/foo` і `services/foo` мають окремі підтвердження;
+    `scripts/migrate-review-keys.mjs`.
+  - Preview (github-режим): §3b `service:zzz-card`; §4 картка (recreate → всі
+    мови потребують перевірки → confirm uk → en/ru лишились); §4 фото — freeze
+    на github-режимному publish дав `_pub/<hashA>` у `published.json` +
+    закомічений файл.
 
 - **П38 — життєвий цикл карток і фото (задача 16:23), 3 частини:**
   - **§3** прив'язка підтверджень до **примірника** картки: поле `bornAt`
@@ -134,10 +150,14 @@
 сторінки послуги; вікно `confirm`; повний цикл інших колекцій (авто/галерея/
 банери/контакти) — на Vercel не проганявся (лише юніт-тести з `FakeStorage mode="github"`).
 
-### 5.5. ✅ Міждеплойна властивість фото — ЗАКРИТО у П38 §5–6
-Заморозка у `_pub/` діє для авто, галереї, послуг і банерів (одна реалізація).
-**Лишилось на Preview:** повний цикл заморозки на github-режимному `publish` +
-A→B між двома реальними збірками Vercel (локально пройдено).
+### 5.5. ✅ Міждеплойна властивість фото — ЗАКРИТО (П38 §5–6 + П39)
+Заморозка у `_pub/` діє для авто, галереї, послуг, банерів. **Перевірено на
+Preview (github-режим, `zzz-photo`):** publish A → `_pub/<hashA>` у знімку +
+глядач бачить A (байти звірені) → заміна робочого фото на B без публікації +
+нова збірка Vercel → **глядач і далі бачить A** (`_pub/<hashA>`, байти = A),
+редактор у чернетці бачить B (робочий шлях, байти = B), панель = «є
+неопубліковані зміни» → publish B → `_pub/<hashB>` (стара `_pub/<hashA>`
+лишилась — очищення відкладене).
 
 ### 5.6. Б4 / content-guard для `main` — врахувати `_pub/`
 `published.json` тепер посилається на `_pub/<hash>` замість `photos/*`. Маніфест
@@ -178,21 +198,25 @@ A→B між двома реальними збірками Vercel (локаль
 
 ## 8. Карта ключових файлів
 
-**Код П38:**
+**Код П38 + П39:**
 - `keystatic.config.ts` — `bornAtField()` у 4 колекціях + сінглтоні.
 - `src/lib/content/carsGate.ts` — `ReviewRow.instance`, `reviewInstanceMatches`,
-  `GateContext.instance`; 4 інші гейти викликають `reviewInstanceMatches`.
-- `src/lib/content/panelStore.ts` — `instanceToken`/`instanceMap`,
-  `freezeItemMedia`/`gcFrozenMedia`/`inSyncIgnoringFrozenPhotos`,
-  `completeDeletion`, `freezePublishedMedia`; `getPanelData`/`confirmLocale`/
-  `publishItem`/`unpublishItem` оновлені.
-- `src/lib/content/store/adapter.ts` — `assert{Readable,Published}MediaPath`,
-  `readMedia`/`putPublishedMedia`/`listPublishedMedia`/`deletePublishedMedia` у
-  інтерфейсі; `localFs.ts` + `github.ts` реалізують.
-- `src/app/api/panel/route.ts` — дія `complete-deletion` + `respond()`.
-- `src/app/panel/page.tsx` — `<PendingDeletions>`; `PanelActions.tsx` — variant `solid`.
-- `scripts/migrate-born-at.mjs`, `scripts/migrate-freeze-published-photos.mjs`.
-- `src/lib/content/panelStore.test.ts` — +23 тестів (усього 315 pass / 0 todo).
+  `reviewRowFor`, `GateContext.{instance,reviewKey}`; 4 інші гейти → `reviewRowFor`.
+- `src/lib/content/panelStore.ts` — `reviewKeyFor` (namespace), `instanceToken`/
+  `instanceMap`, `planFrozenMedia`/`writeFrozenMedia`/`inSyncIgnoringFrozenPhotos`
+  (content-aware, async), `completeDeletion`, `freezePublishedMedia`,
+  `cleanupFrozenMedia`; `getPanelData` (async rows) / `confirmLocale` (namespaced
+  write + legacy consolidation) / `publishItem` (plan→write→snapshot→re-put) /
+  `unpublishItem` (no GC).
+- `src/lib/content/store/adapter.ts` — `MediaMissingError`,
+  `assert{Readable,Published}MediaPath/Dir`, `readMedia`/`putPublishedMedia`/
+  `listPublishedMedia`/`deletePublishedMedia`; `localFs.ts` + `github.ts` реалізують
+  (github: типізовані помилки на транспорт/не-2xx).
+- `src/app/api/panel/route.ts` — дії `complete-deletion` + `cleanup-frozen-media` + `respond()`.
+- `src/app/panel/page.tsx` — `<PendingDeletions>` + кнопка «Прибрати старі копії фото»;
+  `PanelActions.tsx` — variant `solid`, дії `complete-deletion`/`cleanup-frozen-media`.
+- `scripts/migrate-born-at.mjs`, `migrate-freeze-published-photos.mjs`, `migrate-review-keys.mjs`.
+- `src/lib/content/panelStore.test.ts` — усього **322 pass / 0 todo**.
 
 **Код попередніх серій (П35–П37):**
 - `src/components/ServicePhotos.tsx`, `src/lib/content/servicePhotos.ts`,
