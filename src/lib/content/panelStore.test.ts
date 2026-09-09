@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { confirmedText } from "./carsGate";
 import { galleryConfirmedText } from "./galleryGate";
 import { serviceConfirmedText } from "./serviceGate";
+import { promoConfirmedText } from "./promoGate";
 import {
   ConflictError,
   StorageAuthError,
@@ -810,4 +811,194 @@ test("one editor viewing (getPanelData) never blocks or loses another's concurre
   // Viewer's in-memory data is simply stale; a refresh shows the write.
   const after = await getPanelData(s);
   assert.notEqual(viewer.versions.review, after.versions.review);
+});
+
+// ===========================================================================
+// Stage 6 (task 14:51 item 6) — the same panel actions across the other
+// collections, on synthetic data. confirmLocale / publishItem / unpublishItem
+// are kind-generic (they dispatch through KINDS[kindKey]); these check the
+// promo, contact and gallery paths and that one kind's publish never disturbs
+// another kind's snapshot. Local synthetic fixtures only — no GitHub writes.
+// ===========================================================================
+
+const PROMO_L = { title: "P", summary: "", linkLabel: "", body: "" };
+const promoJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    id: "p1",
+    order: 1,
+    type: "promo",
+    visible: true,
+    image: "/p.jpg",
+    linkUrl: "",
+    date: "",
+    uk: PROMO_L,
+    en: PROMO_L,
+    ru: PROMO_L,
+    ...over,
+  });
+const promoReviewAll = {
+  p1: {
+    uk: { hash: sha(promoConfirmedText(PROMO_L)), at: "t" },
+    en: { hash: sha(promoConfirmedText(PROMO_L)), at: "t" },
+    ru: { hash: sha(promoConfirmedText(PROMO_L)), at: "t" },
+  },
+};
+
+const CONTACT_L = { heading: "H", subheading: "S", hoursLabel: "", addressLabel: "" };
+const contactJson = (over: Record<string, unknown> = {}) =>
+  JSON.stringify({
+    id: "site",
+    order: 0,
+    phoneDisplay: "",
+    phoneE164: "",
+    email: "",
+    whatsappNumber: "",
+    telegramUrl: "",
+    instagramUrl: "",
+    facebookUrl: "",
+    youtubeUrl: "",
+    addressText: "",
+    mapsUrl: "",
+    hours: "",
+    uk: CONTACT_L,
+    en: CONTACT_L,
+    ru: CONTACT_L,
+    ...over,
+  });
+
+function stage6Store() {
+  const s = baseStore(); // cars: c1, gallery: g1
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcJson() }]);
+  s.seedDir("src/content/cms/promos", [{ name: "p1.json", text: promoJson() }]);
+  s.seedDir("src/content/cms/contact", [{ name: "site.json", text: contactJson() }]);
+  return s;
+}
+
+test("promo: confirmLocale flips one language to reviewed and gates publish", async () => {
+  const s = stage6Store();
+  let d = await getPanelData(s);
+  const promoRow = d.groups.find((g) => g.rows.some((r) => r.id === "p1"))!.rows.find((r) => r.id === "p1")!;
+  assert.equal(promoRow.langStatus.uk, "needs-review");
+  assert.ok(promoRow.blockers.length > 0); // can't publish yet
+
+  const v = await getPanelData(s).then((x) => x.versions);
+  for (const l of ["uk", "en", "ru"] as const) {
+    const r = await confirmLocale(s, "promo", "p1", l, {
+      working: v.promo,
+      review: (await getPanelData(s)).versions.review,
+    });
+    assert.equal(r.ok, true, r.message);
+  }
+  d = await getPanelData(s);
+  const after = d.groups.flatMap((g) => g.rows).find((r) => r.id === "p1")!;
+  assert.equal(after.langStatus.uk, "reviewed");
+  assert.deepEqual(after.blockers, []);
+  // cars / gallery / services / contact review rows are untouched by the promo confirms.
+  const review = JSON.parse(s.files.get("src/content/cms/review-state.json")!);
+  assert.equal(review.c1, undefined); // c1 was never confirmed in this store
+});
+
+test("promo: publish then unpublish moves exactly the promo snapshot entry", async () => {
+  const s = stage6Store();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(promoReviewAll));
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [], contact: [], promos: [] }),
+  );
+  let v = await getPanelData(s).then((x) => x.versions);
+  const pub = await publishItem(s, "promo", "p1", { working: v.promo, review: v.review, published: v.published });
+  assert.equal(pub.ok, true, pub.message);
+  let snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(snap.promos.map((p: { id: string }) => p.id), ["p1"]);
+  assert.deepEqual(snap.cars, []); // other kinds untouched
+
+  v = await getPanelData(s).then((x) => x.versions);
+  const un = await unpublishItem(s, "promo", "p1", { published: v.published });
+  assert.equal(un.ok, true, un.message);
+  snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(snap.promos, []);
+});
+
+test("promo: a stale version token is rejected (no write) — conflict", async () => {
+  const s = stage6Store();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(promoReviewAll));
+  const stale = await getPanelData(s).then((x) => x.versions);
+  // someone else confirms in between, bumping the review version
+  await confirmLocale(s, "promo", "p1", "uk", {
+    working: stale.promo,
+    review: stale.review,
+  });
+  const r = await confirmLocale(s, "promo", "p1", "en", { working: stale.promo, review: stale.review });
+  assert.equal((r as { conflict?: boolean }).conflict, true);
+});
+
+test("contact (singleton): confirmLocale + publish work through the same path", async () => {
+  const s = stage6Store();
+  const v0 = await getPanelData(s).then((x) => x.versions);
+  const c = await confirmLocale(s, "contact", "site", "uk", { working: v0.contact, review: v0.review });
+  assert.equal(c.ok, true, c.message);
+  for (const l of ["en", "ru"] as const) {
+    const rv = (await getPanelData(s)).versions;
+    const r = await confirmLocale(s, "contact", "site", l, { working: rv.contact, review: rv.review });
+    assert.equal(r.ok, true, r.message);
+  }
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [], contact: [], promos: [] }),
+  );
+  const v = await getPanelData(s).then((x) => x.versions);
+  const pub = await publishItem(s, "contact", "site", {
+    working: v.contact,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(pub.ok, true, pub.message);
+  const snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+  assert.deepEqual(snap.contact.map((c2: { id: string }) => c2.id), ["site"]);
+});
+
+test("gallery: confirm then a stale confirm on another language conflicts", async () => {
+  const s = stage6Store();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(galReviewAll));
+  const stale = await getPanelData(s).then((x) => x.versions);
+  await confirmLocale(s, "gallery", "g1", "uk", { working: stale.gallery, review: stale.review });
+  const r = await confirmLocale(s, "gallery", "g1", "en", { working: stale.gallery, review: stale.review });
+  assert.equal((r as { conflict?: boolean }).conflict, true);
+});
+
+test("cross-kind: publishing a car does not disturb an already-published gallery section", async () => {
+  const s = stage6Store();
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ ...carReviewAll, ...galReviewAll }),
+  );
+  s.seedFile(
+    "src/content/cms/published.json",
+    JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [], contact: [], promos: [] }),
+  );
+  // Step 1: publish the gallery item -> a real, fully-coerced gallery section.
+  let v = await getPanelData(s).then((x) => x.versions);
+  const g = await publishItem(s, "gallery", "g1", {
+    working: v.gallery,
+    review: v.review,
+    published: v.published,
+  });
+  assert.equal(g.ok, true, g.message);
+  const galleryAfterStep1 = JSON.parse(s.files.get("src/content/cms/published.json")!).gallery;
+
+  // Step 2: publish the car item.
+  v = await getPanelData(s).then((x) => x.versions);
+  const c = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal(c.ok, true, c.message);
+  const snap = JSON.parse(s.files.get("src/content/cms/published.json")!);
+
+  // The gallery section is byte-identical to what step 1 produced; the car
+  // section now has c1; nothing else was touched.
+  assert.deepEqual(snap.gallery, galleryAfterStep1);
+  assert.deepEqual(
+    snap.cars.map((car: { id: string }) => car.id),
+    ["c1"],
+  );
+  assert.deepEqual(snap.services, []);
+  assert.deepEqual(snap.promos, []);
 });
