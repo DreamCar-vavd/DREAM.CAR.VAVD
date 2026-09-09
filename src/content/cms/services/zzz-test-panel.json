@@ -4,7 +4,12 @@
   "status": "coming-soon",
   "iconSrc": "/images/services/premium-3d/06-auto-moto-special-equipment-premium-3d.png",
   "priceCurrency": "£",
-  "photos": [],
+  "photos": [
+    {
+      "image": "/images/cms/services/zzz-test-panel/photos/0/image.jpg",
+      "caption": "zzz-test photo — DELETE ME"
+    }
+  ],
   "uk": {
     "title": "ZZZ Тест панелі — видалити",
     "shortDescription": "Тимчасовий матеріал для перевірки запису. DELETE ME.",
