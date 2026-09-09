@@ -1,0 +1,32 @@
+{
+  "id": "zzz-photo",
+  "order": 100,
+  "status": "available",
+  "photos": [
+    {
+      "image": "/images/cms/services/zzz-photo/photos/0/image.jpg"
+    }
+  ],
+  "uk": {
+    "title": "ZZZ Photo UK",
+    "shortDescription": "foto kort UK",
+    "longDescription": "foto dokl UK",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Photo EN",
+    "shortDescription": "foto short EN",
+    "longDescription": "foto long EN",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Photo RU",
+    "shortDescription": "foto krat RU",
+    "longDescription": "foto podr RU",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mtuclj0u-uh6vpb93"
+}
