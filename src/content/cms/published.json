@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-09T14:31:45.140Z",
+  "publishedAt": "2026-09-09T17:06:52.239Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1088,6 +1088,59 @@
         ],
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "zzz-photo",
+      "order": 100,
+      "status": "available",
+      "iconSrc": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
+      "photos": [
+        {
+          "image": "/images/cms/services/zzz-photo/_pub/8dd641381d70e5797d45a76e.jpg",
+          "caption": ""
+        }
+      ],
+      "uk": {
+        "title": "ZZZ Photo UK",
+        "shortDescription": "foto kort UK",
+        "longDescription": "foto dokl UK",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "ZZZ Photo EN",
+        "shortDescription": "foto short EN",
+        "longDescription": "foto long EN",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "ZZZ Photo RU",
+        "shortDescription": "foto krat RU",
+        "longDescription": "foto podr RU",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
         "modalSections": [],
         "priceNote": "",
         "seoTitle": "",
