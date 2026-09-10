@@ -79,6 +79,39 @@ export function checkResultMessage(applied: boolean | null): ActionMessage {
 
 export const CHECK_FAILED_MSG = "Перевірити результат не вдалося — спробуйте ще раз.";
 
+/** The read-only result check aborts after this long so a hung request becomes a
+ *  definite "не вдалося — спробуйте ще раз" (the action stays locked) instead of
+ *  leaving the button spinning forever. */
+export const CHECK_TIMEOUT_MS = 15000;
+
+/**
+ * POST a `check-result` body and return its JSON, or `null` when there is no
+ * usable answer — a network failure, an unparseable body, or the request taking
+ * longer than `timeoutMs` (aborted). `null` routes through `routeCheckResponse`
+ * to "keep the action locked, offer another check". Side-effecting (does the
+ * fetch); the routing decision stays in the pure `routeCheckResponse`.
+ */
+export async function fetchCheckResult(
+  body: unknown,
+  timeoutMs: number = CHECK_TIMEOUT_MS,
+): Promise<{ applied?: boolean | null; message?: string } | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch("/api/panel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    return (await res.json()) as { applied?: boolean | null; message?: string };
+  } catch {
+    return null; // abort (timeout) / network error / unparseable body
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * What the button does with a write's reply. `data === null` = the fetch threw
  * or the body would not parse — i.e. NO structured answer came back. Pure so

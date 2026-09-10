@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   busyLabelFor,
+  fetchCheckResult,
   messageForResponse,
   NETWORK_UNCERTAIN_MSG,
   PANEL_REFRESHED_MSG,
@@ -75,6 +76,20 @@ function useRefresh(): {
     done: !isPending && doneGen === gen && gen > 0,
     refresh,
   };
+}
+
+/**
+ * When an action locks (`uncertain` set, not mid-check), the button that had
+ * focus is now disabled — the keyboard user's place is lost. Move focus to the
+ * one thing they can act on next: "Перевірити результат". Runs again when a
+ * `null` verdict re-locks. Returns a ref for that button.
+ */
+function useFocusOnLock(locked: boolean): React.RefObject<HTMLButtonElement | null> {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (locked) ref.current?.focus();
+  }, [locked]);
+  return ref;
 }
 
 export interface PanelVersions {
@@ -158,27 +173,23 @@ export function PanelButton({
   const [uncertain, setUncertain] = useState<{ checking: boolean; capturedToken?: string } | null>(
     null,
   );
+  const checkBtnRef = useFocusOnLock(!!uncertain && !uncertain.checking);
 
   const checkResult = async () => {
-    if (uncertain?.checking) return;
+    // Two guards: the state flag (visible in the UI) AND the synchronous ref, so
+    // several fast clicks fire ONE check, not one per click.
+    if (uncertain?.checking || inFlight.current) return;
+    inFlight.current = true;
     const capturedToken = uncertain?.capturedToken;
     setUncertain({ checking: true, capturedToken });
-    setMsg(null);
-    let data: { applied?: boolean | null; message?: string } | null = null;
-    try {
-      const res = await fetch("/api/panel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "check-result",
-          check: { ...payload, ...checkExtra, expectToken: capturedToken },
-          versions,
-        }),
-      });
-      data = (await res.json()) as { applied?: boolean | null; message?: string };
-    } catch {
-      data = null;
-    }
+    // Keep the previous status line visible while checking — it holds the retry
+    // affordance; the button label already switches to "Перевіряємо стан…".
+    const data = await fetchCheckResult({
+      action: "check-result",
+      check: { ...payload, ...checkExtra, expectToken: capturedToken },
+      versions,
+    });
+    inFlight.current = false;
     const r = routeCheckResponse(data);
     setMsg(r.msg);
     // Keep the captured target through a `null` verdict so a re-check still uses it.
@@ -249,6 +260,7 @@ export function PanelButton({
           {note && <span className="ml-1 text-neutral-500">· {note}</span>}
           {uncertain && (
             <button
+              ref={checkBtnRef}
               type="button"
               className="ml-2 underline disabled:no-underline disabled:opacity-50"
               disabled={uncertain.checking}
@@ -306,6 +318,7 @@ export function CleanupFrozenMediaButton({
   // Locked after a confirm whose result is unknown. `planPaths` is kept so the
   // read-only check can verify exactly that set of files is gone.
   const [uncertain, setUncertain] = useState<{ checking: boolean; planPaths: string[] } | null>(null);
+  const checkBtnRef = useFocusOnLock(!!uncertain && !uncertain.checking);
 
   // A plan is stale if the branch head it was computed against has moved
   // (github mode), or — local mode, no branch — if published.json changed.
@@ -319,25 +332,17 @@ export function CleanupFrozenMediaButton({
   }
 
   const checkResult = async () => {
-    if (uncertain?.checking) return;
+    if (uncertain?.checking || inFlight.current) return;
+    inFlight.current = true;
     const planPaths = uncertain?.planPaths ?? [];
     setUncertain({ checking: true, planPaths });
-    setMsg(null);
-    let data: { applied?: boolean | null; message?: string } | null = null;
-    try {
-      const res = await fetch("/api/panel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "check-result",
-          check: { action: "cleanup-frozen-media", planPaths },
-          versions: {},
-        }),
-      });
-      data = (await res.json()) as { applied?: boolean | null; message?: string };
-    } catch {
-      data = null;
-    }
+    // Keep the previous status line (and its retry link) visible while checking.
+    const data = await fetchCheckResult({
+      action: "check-result",
+      check: { action: "cleanup-frozen-media", planPaths },
+      versions: {},
+    });
+    inFlight.current = false;
     const r = routeCheckResponse(data);
     setMsg(r.msg);
     setUncertain(r.unlock ? null : { checking: false, planPaths });
@@ -455,6 +460,7 @@ export function CleanupFrozenMediaButton({
           {note && <span className="ml-1 text-neutral-500">· {note}</span>}
           {uncertain && (
             <button
+              ref={checkBtnRef}
               type="button"
               className="ml-2 underline disabled:no-underline disabled:opacity-50"
               disabled={uncertain.checking}

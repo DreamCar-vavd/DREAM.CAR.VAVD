@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   busyLabelFor,
   checkResultMessage,
+  fetchCheckResult,
   messageForResponse,
   NETWORK_UNCERTAIN_MSG,
   PANEL_REFRESHED_MSG,
@@ -197,4 +198,58 @@ test("scenario 7 — no request may fire while one is in flight, refreshing, or 
   assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: true, locked: false }), false);
   // and never while locked pending "Перевірити результат"
   assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: false, locked: true }), false);
+});
+
+// ---------------------------------------------------------------------------
+// task 15:26 §4 — the read-only result check must not hang or multiply
+// ---------------------------------------------------------------------------
+
+test("fetchCheckResult: a hung request is aborted after the timeout and returns null (button stays locked)", async () => {
+  const realFetch = globalThis.fetch;
+  let aborted = false;
+  globalThis.fetch = ((_url: string, opts?: { signal?: AbortSignal }) =>
+    new Promise((_resolve, reject) => {
+      opts?.signal?.addEventListener("abort", () => {
+        aborted = true;
+        reject(new DOMException("aborted", "AbortError"));
+      });
+    })) as typeof fetch;
+  try {
+    const started = Date.now();
+    const out = await fetchCheckResult({ action: "check-result" }, 40);
+    assert.equal(out, null); // -> routeCheckResponse(null) -> stays locked, offer retry
+    assert.equal(aborted, true);
+    assert.ok(Date.now() - started >= 35 && Date.now() - started < 400);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  // null routes to "keep locked, offer another check"
+  const r = routeCheckResponse(null);
+  assert.equal(r.unlock, false);
+});
+
+test("fetchCheckResult: a network error also returns null, not a thrown error", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
+  try {
+    assert.equal(await fetchCheckResult({ action: "check-result" }, 1000), null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("fetchCheckResult: a normal reply is passed straight through", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve({
+      json: () => Promise.resolve({ applied: true, message: "ok" }),
+    })) as unknown as typeof fetch;
+  try {
+    assert.deepEqual(await fetchCheckResult({ action: "check-result" }, 1000), {
+      applied: true,
+      message: "ok",
+    });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
