@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   busyLabelFor,
   messageForResponse,
@@ -9,6 +9,27 @@ import {
   type ActionMessage,
   type ActionResponse,
 } from "./actionMessages";
+
+/**
+ * `router.refresh()` re-fetches the server component but resolves synchronously
+ * and (in this Next version) does not keep a `useTransition` pending for the
+ * network round-trip — so on its own it gives the owner no "refreshing" cue
+ * while `/panel` re-renders (a few seconds against GitHub). This holds a visible
+ * `refreshing` flag for a bounded window after the call; the real end-state is
+ * the freshly rendered panel that replaces it.
+ */
+function useSoftRefresh(holdMs = 2500): { refreshing: boolean; refresh: () => void } {
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    router.refresh();
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setRefreshing(false), holdMs);
+  }, [router, holdMs]);
+  return { refreshing, refresh };
+}
 
 export interface PanelVersions {
   car: string;
@@ -61,8 +82,7 @@ export function PanelButton({
   variant?: "default" | "primary" | "danger" | "solid";
   confirmText?: string;
 }) {
-  const router = useRouter();
-  const [refreshing, startTransition] = useTransition();
+  const { refreshing, refresh } = useSoftRefresh();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<ActionMessage | null>(null);
   // Synchronous guard: `busy`/`refreshing` only disable on the next render, so
@@ -84,7 +104,7 @@ export function PanelButton({
       });
       const data = (await res.json()) as ActionResponse;
       setMsg(messageForResponse(data, data.ok));
-      if (data.ok) startTransition(() => router.refresh());
+      if (data.ok) refresh();
     } catch {
       // No response — the write may or may not have landed. Reload and check,
       // do NOT retry blindly. Deliberately different wording from a confirmed save.
@@ -120,11 +140,7 @@ export function PanelButton({
       {msg && (
         <StatusLine msg={msg}>
           {msg.kind === "conflict" && (
-            <button
-              type="button"
-              className="ml-2 underline"
-              onClick={() => startTransition(() => router.refresh())}
-            >
+            <button type="button" className="ml-2 underline" onClick={refresh}>
               Оновити
             </button>
           )}
@@ -145,8 +161,7 @@ export function PanelButton({
  * drop it and make the owner re-run the check.
  */
 export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersion?: string }) {
-  const router = useRouter();
-  const [refreshing, startTransition] = useTransition();
+  const { refreshing, refresh } = useSoftRefresh();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<ActionMessage | null>(null);
   const [plan, setPlan] = useState<{ count: number; headSha: string } | null>(null);
@@ -182,8 +197,11 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
         setMsg({ kind: "ok", text: data.message });
       } else {
         setPlan(null);
-        setMsg(messageForResponse(data, data.ok));
-        if (data.ok) startTransition(() => router.refresh());
+        // Only a real deletion (a confirm) changed anything worth re-rendering;
+        // a dry run with nothing to clean must not trigger a refresh.
+        const refreshed = data.ok && confirm;
+        setMsg(messageForResponse(data, refreshed));
+        if (refreshed) refresh();
       }
     } catch {
       setPlan(null);
@@ -239,17 +257,16 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
 }
 
 export function RefreshButton() {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { refreshing, refresh } = useSoftRefresh();
   return (
     <button
       type="button"
-      onClick={() => startTransition(() => router.refresh())}
-      disabled={pending}
-      aria-busy={pending}
+      onClick={refresh}
+      disabled={refreshing}
+      aria-busy={refreshing}
       className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-neutral-800"
     >
-      {pending ? busyLabelFor("refresh") : "Оновити стан"}
+      {refreshing ? busyLabelFor("refresh") : "Оновити стан"}
     </button>
   );
 }

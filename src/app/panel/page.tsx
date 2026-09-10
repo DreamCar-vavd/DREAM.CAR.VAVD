@@ -379,6 +379,12 @@ function PendingSummary({ groups }: { groups: PanelGroup[] }) {
 export default async function PanelPage() {
   if (!keystaticEnabled) notFound();
 
+  // Local-only: `PANEL_DEV_SLOW_MS=1500 next dev` makes the server render pause so
+  // `loading.tsx` is actually visible for a screenshot / manual check. Ignored in
+  // production builds and whenever the var is unset or non-numeric.
+  const slow = process.env.NODE_ENV !== "production" && Number(process.env.PANEL_DEV_SLOW_MS);
+  if (slow && slow > 0) await new Promise((r) => setTimeout(r, Math.min(slow, 10_000)));
+
   let data: PanelData;
   try {
     data = await getPanelData(await getStorage());
