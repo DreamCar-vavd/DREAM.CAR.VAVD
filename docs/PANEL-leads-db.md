@@ -31,7 +31,20 @@ GRANT SELECT, INSERT ON leads TO leads_app;
 -- лише SELECT і INSERT ... ON CONFLICT DO NOTHING RETURNING id — звірено із
 -- запитами адаптера (задача 16:08, блок 4). Soft-delete deleted_at для
 -- політики зберігання — окрема ручна дія власника міграційною роллю.
+
+-- Ліміт тривалості запиту — на рівні РОЛІ, лише для runtime-ролі (не Production,
+-- не міграційна). Стандартний Postgres GUC, Neon підтримує ALTER ROLE ... SET;
+-- діє для direct і pooled endpoint; НЕ потребує зміни коду адаптера.
+ALTER ROLE leads_app SET statement_timeout = '4000ms';
+ALTER ROLE leads_app SET idle_in_transaction_session_timeout = '10s';
 ```
+
+Чому `statement_timeout` саме так, а не `?options=` у connection string:
+роль-рівневий параметр не залежить від того, як зібрано URL, переживає зміну
+пулера, і його видно в `\drds` / `pg_db_role_setting`. `4000 мс` < ліміт
+Vercel-функції (`/api/contact`) → здеградована БД не затримує email-канал.
+Спосіб звірено з Neon (vanilla Postgres 17 на SQL-рівні; `statement_timeout`
+підтверджено в docs Neon для pg_cron/міграцій).
 
 `LEADS_DATABASE_URL` у Vercel = connection string саме ролі `leads_app`
 (не owner).
@@ -119,9 +132,23 @@ GRANT SELECT, INSERT ON leads TO leads_app;
 
 # ПАКЕТ РІШЕННЯ — Б3: БД заявок (наступний етап підключення)
 
-**Статус:** підготовлено (задача 15:26). **Не підключено** — потрібне рішення й
-дії власника. Обрано як наступний етап: найменша залежність (одна змінна),
-чиста користь, код готовий, жодного дотику до `main`/Production/публікації.
+**Статус (2026-09-10, задача 20:24): НЕ підключено.** Дозвіл власника є, але
+кроки нижче фізично потребують дій, які асистент виконати не може:
+- **реєстрація / вхід у Neon** — асистент не створює акаунти й не вводить
+  паролі (перевірено: `console.neon.tech` показує екран входу; акаунта немає);
+- **`LEADS_DATABASE_URL` у Vercel** — це значення-секрет, вводить лише власник
+  у полі Value (Vercel MCP-доступ до проєкту — 403, тобто й через API не можна);
+- **connection string** ніколи не потрапляє в чат / команди з видимим виводом /
+  логи / Git.
+
+Що асистент **зробив** цієї сесії: звірив умови Neon Free за офіційним джерелом
+(нижче), уточнив спосіб `statement_timeout` (розділ «Ліміт тривалості»),
+підготував точний runbook власника (розділ 5) і перевірку (розділ 6). Після
+кроків власника (Neon-проєкт + `.env.migrate` + Vercel env) асистент виконає
+міграцію, створення ролі, синтетичні перевірки й живу звірку.
+
+Обрано як наступний етап: найменша залежність (одна змінна), чиста користь,
+код готовий, жодного дотику до `main`/Production/публікації.
 
 ## 1. Результат для бізнесу
 
@@ -171,41 +198,76 @@ GRANT SELECT, INSERT ON leads TO leads_app;
   vehicle, message, idempotency_key, deleted_at`).
 - **Файл поза Git:** `.env.migrate` (у `.gitignore`; видалити після міграції).
 
-## 5. Дії — хто що робить
+## 5. Дії — хто що робить (RUNBOOK)
 
-| Крок | Хто | Дія |
-|---|---|---|
-| Neon-проєкт/гілка | **власник** | Neon Console → New Project `dream-car-leads-test` (або Branch `preview`). Скопіювати connection string ролі owner. |
-| `.env.migrate` | **власник** (локально) або агент за вказівкою | створити файл з owner-рядком, **не** в чат/Git |
-| Міграція | агент (за вказівкою) або власник | `set -a; source .env.migrate; set +a; npm run leads:migrate; unset LEADS_DATABASE_URL` — звірити надрукований список колонок |
-| Роль `leads_app` | **власник** або агент | виконати SQL зі `CREATE ROLE leads_app …` (розділ «Два набори прав») міграційною роллю |
-| `LEADS_DATABASE_URL` у Vercel | **власник** (значення бачить лише власник) | Vercel → Project → Settings → Environment Variables → Add: name `LEADS_DATABASE_URL`, value = рядок `leads_app`, Environment **Preview**, Branch `codex/admin-panel-spike` |
-| Redeploy Preview | **власник** (кнопкою) | Vercel → Deployments → Redeploy останнього Preview |
-| Жива перевірка | агент | розділ 6 |
+| # | Крок | Хто | Точна дія |
+|---|---|---|---|
+| 1 | Neon-акаунт | **власник** | <https://console.neon.tech> → Sign up (Google/GitHub/email). Асистент акаунти не створює. |
+| 2 | Тестовий проєкт | **власник** | Neon Console → **New Project** → name `dream-car-leads-test`, регіон `AWS eu-west-2 (London)` (або Frankfurt), Postgres 17. **Не** обирати платний план. |
+| 3 | Fixed compute | **власник** | проєкт → Branches → `production` → Edit compute → min=max=**0.25 CU** (економія CU-годин). |
+| 4 | Connection strings | **власник** | Dashboard → Connect → скопіювати рядок ролі **owner** (`neondb_owner`). Це піде у `.env.migrate` (не в чат). |
+| 5 | `.env.migrate` | **власник** (локально в `…/dcv-panel-dev-20260909/repo`) | створити файл (у `.gitignore`): `LEADS_DATABASE_URL=<owner-рядок>?sslmode=require`. Повідомити асистенту лише «готово». |
+| 6 | Міграція | **асистент** | `set -a; source .env.migrate; set +a; npm run leads:migrate; unset LEADS_DATABASE_URL` — звірити 10 колонок |
+| 7 | Роль `leads_app` + timeout | **асистент** | SQL з розділу «Два набори прав» (owner-рядком). Згенерувати пароль `openssl rand -base64 24`. |
+| 8 | `leads_app` рядок | **асистент → власник** | асистент складає рядок `postgresql://leads_app:<pwd>@<host>/<db>?sslmode=require` і **записує у `.env.migrate` поряд**, повідомляє власнику: «рядок у файлі, поле `LEADS_APP_URL`» — **у чат не пише** |
+| 9 | Vercel env | **власник** (значення бачить лише власник) | <https://vercel.com> → project `dream.car.vavd` → Settings → Environment Variables → **Add New**: Key `LEADS_DATABASE_URL`, Value = рядок `leads_app` з файлу, Environments = **Preview only**, ✅ "Specific Branches" → `codex/admin-panel-spike` → Save |
+| 10 | Redeploy Preview | **власник** | Vercel → Deployments → останній Preview гілки → ⋯ → **Redeploy** (без "use existing build cache") |
+| 11 | Синтетична перевірка + прибирання | **асистент** | розділ 6 (B/C/D) |
+| 12 | Прибрати `.env.migrate` | **власник або асистент** | після перевірок — `rm .env.migrate` |
 
-Агент **ніколи** не вставляє connection string у чат/Git/звіт; лише в поле
-Value змінної (це робить власник) або в локальний `.env.migrate`.
+Асистент **ніколи** не вставляє жоден connection string у чат / команди з
+видимим виводом / логи / Git / звіт — лише в локальний `.env.migrate` та у
+запитах до `pg` без echo.
 
 ## 6. Перевірка успіху
 
-Після redeploy Preview (авторизована сесія):
+**НЕ надсилати контактну форму Preview.** Якщо на Preview заданий
+`CONTACT_FORM_ENDPOINT`, submit форми відправить **реальний лист** через
+Formspree — це поза дозволом. Запис у БД перевіряти прямо через адаптер із
+синтетичними даними (нижче), і **окремо зазначити**, що повний цикл форми з
+email не перевірявся.
+
+**A. Читання (авторизована сесія, лише перегляд):**
 1. `/panel/leads` → блок «Сховище заявок не налаштоване» **зник**; список
-   порожній («Заявок поки немає»). (На hosted-Preview демо-банера не було —
-   до Б3 там саме «не налаштоване».)
-2. Надіслати **синтетичну** заявку через форму на Preview (ім'я «ZZZ Test»,
-   тестовий телефон/email, повідомлення «DELETE ME») → за кілька секунд рядок
-   з'являється у `/panel/leads`.
-3. Надіслати ту саму заявку **ще раз одразу** → **новий рядок не з'являється**
-   (ідемпотентність по 10-хв бакету).
-4. Прибрати тестові рядки: `UPDATE leads SET deleted_at = now() WHERE
-   message = 'DELETE ME';` (soft-delete; код ніколи не робить hard-delete) або
-   `DELETE` міграційною роллю — це руйнівна дія, робить власник.
+   порожній («Заявок поки немає»). (На hosted-Preview демо-банера не було.)
+
+**B. Запис + ідемпотентність (локально, адаптер напряму, синтетичні дані):**
+```bash
+# .env.migrate тут = рядок leads_app (той самий, що піде у Vercel)
+set -a; source .env.migrate; set +a
+node --import tsx -e '
+  import { getWritableLeadsStore, deriveIdempotencyKeys } from "./src/lib/leads/store";
+  const s = await getWritableLeadsStore();
+  const inp = { name:"ZZZ Test", phone:"+44 0000 000000", email:"zzz@example.invalid",
+                service:"diagnostics", vehicle:"", message:"DELETE ME 20:24" };
+  const k = await deriveIdempotencyKeys(inp);
+  console.log("create#1", await s.create(inp, k));   // inserted:true
+  console.log("create#2", await s.create(inp, k));   // inserted:false — той самий рядок
+  const page = await s.list({ limit: 5 });
+  console.log("list", page.leads.length, "total", page.total);
+'
+unset LEADS_DATABASE_URL
+```
+Очікування: `create#1 { inserted: true }`, `create#2 { inserted: false, id: <той самий> }`,
+`list` містить рядок. Різні заявки (інший `message`) → різні ключі → окремі рядки.
+3. Після redeploy Preview той самий рядок видно в `/panel/leads` (перегляд).
+
+**C. Помилки не розкривають деталей:** тимчасово вказати недосяжний хост у
+`.env.migrate` → `s.list()` кидає; сторінка `/panel/leads` має показати
+**фіксований** текст (`leadsListErrorView`), не хост/роль. (Юніт уже покриває —
+`loadError.test.ts`; жива звірка додатково.)
+
+**D. Прибирання:** прибрати створені тестові рядки —
+`UPDATE leads SET deleted_at = now() WHERE message LIKE 'DELETE ME%';`
+(soft-delete) або `DELETE` міграційною роллю. Звірити, що `/panel/leads` знову
+порожній.
 5. Звірити: `git status` чистий, `main` @ `ce1977af`, PR #26 draft.
 
-## 7. Витрати й ліміти (офіційно, neon.com, станом на 2026-09)
+## 7. Витрати й ліміти (офіційно, neon.com — звірено 2026-09-10)
 
 Джерела: <https://neon.com/faqs/free-plan-limits-and-quotas>,
 <https://neon.com/pricing>, <https://neon.com/docs/introduction/plans>.
+Умови станом на 2026-09-10 не змінилися відносно запису задачі 15:26.
 
 **Регіон:** обрати при створенні проєкту найближчий до Vercel-деплою й
 клієнтів — для автосалону в UK це `AWS eu-west-2 (London)` або
@@ -233,10 +295,15 @@ Value змінної (це робить власник) або в локальн
 | Проєкти | 100 | 1 (тест) + 1 (prod пізніше) |
 | Гілки на проєкт | 10 | 1–2 |
 | Compute | **100 CU-годин / проєкт / місяць** (≈400 год при 0.25 CU) | майже нуль — БД спить (scale-to-zero через 5 хв, вимкнути не можна), прокидається на запит форми |
+| Autoscaling | до 2 CU (≈8 ГБ RAM) | тест тримати фіксовано 0.25 CU |
 | Storage | **0.5 ГБ / проєкт** | рядок заявки ~1 КБ → десятки тисяч рядків вміщаються |
 | Мережа (public transfer) | 5 ГБ / проєкт / місяць | мізерно |
-| Instant restore | 6 годин історії (до 1 ГБ змін) | достатньо |
+| Instant restore | 6 годин історії (до 1 ГБ змін) + 1 ручний snapshot | достатньо для тесту |
+| Моніторинг | 1 день історії | — |
 | Підтримка | community | — |
+
+Скидається щомісяця: CU-години й transfer. Постійні ліміти (не помісячні):
+проєкти, гілки, storage.
 
 **Якщо перевищити Free:** дані **не видаляються**. CU-години вичерпані →
 compute призупиняється до наступного періоду або апгрейду; storage > 0.5 ГБ →
@@ -260,14 +327,17 @@ $0.106/CU-година + $0.35/ГБ-місяць, без місячного мі
 - Видалення бази/даних — окрема руйнівна дія власника, не «звичайне
   скасування».
 
-## 9. Які дозволи ще потрібні
+## 9. Хто що може — межа асистента
 
-- **Власник:** акаунт Neon (безкоштовний); доступ до Vercel Environment
-  Variables проєкту `dream.car.vavd` (є).
-- **Агент:** дозвіл виконати `npm run leads:migrate` з локального `.env.migrate`
-  (одноразово) і драйвити живу перевірку в браузері власника. Секрети в чат не
-  передавати. Production-змінні (`LEADS_DATABASE_URL` для Production) — **поза**
-  цим етапом.
+- **Тільки власник** (асистент не має права): створення/вхід у Neon-акаунт
+  (створення акаунтів, введення паролів — заборонено), додавання/зміна env у
+  Vercel (значення-секрет; MCP-доступ до проєкту — 403).
+- **Асистент** (у межах дозволу задачі): міграція `npm run leads:migrate` з
+  `.env.migrate`, `CREATE ROLE`/`GRANT`/`ALTER ROLE` синтаксисом розділу «Два
+  набори прав», синтетичні `create`/`list` через адаптер, жива звірка
+  `/panel/leads` в авторизованому браузері. Секрети — лише у `.env.migrate`.
+- **Поза цим етапом:** будь-що для Production (`LEADS_DATABASE_URL` у Production,
+  redeploy `main`) — окремий запит (кінець файлу).
 
 ## 10. Питання зберігання/видалення — потрібне рішення власника
 
@@ -296,26 +366,33 @@ $0.106/CU-година + $0.35/ГБ-місяць, без місячного мі
 Звірено з кодом (`src/app/api/contact/route.ts`, `src/lib/leads/store.ts`,
 `src/lib/leads/deliver.ts`) — без надсилання форми, без значень env.
 
-## A. Поточний Production (сайт на `main`, гілка коду без БД-адаптера в дії)
+## A. Поточний Production (сайт на `main`)
+
+**Звірено на `origin/main` (задача 20:24 блок 6): у `main` НЕМАЄ жодного файлу
+панелі / Keystatic / leads.** `git ls-tree -r origin/main` — 0 збігів на
+`panel|keystatic|leads` (164 файли всього). `main`-версія
+`src/app/api/contact/route.ts`:
 
 ```
 Форма (src/components/**, клієнт)
   │  POST /api/contact  (JSON)
   ▼
-src/app/api/contact/route.ts
+src/app/api/contact/route.ts  (версія main — БЕЗ кроку БД)
   ├─ origin/content-type/honeypot/валідація
-  ├─ getWritableLeadsStore()
-  │     └─ resolveLeadsMode(): немає LEADS_DATABASE_URL → "not-configured"
-  │        → повертає null  →  крок БД ПОВНІСТЮ пропускається
-  └─ email-канал: fetch(CONTACT_FORM_ENDPOINT)  →  Formspree  →  пошта власника
-                     (redirect:"error", timeout 10 с)
+  ├─ resolveAllowedEndpoint(CONTACT_FORM_ENDPOINT)  → нема → 503
+  └─ fetch(endpoint)  →  Formspree  →  пошта власника (redirect:"error", 10 с)
         │
         ▼
-   resolveLeadResponse({ hasStore:false, savedToDb:false, email })  →  200 / 502 / 504
+   200 { ok:true }  /  502  /  504
 ```
 
-Наслідок: **на Production заявка ніде не зберігається в БД** — лише email.
-`/panel/leads` на Production-хості: «Сховище заявок не налаштоване».
+`main` не імпортує `@/lib/leads/*`, не викликає `getWritableLeadsStore`,
+`deriveIdempotencyKeys`, `resolveLeadResponse`. Немає `/panel/leads`. Немає
+`keystatic.config.ts`.
+
+Наслідок: **на Production заявка ніде не зберігається** — лише email через
+Formspree. `LEADS_DATABASE_URL` на Production **не мав би ефекту** — код, який
+його читає, у `main` відсутній.
 
 ## B. Preview після Б3 (Neon підключено ТІЛЬКИ до Preview)
 
@@ -342,30 +419,31 @@ Neon (гілка preview) ──select──►  /panel/leads на Preview  (dyn
 
 ## Ключове питання: чи побачить панель заявки з ПОТОЧНОГО Production, якщо Neon під'єднано лише до Preview?
 
-**Ні.** Причини, з коду й з моделі Vercel:
+**Ні.** Причини, з коду `main` і з моделі Vercel:
 
-1. `LEADS_DATABASE_URL` — змінна **на середовище** (Vercel Environment = Preview,
-   Branch = `codex/admin-panel-spike`). Production-деплой (`main`) її не отримує
-   → `resolveLeadsMode()` там = `not-configured` → `getWritableLeadsStore()`
-   повертає `null` → `route.ts` не робить жодного `INSERT`.
-2. Немає іншого маршруту даних: Production `/api/contact` пише лише в email;
-   Formspree не має конектора до Neon; `/panel/leads` читає **тільки** свою
-   `LEADS_DATABASE_URL` (тобто preview-гілку).
-3. Отже заявки з живого сайту в панель **не потраплять**, доки БД не під'єднано
-   до Production-середовища окремо (розділ нижче).
+1. **Коду немає.** У `main` відсутній весь subsystem заявок-у-БД (розділ A):
+   немає `src/lib/leads/*`, немає кроку БД у `/api/contact`, немає
+   `/panel/leads`. Навіть якщо додати `LEADS_DATABASE_URL` у Production env —
+   його нічим прочитати.
+2. `LEADS_DATABASE_URL` — змінна **на середовище** (зараз буде Vercel
+   Environment = Preview, Branch = `codex/admin-panel-spike`). Production-деплой
+   `main` її не отримує, і навіть отримавши — див. п.1.
+3. Немає іншого маршруту даних: Production `/api/contact` пише лише в email;
+   Formspree не має конектора до Neon; `/panel/leads` (на Preview) читає
+   **тільки** свою `LEADS_DATABASE_URL`.
 
-Показувати власнику заявки з Production у панелі можна **лише** після окремого
-кроку «Б3-prod»: своя Neon-гілка `main`, `LEADS_DATABASE_URL` у Vercel
-Environment = **Production**, redeploy Production. Це окреме рішення власника й
-поза поточним дозволом.
+Отже заявки з живого сайту в панель **не потраплять** без окремого етапу
+«Б3-prod».
 
 ## Розбивка пакета Б3
 
-| Етап | Що дає | Дозвіл |
+| Етап | Що дає | Що потрібно |
 |---|---|---|
-| **Б3-preview** (цей) | тестова Neon-гілка + `LEADS_DATABASE_URL` у Preview; синтетичні заявки з Preview-форми осідають у панелі; жива перевірка адаптера/ідемпотентності/пагінації | у межах поточного завдання (міграція з `.env.migrate`, жива перевірка) |
-| **Б3-prod** (окремо) | окрема Neon-гілка `main` + `LEADS_DATABASE_URL` у Production; реальні заявки з сайту в панелі | **потрібне окреме рішення власника**: створення prod-бази, ротація/зберігання пароля, політика retention/експорту/видалення персональних даних, GDPR-обовʼязки |
-| Поза дозволом зараз | зміна `main`, Production env, DNS, тарифів; hard-delete даних; автоматичний retention | — |
+| **Б3-preview** (цей) | тестова Neon-БД + `LEADS_DATABASE_URL` у Preview; синтетичні заявки осідають у панелі; жива перевірка адаптера/ідемпотентності/помилок | Neon-акаунт власника, `.env.migrate`, Vercel env (Preview), 1 redeploy. Асистент: міграція + роль + синтетичні перевірки |
+| **Б3-prod** (окремо, поза поточним дозволом) | реальні заявки робочого сайту в панелі | **(a)** доставити код у `main`: `src/lib/leads/*`, `/panel/leads` route + його гейт, зміну `/api/contact` (крок БД), і залежності панелі, яких вимагає `keystaticEnabled`/`getStorage`. Практично — це merge PR #26 або виділення підмножини. **(b)** окрема Production Neon-БД (не тестова) + `LEADS_DATABASE_URL` у Vercel Environment = Production. **(c)** redeploy `main`. **(d)** GDPR: retention, дампи, видалення на запит (розділ 10). **(e)** рішення про регіон/провайдера prod-БД |
+| Поза дозволом зараз | зміна `main`, Production env, Production deploy, DNS, тарифів; hard-delete даних; автоматичний retention | — |
+
+**Один наступний запит власнику після Б3-preview** — див. кінець файлу.
 
 ---
 
@@ -406,11 +484,48 @@ Environment = **Production**, redeploy Production. Це окреме рішен�
 `src/lib/leads/loadError.test.ts` (7). Ані `route.ts`, ані адаптер не логують
 рядок помилки з деталями.
 
-## Рекомендація (потребує рішення власника, НЕ зроблено)
+## Ліміт тривалості SQL-запиту (задача 20:24 — рішення прийнято)
 
-Адаптер має `connectionTimeoutMillis: 5000`, але **не** має ліміту на
-тривалість запиту. Здеградована БД може затримати `/api/contact` на весь
-таймаут функції. Пропозиція окремим кроком: додати `statement_timeout`
-(через `?options=-c%20statement_timeout%3D4000` у connection string або в
-пулі). Не критично для кількох заявок на день; не змінюю в межах цього
-завдання.
+Адаптер має `connectionTimeoutMillis: 5000`, але не має ліміту на тривалість
+запиту — здеградована БД могла б затримати `/api/contact` на весь таймаут
+функції. **Рішення:** параметр рівня ролі, БЕЗ зміни коду адаптера —
+`ALTER ROLE leads_app SET statement_timeout = '4000ms'` (+ `idle_in_transaction`),
+виконати при створенні ролі (SQL у розділі «Два набори прав»). Діє лише для
+тестової runtime-ролі; Production і міграційна роль не зачеплені. Спосіб
+сумісний із Neon (vanilla Postgres на SQL-рівні) і з наявним `pg`-пулом
+(параметр приходить із сесією, коду читати не треба).
+
+---
+
+# ЗАПИТ ВЛАСНИКУ — наступний етап після Б3-preview (Б3-prod)
+
+**Не виконувати зараз.** Це окреме рішення; нижче — усе, щоб його ухвалити.
+
+**Результат для бізнесу:** реальні заявки з робочого сайту `dream-car-vavd.com`
+видно списком у панелі (одне місце, пагінація, без дублів), паралельно з
+наявними листами.
+
+**Область змін:**
+1. **Код у `main`.** Зараз весь subsystem заявок є лише в PR #26. Варіанти:
+   (a) domerge PR #26 цілком (уся панель); (b) виділити мінімальний зріз
+   (`src/lib/leads/*`, `/panel/leads` + гейт, крок БД у `/api/contact`,
+   `keystaticEnabled`/`getStorage` залежності) в окремий PR. Оцінити разом.
+2. **Окрема Production Neon-БД** (не тестова гілка) — свій проєкт або гілка
+   `main`, своя роль `leads_app`, свій `LEADS_DATABASE_URL`.
+3. **Vercel:** `LEADS_DATABASE_URL` у Environment = **Production**.
+4. **Redeploy `main`.**
+
+**Перевірки перед вмиканням:** ті самі, що для Preview (розділ 6) — на
+Production-БД, синтетичною заявкою, потім прибрати. Плюс: `content:guard`,
+`next build`, CI на PR коду.
+
+**Витрати:** Neon Free покриває й Production-обсяг автосалону (розділ 7) —
+$0/місяць. Якщо колись обсяг зросте — Launch pay-as-you-go (~$1–5/місяць).
+Vercel-тариф не потрібен (Blob — окреме питання Б2).
+
+**Відновлення / скасування:** прибрати `LEADS_DATABASE_URL` з Production →
+redeploy → сайт повертається до email-only. Дані в Neon лишаються (`pg_dump` /
+Neon PITR). Відкат коду — revert PR у `main`.
+
+**Рішення власника, яких бракує (розділ 10):** термін зберігання, розклад
+дампів, місце дампів, процедура GDPR-видалення, регіон prod-БД.
