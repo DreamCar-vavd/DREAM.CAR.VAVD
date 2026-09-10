@@ -2089,42 +2089,119 @@ test("cross-kind: publishing a car does not disturb an already-published gallery
 // SPECIFIC expected effect of each action: true / false / null (keep locked).
 // ---------------------------------------------------------------------------
 
-test("check publish: true only after the item is really in the published snapshot", async () => {
+const rowOf = async (s: FakeStorage, kind: string, id: string) => {
+  const d = await getPanelData(s);
+  return d.groups.find((g) => g.kind === kind)!.rows.find((r) => r.id === id)!;
+};
+
+test("check publish: true ONLY when the exact captured version is what got published", async () => {
   const s = baseStore();
   s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
   const before = await versions(s);
+  const token = (await rowOf(s, "car", "c1")).publishTargetToken;
 
-  // Not published yet -> "схоже, НЕ застосовано" (retry ok), never a false "applied".
-  const no = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, before);
+  // Not published yet -> false (retry ok), never a false "applied".
+  const no = await checkActionResult(
+    s,
+    { action: "publish", kind: "car", id: "c1", expectToken: token },
+    before,
+  );
   assert.equal(no.applied, false);
 
   await publishItem(s, "car", "c1", { working: before.car, review: before.review, published: before.published });
-  const yes = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, before);
+  const yes = await checkActionResult(
+    s,
+    { action: "publish", kind: "car", id: "c1", expectToken: token },
+    before,
+  );
   assert.equal(yes.applied, true);
 });
 
-test("check publish: another editor moved the published token but our row is still modified -> null (stay locked)", async () => {
+test("check publish: our request failed, another editor published a DIFFERENT version of the SAME item -> null, never a false success", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const before = await versions(s);
+  // Editor A captures the token for the version they try to publish.
+  const tokenA = (await rowOf(s, "car", "c1")).publishTargetToken;
+  // A's request is lost. Editor B edits c1 and publishes THEIR version.
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ price: "£777" }) }]);
+  const vB = await versions(s);
+  await publishItem(s, "car", "c1", { working: vB.car, review: vB.review, published: vB.published });
+
+  const r = await checkActionResult(
+    s,
+    { action: "publish", kind: "car", id: "c1", expectToken: tokenA },
+    before,
+  );
+  assert.equal(r.applied, null); // NOT true — it was B's version, not A's
+  assert.doesNotMatch(r.message, /опубліковано саме цю версію/);
+  assert.match(r.message, /іншу версію|перегляньте|не повторюйте/i);
+});
+
+test("check publish: another editor published a different ITEM -> our item absent -> false (retry ok)", async () => {
   const s = baseStore();
   s.seedDir("src/content/cms/gallery", [{ name: "g1.json", text: galJson() }]);
   s.seedFile("src/content/cms/review-state.json", JSON.stringify({ ...carReviewAll, ...galReviewAll }));
   const before = await versions(s);
-  // Someone else publishes the gallery item — published token moves, c1 stays modified.
+  const tokenA = (await rowOf(s, "car", "c1")).publishTargetToken;
   const v = await versions(s);
   await publishItem(s, "gallery", "g1", { working: v.gallery, review: v.review, published: v.published });
 
-  const r = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, before);
-  assert.equal(r.applied, null); // "Дані змінив інший редактор…"
+  const r = await checkActionResult(
+    s,
+    { action: "publish", kind: "car", id: "c1", expectToken: tokenA },
+    before,
+  );
+  assert.equal(r.applied, false); // c1 simply isn't published
 });
 
-test("check confirm-locale: true when that exact locale reads reviewed, false when it does not", async () => {
+test("check confirm-locale: OUR confirm of THIS text landed even after the text later changed to B", async () => {
   const s = baseStore();
   const v = await versions(s);
-  const before = await checkActionResult(s, { action: "confirm-locale", kind: "car", id: "c1", locale: "uk" }, v);
+  const tokenA = (await rowOf(s, "car", "c1")).localeTextToken.uk;
+
+  // Nothing confirmed yet -> false.
+  const before = await checkActionResult(
+    s,
+    { action: "confirm-locale", kind: "car", id: "c1", locale: "uk", expectToken: tokenA },
+    v,
+  );
   assert.equal(before.applied, false);
 
+  // A's confirm of text-A landed; then the working text changes to B.
   await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
-  const after = await checkActionResult(s, { action: "confirm-locale", kind: "car", id: "c1", locale: "uk" }, await versions(s));
-  assert.equal(after.applied, true);
+  s.seedDir("src/content/cms/cars", [
+    { name: "c1.json", text: carJson({ uk: { ...CAR_L, description: "text B now" } }) },
+  ]);
+
+  const after = await checkActionResult(
+    s,
+    { action: "confirm-locale", kind: "car", id: "c1", locale: "uk", expectToken: tokenA },
+    await versions(s),
+  );
+  assert.equal(after.applied, true); // A's confirm DID happen
+  assert.match(after.message, /застосовано/);
+  assert.match(after.message, /текст змінили|перегляньте/i); // but flags the drift
+});
+
+test("check confirm-locale: another editor confirmed DIFFERENT text since -> null, don't suggest a blind re-confirm", async () => {
+  const s = baseStore();
+  const tokenA = (await rowOf(s, "car", "c1")).localeTextToken.uk;
+
+  // Editor B changed the text AND confirmed it.
+  s.seedDir("src/content/cms/cars", [
+    { name: "c1.json", text: carJson({ uk: { ...CAR_L, description: "B's text" } }) },
+  ]);
+  const vB = await versions(s);
+  await confirmLocale(s, "car", "c1", "uk", { working: vB.car, review: vB.review });
+
+  const r = await checkActionResult(
+    s,
+    { action: "confirm-locale", kind: "car", id: "c1", locale: "uk", expectToken: tokenA },
+    await versions(s),
+  );
+  assert.equal(r.applied, null);
+  assert.match(r.message, /іншим текстом|прочитайте|наосліп/i);
 });
 
 test("check unpublish: true once the item is gone from the published snapshot", async () => {
@@ -2166,10 +2243,16 @@ test("check cleanup: true/false/null keyed on the EXACT plan paths, not a fuzzy 
 
 test("check: a read failure is NOT an answer — applied stays null so the button stays locked", async () => {
   const s = baseStore();
-  s.readDir = async () => {
-    throw new StorageUnavailableError("тест");
+  const realRead = s.readFile.bind(s);
+  s.readFile = async (f, at) => {
+    if (f === "src/content/cms/published.json") throw new StorageUnavailableError("тест");
+    return realRead(f, at);
   };
-  const r = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, await versions(s).catch(() => ({})));
+  const r = await checkActionResult(
+    s,
+    { action: "publish", kind: "car", id: "c1", expectToken: "anything" },
+    {},
+  );
   assert.equal(r.applied, null);
   assert.match(r.message, /не вдалося|ще раз/i);
 });

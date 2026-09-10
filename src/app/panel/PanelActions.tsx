@@ -123,6 +123,7 @@ export function PanelButton({
   variant = "default",
   confirmText,
   checkExtra,
+  targetToken,
 }: {
   payload: ActionPayload;
   versions: PanelVersions;
@@ -133,6 +134,14 @@ export function PanelButton({
   /** Extra fields the read-only result check needs beyond `payload`
    *  (e.g. `slugs` for complete-deletion). */
   checkExtra?: { slugs?: string[]; planPaths?: string[] };
+  /**
+   * Identity of THIS action's expected result, from the server render — for
+   * publish `row.publishTargetToken`, for confirm-locale
+   * `row.localeTextToken[locale]`. Captured the instant an action is fired and
+   * kept for the whole uncertain period so "Перевірити результат" verifies the
+   * version we actually attempted, not the row's props after a refresh.
+   */
+  targetToken?: string;
 }) {
   const { busy: refreshing, slow: refreshSlow, done: refreshDone, refresh } = useRefresh();
   const [busy, setBusy] = useState(false);
@@ -144,18 +153,27 @@ export function PanelButton({
   // Set when a write's outcome is UNKNOWN (lost response, either hop). The
   // action stays locked until a read-only "Перевірити результат" gives a
   // definite yes/no; a `null` ("Результат поки невідомий") keeps it locked.
-  const [uncertain, setUncertain] = useState<{ checking: boolean } | null>(null);
+  // `capturedToken` is the initial target frozen at fire time — never re-read
+  // from `targetToken` after a refresh.
+  const [uncertain, setUncertain] = useState<{ checking: boolean; capturedToken?: string } | null>(
+    null,
+  );
 
   const checkResult = async () => {
     if (uncertain?.checking) return;
-    setUncertain({ checking: true });
+    const capturedToken = uncertain?.capturedToken;
+    setUncertain({ checking: true, capturedToken });
     setMsg(null);
     let data: { applied?: boolean | null; message?: string } | null = null;
     try {
       const res = await fetch("/api/panel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "check-result", check: { ...payload, ...checkExtra }, versions }),
+        body: JSON.stringify({
+          action: "check-result",
+          check: { ...payload, ...checkExtra, expectToken: capturedToken },
+          versions,
+        }),
       });
       data = (await res.json()) as { applied?: boolean | null; message?: string };
     } catch {
@@ -163,7 +181,8 @@ export function PanelButton({
     }
     const r = routeCheckResponse(data);
     setMsg(r.msg);
-    setUncertain(r.unlock ? null : { checking: false });
+    // Keep the captured target through a `null` verdict so a re-check still uses it.
+    setUncertain(r.unlock ? null : { checking: false, capturedToken });
     if (r.refresh) refresh();
   };
 
@@ -189,7 +208,9 @@ export function PanelButton({
     }
     const r = routeWriteResponse(data);
     setMsg(r.msg);
-    if (r.lock) setUncertain({ checking: false });
+    // Freeze the initial target NOW — the row's props will change on the next
+    // refresh and must not be read back for the check.
+    if (r.lock) setUncertain({ checking: false, capturedToken: targetToken });
     if (r.refresh) refresh();
   }
 

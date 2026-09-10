@@ -174,6 +174,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
                 <PanelButton
                   payload={{ action: "confirm-locale", kind, id: row.id, locale }}
                   versions={versions}
+                  targetToken={row.localeTextToken[locale]}
                 >
                   Позначити перевіреним
                 </PanelButton>
@@ -197,6 +198,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
           versions={versions}
           variant="primary"
           disabled={row.blockers.length > 0 || row.publishState === "in-sync"}
+          targetToken={row.publishTargetToken}
         >
           {row.publishedExists ? "Опублікувати зміни" : "Опублікувати"}
         </PanelButton>

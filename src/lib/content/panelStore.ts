@@ -304,22 +304,37 @@ type MediaIndex = Map<string, { id: string; size: number }>;
  * it could not be fetched, `getPanelData` rejects — an incomplete tree is never
  * read as "all in sync".
  */
+/** A card's content with photo URLs blanked — so a token computed from it
+ *  survives freezing (working `photos/*` path → published `_pub/<hash>` path). */
+function stripPhotoUrls(kindKey: KindKey, o: Record<string, unknown>): Record<string, unknown> {
+  if (kindKey === "promo") return { ...o, image: "" };
+  const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
+  const out: Record<string, unknown> = { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
+  if (kindKey === "car" && o.video && typeof o.video === "object") {
+    out.video = { ...(o.video as Record<string, unknown>), posterSrc: "" };
+  }
+  return out;
+}
+
+/**
+ * A stable identity for "the content this card would publish", ignoring which
+ * frozen `_pub/` copy the photos resolve to. Captured by the client at the
+ * moment a publish is attempted and compared, in `checkActionResult`, against
+ * whatever is actually in the published snapshot later — so "another editor
+ * published a different version of the same item" can never read as "our
+ * publish succeeded". NOT sensitive; a hash of already-public card text.
+ */
+export function publishContentToken(kindKey: KindKey, item: Record<string, unknown>): string {
+  return sha256(stable(stripPhotoUrls(kindKey, item)));
+}
+
 function inSyncIgnoringFrozenPhotos(
   index: MediaIndex,
   kindKey: KindKey,
   pub: Record<string, unknown>,
   item: Record<string, unknown>,
 ): boolean {
-  const stripPhotoUrls = (o: Record<string, unknown>) => {
-    if (kindKey === "promo") return { ...o, image: "" };
-    const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
-    const out: Record<string, unknown> = { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
-    if (kindKey === "car" && o.video && typeof o.video === "object") {
-      out.video = { ...(o.video as Record<string, unknown>), posterSrc: "" };
-    }
-    return out;
-  };
-  if (stable(stripPhotoUrls(pub)) !== stable(stripPhotoUrls(item))) return false;
+  if (stable(stripPhotoUrls(kindKey, pub)) !== stable(stripPhotoUrls(kindKey, item))) return false;
 
   const pu = itemImageUrls(kindKey, pub);
   const iu = itemImageUrls(kindKey, item);
@@ -371,6 +386,20 @@ export interface PanelRow {
    * shown read-only with only "прибрати з сайті".
    */
   workingExists: boolean;
+  /**
+   * Identity of the content a publish of this row WOULD write, ignoring frozen
+   * photo paths. The client captures this the moment a publish is attempted and
+   * hands it back to `checkActionResult` if the response is lost — so the check
+   * verifies THIS exact version, not whatever the row looks like after a refresh.
+   */
+  publishTargetToken: string;
+  /**
+   * Per-locale hash of the confirmed text — identical to what `confirmLocale`
+   * writes into review-state. Captured on a "Позначити перевіреним" click so a
+   * lost-response check can tell "our confirm of THIS text landed" apart from
+   * "someone confirmed different text since".
+   */
+  localeTextToken: Record<ContentLocale, string>;
 }
 export interface PanelGroup {
   kind: KindKey;
@@ -529,6 +558,10 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
         publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
         publishedExists: Boolean(pub),
         workingExists: true,
+        publishTargetToken: publishContentToken(kindKey, item as unknown as Record<string, unknown>),
+        localeTextToken: Object.fromEntries(
+          LOCALES.map((l) => [l, sha256(kind.confirmedText(item, l))]),
+        ) as Record<ContentLocale, string>,
       };
     });
 
@@ -549,6 +582,11 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
         publiclyVisible: kind.isRenderable(pub),
         publishedExists: true,
         workingExists: false,
+        publishTargetToken: publishContentToken(kindKey, pub as unknown as Record<string, unknown>),
+        localeTextToken: Object.fromEntries(LOCALES.map((l) => [l, ""])) as Record<
+          ContentLocale,
+          string
+        >,
       }));
 
     return {
@@ -1082,6 +1120,14 @@ export interface CheckTarget {
   kind?: KindKey;
   id?: string;
   locale?: ContentLocale;
+  /**
+   * The initial target captured at click time, BEFORE the write:
+   *  - publish       — `row.publishTargetToken` (content identity, frozen-photo-safe)
+   *  - confirm-locale — `row.localeTextToken[locale]` (hash of that locale's text)
+   * The check compares THIS against fresh state; the row's post-refresh props
+   * must never stand in for it.
+   */
+  expectToken?: string;
   /** cleanup: the exact `_pub/` repo paths from the confirmed dry-run plan. */
   planPaths?: string[];
   /** complete-deletion: the stale review slugs the owner was shown. */
@@ -1120,9 +1166,8 @@ export async function checkActionResult(
       );
     }
 
-    const data = await getPanelData(storage);
-
     if (target.action === "complete-deletion") {
+      const data = await getPanelData(storage);
       const asked = target.slugs?.length ? target.slugs : data.staleReviewSlugs;
       const remaining = asked.filter((s) => data.staleReviewSlugs.includes(s));
       return remaining.length === 0
@@ -1134,58 +1179,103 @@ export async function checkActionResult(
           };
     }
 
-    const row =
-      target.kind && target.id
-        ? data.groups.find((g) => g.kind === target.kind)?.rows.find((r) => r.id === target.id)
-        : undefined;
-    const publishedMoved = data.versions.published !== (seen.published ?? "");
+    if (!target.kind || !target.id) return unknown("Не вказано матеріал для перевірки.");
+    const kind = KINDS[target.kind] as ContentKind<{ id: string; order: number }>;
+    const LOC = target.locale ? target.locale.toUpperCase() : "";
 
-    if (target.action === "publish") {
-      if (!row) return unknown("Матеріал не знайдено — можливо, картку видалили в Keystatic.");
-      if (row.publishState === "in-sync" && row.publishedExists) {
-        return publishedMoved
-          ? { ok: true, applied: true, message: "Схоже, опубліковано — картка збігається з опублікованою версією." }
-          : unknown("Стан суперечливий — перевірте ще раз за хвилину.");
+    if (target.action === "publish" || target.action === "unpublish") {
+      const publishedF = await storage.readFile(PUBLISHED);
+      const snapshot = parseSnapshot(publishedF.data);
+      const list = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[target.kind]]);
+      const publishedItem = list.find((p) => p.id === target.id);
+      const publishedMoved = publishedF.version !== (seen.published ?? "");
+
+      if (target.action === "unpublish") {
+        return publishedItem
+          ? {
+              ok: true,
+              applied: false,
+              message: `«${target.id}» ще опубліковано — схоже, НЕ прибрано. Можна повторити.`,
+            }
+          : { ok: true, applied: true, message: `«${target.id}» більше не опубліковано — схоже, прибрано з сайту.` };
       }
-      if (!publishedMoved && (row.publishState === "modified" || !row.publishedExists)) {
+
+      // publish — verify the EXACT version we tried to publish (captured token),
+      // not "is the row in-sync now".
+      if (!publishedItem) {
         return {
           ok: true,
           applied: false,
-          message: "Схоже, НЕ опубліковано — на сайті попередня версія, зміни лишаються неопублікованими. Можна повторити.",
+          message: `«${target.id}» не опубліковано — на сайті попередня версія. Можна повторити.`,
         };
       }
-      // token moved but this row is still "modified" — someone published or
-      // edited in between; we cannot say whether THIS publish landed.
-      return unknown("Дані змінив інший редактор — чи застосовано саме цю публікацію, визначити не вдалося.");
-    }
-
-    if (target.action === "unpublish") {
-      if (!row) {
-        return { ok: true, applied: true, message: "Матеріал більше не опублікований — схоже, прибрано з сайту." };
+      if (!target.expectToken) {
+        return unknown(
+          `«${target.id}» опубліковано, але звірити саме вашу версію не вдалося (застаріла вкладка). Перегляньте матеріал у панелі.`,
+        );
       }
-      return row.publishedExists
-        ? {
-            ok: true,
-            applied: false,
-            message: "Схоже, НЕ прибрано — матеріал ще опублікований. Можна повторити.",
-          }
-        : { ok: true, applied: true, message: "Схоже, прибрано з сайту — опублікованої версії більше немає." };
+      const publishedToken = publishContentToken(
+        target.kind,
+        publishedItem as unknown as Record<string, unknown>,
+      );
+      if (publishedToken === target.expectToken) {
+        return {
+          ok: true,
+          applied: true,
+          message: `Схоже, опубліковано саме цю версію «${target.id}» — повторювати не треба.`,
+        };
+      }
+      // «A» is published, but with content different from what we tried — another
+      // editor published a different version. NOT our success.
+      return unknown(
+        `Опубліковано іншу версію «${target.id}»${publishedMoved ? " (інший редактор)" : ""}. ` +
+          `Стару дію не повторюйте — перегляньте поточний матеріал у панелі та вирішіть заново.`,
+      );
     }
 
     if (target.action === "confirm-locale") {
-      if (!row || !target.locale) return unknown("Картку або мову не знайдено — перевірте ще раз.");
-      const st = row.langStatus[target.locale];
-      if (st === "reviewed") {
-        return { ok: true, applied: true, message: `${target.locale.toUpperCase()}: схоже, позначено перевіреним.` };
+      if (!target.locale) return unknown("Не вказано мову для перевірки.");
+      const [reviewF, loaded] = await Promise.all([
+        storage.readFile(REVIEW),
+        loadKind(storage, target.kind),
+      ]);
+      const review = parseReview(reviewF.data);
+      const rkey = reviewKeyFor(target.kind, target.id);
+      const conf = (review[rkey] ?? review[target.id])?.[target.locale];
+      const workingItem = loaded.working.find((w) => w.id === target.id);
+      const currentText = workingItem
+        ? sha256(loaded.kind.confirmedText(workingItem, target.locale))
+        : undefined;
+
+      if (conf && target.expectToken && conf.hash === target.expectToken) {
+        // OUR confirm of THIS exact text landed.
+        const drifted = currentText !== undefined && currentText !== target.expectToken;
+        return {
+          ok: true,
+          applied: true,
+          message:
+            `${LOC}: підтвердження застосовано.` +
+            (drifted
+              ? " Відтоді текст змінили — перегляньте картку в Keystatic, перш ніж підтверджувати знову."
+              : " Повторювати не треба."),
+        };
       }
-      if (st === "needs-review") {
+      if (conf && target.expectToken && conf.hash !== target.expectToken) {
+        // A DIFFERENT text was confirmed since — can't say ours landed, and the
+        // owner must read the current text before confirming anything.
+        return unknown(
+          `${LOC}: мову підтверджено іншим текстом (можливо, інший редактор). ` +
+            `Не підтверджуйте наосліп — відкрийте картку в Keystatic, прочитайте поточний текст.`,
+        );
+      }
+      if (!conf) {
         return {
           ok: true,
           applied: false,
-          message: `${target.locale.toUpperCase()}: схоже, НЕ підтверджено (або текст змінили після). Можна підтвердити знову.`,
+          message: `${LOC}: схоже, НЕ підтверджено. Прочитайте текст і підтвердіть знову.`,
         };
       }
-      return unknown(`${target.locale.toUpperCase()}: стан мови незвичний — перевірте картку в Keystatic.`);
+      return unknown(`${LOC}: стан підтвердження незвичний — перевірте картку в Keystatic.`);
     }
 
     return unknown("Невідома дія для перевірки.");
