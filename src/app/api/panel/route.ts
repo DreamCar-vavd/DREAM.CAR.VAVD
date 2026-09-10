@@ -3,6 +3,7 @@ import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { LOCALES, type ContentLocale } from "@/lib/content/carsGate";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
 import {
+  checkActionResult,
   cleanupFrozenMedia,
   completeDeletion,
   confirmLocale,
@@ -10,7 +11,7 @@ import {
   unpublishItem,
 } from "@/lib/content/panelStore";
 import { KINDS, type KindKey } from "@/lib/content/kinds";
-import type { ActionResult } from "@/lib/content/panelStore";
+import type { ActionResult, CheckTarget } from "@/lib/content/panelStore";
 
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -40,6 +41,8 @@ interface Body {
   /** cleanup-frozen-media: second call — confirm the dry-run against this head. */
   confirm?: boolean;
   headSha?: string;
+  /** check-result: describe the write whose outcome the owner is verifying. */
+  check?: CheckTarget;
 }
 
 export async function POST(request: Request) {
@@ -63,6 +66,16 @@ export async function POST(request: Request) {
   const v = body.versions ?? {};
   const review = String(v.review ?? "");
   const published = String(v.published ?? "");
+
+  // Read-only result check for a write whose outcome was lost. NEVER writes.
+  if (body.action === "check-result") {
+    const c = body.check;
+    if (!c || typeof c.action !== "string") {
+      return json({ ok: false, message: "Не вказано дію для перевірки." }, 400);
+    }
+    const r = await checkActionResult(storage, c, v);
+    return json(r, 200);
+  }
 
   // Item-independent actions — handled before the kind/id checks below.
   if (body.action === "complete-deletion") {

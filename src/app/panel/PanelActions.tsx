@@ -120,7 +120,7 @@ export function PanelButton({
   disabled,
   variant = "default",
   confirmText,
-  stateToken,
+  checkExtra,
 }: {
   payload: ActionPayload;
   versions: PanelVersions;
@@ -128,10 +128,9 @@ export function PanelButton({
   disabled?: boolean;
   variant?: "default" | "primary" | "danger" | "solid";
   confirmText?: string;
-  /** A string from the server render that CHANGES iff this action took effect
-   *  (e.g. a row's publishState). Lets "Перевірити результат" say whether a
-   *  lost-response write actually landed. */
-  stateToken?: string;
+  /** Extra fields the read-only result check needs beyond `payload`
+   *  (e.g. `slugs` for complete-deletion). */
+  checkExtra?: { slugs?: string[]; planPaths?: string[] };
 }) {
   const { busy: refreshing, slow: refreshSlow, done: refreshDone, refresh } = useRefresh();
   const [busy, setBusy] = useState(false);
@@ -140,20 +139,49 @@ export function PanelButton({
   // clicks — or a click during the post-action refresh — could fire a second
   // request against stale versions. This blocks it immediately.
   const inFlight = useRef(false);
-  // Set when a response is LOST. The action is then locked until the owner runs
-  // a read-only "Перевірити результат" (`checking`), after which the fresh
-  // `stateToken` is compared to `tokenBefore` to say whether the write landed.
-  const [uncertain, setUncertain] = useState<{ tokenBefore: string; checking: boolean } | null>(null);
+  // Set when a write's outcome is UNKNOWN (lost response, either hop). The
+  // action stays locked until a read-only "Перевірити результат" gives a
+  // definite yes/no; a `null` ("Результат поки невідомий") keeps it locked.
+  const [uncertain, setUncertain] = useState<{ checking: boolean } | null>(null);
 
-  // The "Перевірити результат" refresh just settled — compare then unlock.
-  if (uncertain?.checking && refreshDone) {
-    const applied = stateToken === undefined ? null : stateToken !== uncertain.tokenBefore;
-    setMsg(checkResultMessage(applied));
-    setUncertain(null);
-  }
-  const checkResult = () => {
-    setUncertain((u) => (u ? { ...u, checking: true } : u));
-    refresh();
+  const checkResult = async () => {
+    if (uncertain?.checking) return;
+    setUncertain({ checking: true });
+    setMsg(null);
+    try {
+      const res = await fetch("/api/panel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "check-result",
+          check: { ...payload, ...checkExtra },
+          versions,
+        }),
+      });
+      let data: { applied?: boolean | null; message?: string } | null = null;
+      try {
+        data = (await res.json()) as { applied?: boolean | null; message?: string };
+      } catch {
+        data = null;
+      }
+      if (!data || data.applied === undefined) {
+        setUncertain({ checking: false }); // still locked; owner can check again
+        setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
+        return;
+      }
+      const applied = data.applied ?? null;
+      const text = data.message ?? checkResultMessage(applied).text;
+      setMsg({ kind: applied === true ? "ok" : applied === false ? "conflict" : "uncertain", text });
+      if (applied === null) {
+        setUncertain({ checking: false }); // "Результат поки невідомий" — keep locked
+      } else {
+        setUncertain(null); // definite answer — unlock; sync the panel
+        refresh();
+      }
+    } catch {
+      setUncertain({ checking: false });
+      setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
+    }
   };
 
   async function run() {
@@ -177,7 +205,7 @@ export function PanelButton({
       // Lock on EITHER path a write's result can be unknown: the server said so
       // (`outcome:"unknown"`), or no parseable response came back at all.
       if (!data || (!data.ok && data.outcome === "unknown")) {
-        setUncertain({ tokenBefore: stateToken ?? "", checking: false });
+        setUncertain({ checking: false });
         setMsg(data ? messageForResponse(data) : { kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
       } else {
         setMsg(messageForResponse(data, data.ok));
@@ -186,7 +214,7 @@ export function PanelButton({
     } catch {
       // No response at all — the write may or may not have landed. Lock this
       // action and make the owner CHECK (read-only) before anything is repeated.
-      setUncertain({ tokenBefore: stateToken ?? "", checking: false });
+      setUncertain({ checking: false });
       setMsg({ kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
@@ -231,10 +259,10 @@ export function PanelButton({
             <button
               type="button"
               className="ml-2 underline disabled:no-underline disabled:opacity-50"
-              disabled={refreshing}
+              disabled={uncertain.checking}
               onClick={checkResult}
             >
-              {uncertain.checking && refreshing ? busyLabelFor("check-result") : "Перевірити результат"}
+              {uncertain.checking ? busyLabelFor("check-result") : "Перевірити результат"}
             </button>
           )}
           {!uncertain && msg.kind === "conflict" && (
@@ -272,24 +300,61 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
   // landed — that snapshot is gone, so the plan is stale: drop it and make the
   // owner re-run the check. Adjusted during render (reset-on-prop-change), not
   // in an effect.
-  const [plan, setPlan] = useState<{ count: number; headSha: string; forVersion?: string } | null>(null);
+  const [plan, setPlan] = useState<{
+    count: number;
+    headSha: string;
+    paths: string[];
+    forVersion?: string;
+  } | null>(null);
   const inFlight = useRef(false);
-  const [uncertain, setUncertain] = useState<{ checking: boolean } | null>(null);
+  // Locked after a confirm whose result is unknown. `planPaths` is kept so the
+  // read-only check can verify exactly that set of files is gone.
+  const [uncertain, setUncertain] = useState<{ checking: boolean; planPaths: string[] } | null>(null);
 
   if (plan && plan.forVersion !== publishedVersion) {
     setPlan(null);
     if (msg) setMsg(null);
   }
-  if (uncertain?.checking && refreshDone) {
-    setUncertain(null);
-    setMsg({
-      kind: "conflict",
-      text: "Стан оновлено — подивіться, чи лишилися зайві копії, і за потреби запустіть очищення ще раз.",
-    });
-  }
-  const checkResult = () => {
-    setUncertain((u) => (u ? { checking: true } : u));
-    refresh();
+
+  const checkResult = async () => {
+    if (uncertain?.checking) return;
+    const planPaths = uncertain?.planPaths ?? [];
+    setUncertain({ checking: true, planPaths });
+    setMsg(null);
+    try {
+      const res = await fetch("/api/panel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "check-result",
+          check: { action: "cleanup-frozen-media", planPaths },
+          versions: {},
+        }),
+      });
+      let data: { applied?: boolean | null; message?: string } | null = null;
+      try {
+        data = (await res.json()) as { applied?: boolean | null; message?: string };
+      } catch {
+        data = null;
+      }
+      if (!data || data.applied === undefined) {
+        setUncertain({ checking: false, planPaths });
+        setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
+        return;
+      }
+      const applied = data.applied ?? null;
+      const text = data.message ?? "";
+      setMsg({ kind: applied === true ? "ok" : applied === false ? "conflict" : "uncertain", text });
+      if (applied === null) {
+        setUncertain({ checking: false, planPaths });
+      } else {
+        setUncertain(null);
+        refresh();
+      }
+    } catch {
+      setUncertain({ checking: false, planPaths });
+      setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
+    }
   };
 
   async function call(confirm: boolean, headSha?: string) {
@@ -303,25 +368,30 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "cleanup-frozen-media", confirm, headSha, versions: {} }),
       });
-      let data:
-        | (ActionResponse & { cleanup?: { count: number; totalBytes: number; headSha: string } })
-        | null = null;
+      type CleanupData = ActionResponse & {
+        cleanup?: { count: number; totalBytes: number; headSha: string; paths: string[] };
+      };
+      let data: CleanupData | null = null;
       try {
-        data = (await res.json()) as ActionResponse & {
-          cleanup?: { count: number; totalBytes: number; headSha: string };
-        };
+        data = (await res.json()) as CleanupData;
       } catch {
         data = null; // sent, but no structured answer — treat as unknown outcome
       }
       if (!data || (!data.ok && data.outcome === "unknown")) {
         // A confirm whose result is unknown MUST lock — the delete commit may
-        // have landed. A dry run can't be "uncertain" (it writes nothing), but
-        // if the server ever says so we still lock, conservatively.
+        // have landed. Keep this plan's paths for the read-only check. A dry run
+        // writes nothing, but if the server ever says "unknown" we still lock.
+        const planPaths = confirm ? (plan?.paths ?? []) : [];
         setPlan(null);
-        setUncertain({ checking: false });
+        setUncertain({ checking: false, planPaths });
         setMsg(data ? messageForResponse(data) : { kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
       } else if (data.ok && data.cleanup && !confirm) {
-        setPlan({ count: data.cleanup.count, headSha: data.cleanup.headSha, forVersion: publishedVersion });
+        setPlan({
+          count: data.cleanup.count,
+          headSha: data.cleanup.headSha,
+          paths: data.cleanup.paths ?? [],
+          forVersion: publishedVersion,
+        });
         setMsg({ kind: "ok", text: data.message });
       } else {
         setPlan(null);
@@ -332,8 +402,9 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
         if (refreshed) refresh();
       }
     } catch {
+      const planPaths = confirm ? (plan?.paths ?? []) : [];
       setPlan(null);
-      setUncertain({ checking: false });
+      setUncertain({ checking: false, planPaths });
       setMsg({ kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
@@ -398,10 +469,10 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
             <button
               type="button"
               className="ml-2 underline disabled:no-underline disabled:opacity-50"
-              disabled={refreshing}
+              disabled={uncertain.checking}
               onClick={checkResult}
             >
-              {uncertain.checking && refreshing ? busyLabelFor("check-result") : "Перевірити результат"}
+              {uncertain.checking ? busyLabelFor("check-result") : "Перевірити результат"}
             </button>
           )}
         </StatusLine>

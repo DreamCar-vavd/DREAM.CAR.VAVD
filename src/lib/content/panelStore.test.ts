@@ -22,6 +22,7 @@ import {
   type Versioned,
 } from "./store/adapter";
 import {
+  checkActionResult,
   cleanupFrozenMedia,
   completeDeletion,
   confirmLocale,
@@ -2081,4 +2082,109 @@ test("cross-kind: publishing a car does not disturb an already-published gallery
   );
   assert.deepEqual(snap.services, []);
   assert.deepEqual(snap.promos, []);
+});
+
+// ---------------------------------------------------------------------------
+// checkActionResult — the read-only "Перевірити результат". Verifies the
+// SPECIFIC expected effect of each action: true / false / null (keep locked).
+// ---------------------------------------------------------------------------
+
+test("check publish: true only after the item is really in the published snapshot", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const before = await versions(s);
+
+  // Not published yet -> "схоже, НЕ застосовано" (retry ok), never a false "applied".
+  const no = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, before);
+  assert.equal(no.applied, false);
+
+  await publishItem(s, "car", "c1", { working: before.car, review: before.review, published: before.published });
+  const yes = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, before);
+  assert.equal(yes.applied, true);
+});
+
+test("check publish: another editor moved the published token but our row is still modified -> null (stay locked)", async () => {
+  const s = baseStore();
+  s.seedDir("src/content/cms/gallery", [{ name: "g1.json", text: galJson() }]);
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify({ ...carReviewAll, ...galReviewAll }));
+  const before = await versions(s);
+  // Someone else publishes the gallery item — published token moves, c1 stays modified.
+  const v = await versions(s);
+  await publishItem(s, "gallery", "g1", { working: v.gallery, review: v.review, published: v.published });
+
+  const r = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, before);
+  assert.equal(r.applied, null); // "Дані змінив інший редактор…"
+});
+
+test("check confirm-locale: true when that exact locale reads reviewed, false when it does not", async () => {
+  const s = baseStore();
+  const v = await versions(s);
+  const before = await checkActionResult(s, { action: "confirm-locale", kind: "car", id: "c1", locale: "uk" }, v);
+  assert.equal(before.applied, false);
+
+  await confirmLocale(s, "car", "c1", "uk", { working: v.car, review: v.review });
+  const after = await checkActionResult(s, { action: "confirm-locale", kind: "car", id: "c1", locale: "uk" }, await versions(s));
+  assert.equal(after.applied, true);
+});
+
+test("check unpublish: true once the item is gone from the published snapshot", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  let v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  const stillThere = await checkActionResult(s, { action: "unpublish", kind: "car", id: "c1" }, await versions(s));
+  assert.equal(stillThere.applied, false);
+
+  v = await versions(s);
+  await unpublishItem(s, "car", "c1", { published: v.published });
+  const gone = await checkActionResult(s, { action: "unpublish", kind: "car", id: "c1" }, await versions(s));
+  assert.equal(gone.applied, true);
+});
+
+test("check cleanup: true/false/null keyed on the EXACT plan paths, not a fuzzy count", async () => {
+  const s = photoStore();
+  s.seedMedia("public/images/cms/services/s1/_pub/deadbeef00.jpg", jpgBytes("old-1"));
+  s.seedMedia("public/images/cms/services/s1/_pub/deadbeef11.jpg", jpgBytes("old-2"));
+  const plan = [
+    "public/images/cms/services/s1/_pub/deadbeef00.jpg",
+    "public/images/cms/services/s1/_pub/deadbeef11.jpg",
+  ];
+  const bothPresent = await checkActionResult(s, { action: "cleanup-frozen-media", planPaths: plan }, {});
+  assert.equal(bothPresent.applied, false);
+
+  s.media.delete(plan[0]);
+  const partial = await checkActionResult(s, { action: "cleanup-frozen-media", planPaths: plan }, {});
+  assert.equal(partial.applied, null); // "Прибрано частину…" — stay locked
+
+  s.media.delete(plan[1]);
+  const gone = await checkActionResult(s, { action: "cleanup-frozen-media", planPaths: plan }, {});
+  assert.equal(gone.applied, true);
+
+  const noPlan = await checkActionResult(s, { action: "cleanup-frozen-media", planPaths: [] }, {});
+  assert.equal(noPlan.applied, null);
+});
+
+test("check: a read failure is NOT an answer — applied stays null so the button stays locked", async () => {
+  const s = baseStore();
+  s.readDir = async () => {
+    throw new StorageUnavailableError("тест");
+  };
+  const r = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, await versions(s).catch(() => ({})));
+  assert.equal(r.applied, null);
+  assert.match(r.message, /не вдалося|ще раз/i);
+});
+
+test("check complete-deletion: true once the asked-about stale slugs are gone", async () => {
+  const s = baseStore();
+  // review-state row for a slug with no working card in any kind = stale.
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({ "car:ghost": { uk: { hash: "x", at: "t" }, instance: "" } }),
+  );
+  const stale = await checkActionResult(s, { action: "complete-deletion", slugs: ["car:ghost"] }, {});
+  assert.equal(stale.applied, false);
+
+  await completeDeletion(s, { review: (await versions(s)).review });
+  const cleared = await checkActionResult(s, { action: "complete-deletion", slugs: ["car:ghost"] }, {});
+  assert.equal(cleared.applied, true);
 });

@@ -578,8 +578,9 @@ export type ActionResult =
       ok: true;
       message: string;
       /** Dry-run summary from `cleanupFrozenMedia` — the client re-submits with
-       *  `confirm` + this `headSha` to actually delete. */
-      cleanup?: { count: number; totalBytes: number; headSha: string };
+       *  `confirm` + this `headSha` to actually delete, and keeps `paths` so a
+       *  lost-response check can verify exactly this set was removed. */
+      cleanup?: { count: number; totalBytes: number; headSha: string; paths: string[] };
     }
   | {
       ok: false;
@@ -1022,7 +1023,7 @@ export async function cleanupFrozenMedia(
         message: `Можна прибрати ${paths.length} стар(у/і/их) копі(ю/ї/й) фото — ${humanBytes(
           totalBytes,
         )}. Натисніть ще раз, щоб підтвердити.`,
-        cleanup: { count: paths.length, totalBytes, headSha: headSha ?? "" },
+        cleanup: { count: paths.length, totalBytes, headSha: headSha ?? "", paths },
       };
     }
     // github mode: a confirm is only valid against the exact head the user was
@@ -1056,4 +1057,132 @@ export async function cleanupFrozenMedia(
         `.${tail}`,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// read-only result check — the ONLY thing "Перевірити результат" runs after a
+// write whose outcome is unknown. It NEVER writes and NEVER retries the action;
+// it re-reads fresh state and answers one question: did THIS action's specific
+// expected effect happen?  true / false / null ("Результат поки невідомий").
+// A null answer must NOT unlock the button (the caller keeps it locked); a
+// page refresh settling is not, by itself, an answer.
+// ---------------------------------------------------------------------------
+
+export interface CheckTarget {
+  action: "publish" | "unpublish" | "confirm-locale" | "complete-deletion" | "cleanup-frozen-media";
+  kind?: KindKey;
+  id?: string;
+  locale?: ContentLocale;
+  /** cleanup: the exact `_pub/` repo paths from the confirmed dry-run plan. */
+  planPaths?: string[];
+  /** complete-deletion: the stale review slugs the owner was shown. */
+  slugs?: string[];
+}
+
+export type CheckResult = { ok: true; applied: boolean | null; message: string };
+
+export async function checkActionResult(
+  storage: PanelStorage,
+  target: CheckTarget,
+  seen: Record<string, string | undefined>,
+): Promise<CheckResult> {
+  const unknown = (message: string): CheckResult => ({ ok: true, applied: null, message });
+  try {
+    // cleanup is checked against the media tree alone — no need for full panel data.
+    if (target.action === "cleanup-frozen-media") {
+      const plan = target.planPaths ?? [];
+      if (plan.length === 0) {
+        return unknown("Немає збереженого плану для звірки — запустіть перевірку зайвих копій ще раз.");
+      }
+      const index = await storage.mediaIndex();
+      const still = plan.filter((p) => index.has(p));
+      if (still.length === 0) {
+        return { ok: true, applied: true, message: "Схоже, копії прибрано — жодного файла з плану вже немає." };
+      }
+      if (still.length === plan.length) {
+        return {
+          ok: true,
+          applied: false,
+          message: "Схоже, нічого не прибрано — усі файли з плану на місці. Можна повторити очищення.",
+        };
+      }
+      return unknown(
+        `Прибрано частину (${plan.length - still.length} з ${plan.length}) — результат невизначений, перевірте ще раз.`,
+      );
+    }
+
+    const data = await getPanelData(storage);
+
+    if (target.action === "complete-deletion") {
+      const asked = target.slugs?.length ? target.slugs : data.staleReviewSlugs;
+      const remaining = asked.filter((s) => data.staleReviewSlugs.includes(s));
+      return remaining.length === 0
+        ? { ok: true, applied: true, message: "Схоже, рядки підтверджень видалених карток прибрано." }
+        : {
+            ok: true,
+            applied: false,
+            message: `Ще лишилися незавершені видалення: ${remaining.join(", ")}. Можна повторити.`,
+          };
+    }
+
+    const row =
+      target.kind && target.id
+        ? data.groups.find((g) => g.kind === target.kind)?.rows.find((r) => r.id === target.id)
+        : undefined;
+    const publishedMoved = data.versions.published !== (seen.published ?? "");
+
+    if (target.action === "publish") {
+      if (!row) return unknown("Матеріал не знайдено — можливо, картку видалили в Keystatic.");
+      if (row.publishState === "in-sync" && row.publishedExists) {
+        return publishedMoved
+          ? { ok: true, applied: true, message: "Схоже, опубліковано — картка збігається з опублікованою версією." }
+          : unknown("Стан суперечливий — перевірте ще раз за хвилину.");
+      }
+      if (!publishedMoved && (row.publishState === "modified" || !row.publishedExists)) {
+        return {
+          ok: true,
+          applied: false,
+          message: "Схоже, НЕ опубліковано — на сайті попередня версія, зміни лишаються неопублікованими. Можна повторити.",
+        };
+      }
+      // token moved but this row is still "modified" — someone published or
+      // edited in between; we cannot say whether THIS publish landed.
+      return unknown("Дані змінив інший редактор — чи застосовано саме цю публікацію, визначити не вдалося.");
+    }
+
+    if (target.action === "unpublish") {
+      if (!row) {
+        return { ok: true, applied: true, message: "Матеріал більше не опублікований — схоже, прибрано з сайту." };
+      }
+      return row.publishedExists
+        ? {
+            ok: true,
+            applied: false,
+            message: "Схоже, НЕ прибрано — матеріал ще опублікований. Можна повторити.",
+          }
+        : { ok: true, applied: true, message: "Схоже, прибрано з сайту — опублікованої версії більше немає." };
+    }
+
+    if (target.action === "confirm-locale") {
+      if (!row || !target.locale) return unknown("Картку або мову не знайдено — перевірте ще раз.");
+      const st = row.langStatus[target.locale];
+      if (st === "reviewed") {
+        return { ok: true, applied: true, message: `${target.locale.toUpperCase()}: схоже, позначено перевіреним.` };
+      }
+      if (st === "needs-review") {
+        return {
+          ok: true,
+          applied: false,
+          message: `${target.locale.toUpperCase()}: схоже, НЕ підтверджено (або текст змінили після). Можна підтвердити знову.`,
+        };
+      }
+      return unknown(`${target.locale.toUpperCase()}: стан мови незвичний — перевірте картку в Keystatic.`);
+    }
+
+    return unknown("Невідома дія для перевірки.");
+  } catch (err) {
+    // A read failure is NOT an answer — stay "unknown", keep the button locked.
+    const msg = err instanceof Error ? err.message : String(err);
+    return unknown(`Стан прочитати не вдалося (${msg}). Спробуйте «Перевірити результат» ще раз.`);
+  }
 }
