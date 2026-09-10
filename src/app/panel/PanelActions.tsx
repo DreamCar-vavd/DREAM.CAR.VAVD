@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   busyLabelFor,
-  checkResultMessage,
   messageForResponse,
   NETWORK_UNCERTAIN_MSG,
   PANEL_REFRESHED_MSG,
   REFRESH_SLOW_MSG,
+  routeCheckResponse,
+  routeWriteResponse,
+  shouldFireAction,
   type ActionMessage,
   type ActionResponse,
 } from "./actionMessages";
@@ -148,78 +150,47 @@ export function PanelButton({
     if (uncertain?.checking) return;
     setUncertain({ checking: true });
     setMsg(null);
+    let data: { applied?: boolean | null; message?: string } | null = null;
     try {
       const res = await fetch("/api/panel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "check-result",
-          check: { ...payload, ...checkExtra },
-          versions,
-        }),
+        body: JSON.stringify({ action: "check-result", check: { ...payload, ...checkExtra }, versions }),
       });
-      let data: { applied?: boolean | null; message?: string } | null = null;
-      try {
-        data = (await res.json()) as { applied?: boolean | null; message?: string };
-      } catch {
-        data = null;
-      }
-      if (!data || data.applied === undefined) {
-        setUncertain({ checking: false }); // still locked; owner can check again
-        setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
-        return;
-      }
-      const applied = data.applied ?? null;
-      const text = data.message ?? checkResultMessage(applied).text;
-      setMsg({ kind: applied === true ? "ok" : applied === false ? "conflict" : "uncertain", text });
-      if (applied === null) {
-        setUncertain({ checking: false }); // "Результат поки невідомий" — keep locked
-      } else {
-        setUncertain(null); // definite answer — unlock; sync the panel
-        refresh();
-      }
+      data = (await res.json()) as { applied?: boolean | null; message?: string };
     } catch {
-      setUncertain({ checking: false });
-      setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
+      data = null;
     }
+    const r = routeCheckResponse(data);
+    setMsg(r.msg);
+    setUncertain(r.unlock ? null : { checking: false });
+    if (r.refresh) refresh();
   };
 
   async function run() {
-    if (inFlight.current || busy || refreshing || uncertain) return;
+    if (!shouldFireAction({ inFlight: inFlight.current, busy, refreshing, locked: !!uncertain })) return;
     if (confirmText && !window.confirm(confirmText)) return;
     inFlight.current = true;
     setBusy(true);
     setMsg(null);
+    let data: ActionResponse | null = null;
     try {
       const res = await fetch("/api/panel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, versions }),
       });
-      let data: ActionResponse | null = null;
-      try {
-        data = (await res.json()) as ActionResponse;
-      } catch {
-        data = null; // sent, but no structured answer — treat as unknown outcome
-      }
-      // Lock on EITHER path a write's result can be unknown: the server said so
-      // (`outcome:"unknown"`), or no parseable response came back at all.
-      if (!data || (!data.ok && data.outcome === "unknown")) {
-        setUncertain({ checking: false });
-        setMsg(data ? messageForResponse(data) : { kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
-      } else {
-        setMsg(messageForResponse(data, data.ok));
-        if (data.ok) refresh();
-      }
+      data = (await res.json()) as ActionResponse;
     } catch {
-      // No response at all — the write may or may not have landed. Lock this
-      // action and make the owner CHECK (read-only) before anything is repeated.
-      setUncertain({ checking: false });
-      setMsg({ kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
+      data = null; // no response, or a body that would not parse — outcome unknown
     } finally {
       setBusy(false);
       inFlight.current = false;
     }
+    const r = routeWriteResponse(data);
+    setMsg(r.msg);
+    if (r.lock) setUncertain({ checking: false });
+    if (r.refresh) refresh();
   }
 
   const base =
@@ -331,6 +302,7 @@ export function CleanupFrozenMediaButton({
     const planPaths = uncertain?.planPaths ?? [];
     setUncertain({ checking: true, planPaths });
     setMsg(null);
+    let data: { applied?: boolean | null; message?: string } | null = null;
     try {
       const res = await fetch("/api/panel", {
         method: "POST",
@@ -341,34 +313,18 @@ export function CleanupFrozenMediaButton({
           versions: {},
         }),
       });
-      let data: { applied?: boolean | null; message?: string } | null = null;
-      try {
-        data = (await res.json()) as { applied?: boolean | null; message?: string };
-      } catch {
-        data = null;
-      }
-      if (!data || data.applied === undefined) {
-        setUncertain({ checking: false, planPaths });
-        setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
-        return;
-      }
-      const applied = data.applied ?? null;
-      const text = data.message ?? "";
-      setMsg({ kind: applied === true ? "ok" : applied === false ? "conflict" : "uncertain", text });
-      if (applied === null) {
-        setUncertain({ checking: false, planPaths });
-      } else {
-        setUncertain(null);
-        refresh();
-      }
+      data = (await res.json()) as { applied?: boolean | null; message?: string };
     } catch {
-      setUncertain({ checking: false, planPaths });
-      setMsg({ kind: "uncertain", text: "Перевірити результат не вдалося — спробуйте ще раз." });
+      data = null;
     }
+    const r = routeCheckResponse(data);
+    setMsg(r.msg);
+    setUncertain(r.unlock ? null : { checking: false, planPaths });
+    if (r.refresh) refresh();
   };
 
   async function call(confirm: boolean, headSha?: string) {
-    if (inFlight.current || busy || refreshing || uncertain) return;
+    if (!shouldFireAction({ inFlight: inFlight.current, busy, refreshing, locked: !!uncertain })) return;
     inFlight.current = true;
     setBusy(true);
     setMsg(null);

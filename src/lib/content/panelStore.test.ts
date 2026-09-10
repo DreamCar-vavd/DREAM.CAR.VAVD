@@ -2188,3 +2188,38 @@ test("check complete-deletion: true once the asked-about stale slugs are gone", 
   const cleared = await checkActionResult(s, { action: "complete-deletion", slugs: ["car:ghost"] }, {});
   assert.equal(cleared.applied, true);
 });
+
+test("check publish: general status unchanged but working CONTENT changed -> never a false 'applied' (scenario 6)", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  const before = await versions(s);
+  await publishItem(s, "car", "c1", { working: before.car, review: before.review, published: before.published });
+  // owner edits a shared (non-locale) field after the (uncertain) publish; the
+  // published token has NOT moved beyond that first publish.
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carJson({ price: "£999" }) }]);
+  const seenAfterOurPublish = await versions(s);
+  const r = await checkActionResult(s, { action: "publish", kind: "car", id: "c1" }, seenAfterOurPublish);
+  assert.notEqual(r.applied, true); // row is "modified" again — must not claim applied
+});
+
+test("check is READ-ONLY — it never writes, whatever the verdict (no repeated write before confirmation)", async () => {
+  const s = baseStore();
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  let writes = 0;
+  const realWrite = s.writeFile.bind(s);
+  s.writeFile = (f, t, e) => {
+    writes += 1;
+    return realWrite(f, t, e);
+  };
+  const targets: import("./panelStore").CheckTarget[] = [
+    { action: "publish", kind: "car", id: "c1" },
+    { action: "unpublish", kind: "car", id: "c1" },
+    { action: "confirm-locale", kind: "car", id: "c1", locale: "uk" },
+    { action: "complete-deletion", slugs: ["car:ghost"] },
+    { action: "cleanup-frozen-media", planPaths: ["public/images/cms/cars/c1/_pub/aa.jpg"] },
+  ];
+  for (const t of targets) {
+    await checkActionResult(s, t, await versions(s));
+  }
+  assert.equal(writes, 0, "checkActionResult must not perform any write");
+});

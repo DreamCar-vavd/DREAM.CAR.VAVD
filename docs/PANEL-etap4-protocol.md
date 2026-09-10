@@ -112,6 +112,34 @@ unreferenced media file(s)» лише з тими 2 шляхами. Чистий
 
 ---
 
+## E. Цільові перевірки виправлень ревізії 12:50 (unit)
+
+**Середовище:** `node --test` (без DOM) · **код `a87d188`+ (ревізія П44)**
+Логіка кнопки винесена в чисті хелпери `routeWriteResponse` /
+`routeCheckResponse` / `shouldFireAction` (`src/app/panel/actionMessages.ts`) і
+`checkActionResult` (`src/lib/content/panelStore.ts`) — перевіряється **поведінка**
+(блок / оновлення / дозвіл на повтор), не тексти.
+
+| # | Сценарій задачі | Тест | Очікування |
+|---|---|---|---|
+| 1 | запис виконано, відповідь браузеру втрачена | `route write: scenario 1` + `check publish: true only after…` | `routeWriteResponse(null)` → **блок**, без refresh; далі `checkActionResult` після реального запису → `applied:true` → розблок |
+| 2 | GitHub не підтвердив, браузер отримав JSON-помилку | `route write: scenario 2` | чистий 409 → **не блок**, повтор дозволено; `outcome:"unknown"` → **блок** |
+| 3 | відмова до запису | `route write: scenario 3` + `a panel action reports a TRANSIENT failure…` | `transient:true` → **не блок**, повтор після паузи |
+| 4 | перевірка результату теж з помилкою | `route check: … a failed check is not success` + `check: a read failure is NOT an answer` | `routeCheckResponse(null)` / `applied:null` → **блок лишається**, ніколи не «успіх» |
+| 5 | інший редактор змінив дані між дією і перевіркою | `check publish: another editor moved the published token…` | `applied:null` → блок лишається |
+| 6 | статус той самий, вміст змінився | `check publish: general status unchanged but working CONTENT changed` | `applied !== true` (рядок знову «modified») |
+| 7 | швидкі повторні кліки під час запису й оновлення | `scenario 7 — no request may fire while…` + `… performs at most one write` | під час `busy`/`refreshing`/`locked` клік **не** дає запиту; ≤1 `writeFile` на дію |
+| 8 | повільне оновлення / оновлення без змін даних | локально A1/A2/B вище (з вимірами) | 8с → блок 8.8с; швидкий → 1.2с; без змін → теж завершується |
+
+Плюс `check is READ-ONLY — it never writes`: `checkActionResult` для всіх 5 дій
+→ **0** `writeFile`. Повне перезавантаження після невдалого refresh (A3) —
+Next сам робить hard-reload, кнопка не зависає, помилка читання не стає
+«успіхом».
+
+Разом: **400 тестів pass**, tsc 0, eslint 0, build OK, content:guard OK.
+
+---
+
 ## Залишок (для наступного чату)
 
 - Знімки саме **Preview** для станів: очікування / «триває довше» / конфлікт /

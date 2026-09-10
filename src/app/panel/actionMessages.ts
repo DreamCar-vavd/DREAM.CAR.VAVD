@@ -77,6 +77,60 @@ export function checkResultMessage(applied: boolean | null): ActionMessage {
   };
 }
 
+export const CHECK_FAILED_MSG = "Перевірити результат не вдалося — спробуйте ще раз.";
+
+/**
+ * What the button does with a write's reply. `data === null` = the fetch threw
+ * or the body would not parse — i.e. NO structured answer came back. Pure so
+ * every "lost response / definite refusal / success" path is unit-testable
+ * without a DOM. The three exclusive routes:
+ *  - lock:true    -> outcome UNKNOWN; disable the action, force a read-only check
+ *  - refresh:true -> the write landed; sync the panel
+ *  - neither      -> a definite refusal (conflict / transient / bad input); the
+ *                    owner may retry, nothing was written
+ */
+export function routeWriteResponse(data: ActionResponse | null): {
+  lock: boolean;
+  refresh: boolean;
+  msg: ActionMessage;
+} {
+  if (!data) return { lock: true, refresh: false, msg: { kind: "uncertain", text: NETWORK_UNCERTAIN_MSG } };
+  if (!data.ok && data.outcome === "unknown") {
+    return { lock: true, refresh: false, msg: messageForResponse(data) };
+  }
+  if (data.ok) return { lock: false, refresh: true, msg: messageForResponse(data, true) };
+  return { lock: false, refresh: false, msg: messageForResponse(data) };
+}
+
+/**
+ * What the button does with the read-only result check's reply. `applied`:
+ * `true`/`false` unlock (definite answer); `null` — or no parseable reply —
+ * KEEPS the action locked (a failed check is not an answer, and never a
+ * success). A settled refresh on its own never reaches here.
+ */
+export function routeCheckResponse(
+  data: { applied?: boolean | null; message?: string } | null,
+): { unlock: boolean; refresh: boolean; msg: ActionMessage } {
+  if (!data || data.applied === undefined) {
+    return { unlock: false, refresh: false, msg: { kind: "uncertain", text: CHECK_FAILED_MSG } };
+  }
+  const applied = data.applied ?? null;
+  const text = data.message || checkResultMessage(applied).text;
+  const kind: MsgKind = applied === true ? "ok" : applied === false ? "conflict" : "uncertain";
+  return { unlock: applied !== null, refresh: applied !== null, msg: { kind, text } };
+}
+
+/** A click may fire a request only when nothing is already in flight for this
+ *  action AND it is not locked pending a result check. */
+export function shouldFireAction(s: {
+  inFlight: boolean;
+  busy: boolean;
+  refreshing: boolean;
+  locked: boolean;
+}): boolean {
+  return !s.inFlight && !s.busy && !s.refreshing && !s.locked;
+}
+
 /** Shown while a refresh is taking longer than usual — a hint, not a failure. */
 export const REFRESH_SLOW_MSG = "Оновлення триває довше, ніж зазвичай…";
 

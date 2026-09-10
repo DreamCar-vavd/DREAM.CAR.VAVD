@@ -7,6 +7,9 @@ import {
   NETWORK_UNCERTAIN_MSG,
   PANEL_REFRESHED_MSG,
   REFRESH_SLOW_MSG,
+  routeCheckResponse,
+  routeWriteResponse,
+  shouldFireAction,
 } from "./actionMessages";
 
 test("messageForResponse: a confirmed write is green; while the panel refreshes it says so", () => {
@@ -110,4 +113,88 @@ test("busyLabelFor: every action has a spoken verb phrase, never a bare ellipsis
   }
   assert.equal(busyLabelFor("publish"), "Публікується…");
   assert.equal(busyLabelFor("cleanup-confirm"), "Прибираємо копії…");
+});
+
+// ---------------------------------------------------------------------------
+// П44 Е5 — the button's decision routing, one exclusive route per outcome.
+// (behaviour, not wording: lock / refresh / retry-allowed)
+// ---------------------------------------------------------------------------
+
+test("route write: a confirmed write -> refresh, never a lock", () => {
+  const r = routeWriteResponse({ ok: true, message: "Опубліковано." });
+  assert.equal(r.lock, false);
+  assert.equal(r.refresh, true);
+  assert.equal(r.msg.kind, "ok");
+});
+
+test("route write: scenario 1 — write done, browser response lost -> LOCK, no refresh", () => {
+  const r = routeWriteResponse(null); // fetch threw / body unparseable
+  assert.equal(r.lock, true);
+  assert.equal(r.refresh, false);
+  assert.equal(r.msg.kind, "uncertain");
+  assert.doesNotMatch(r.msg.text, /Опубліковано|Збережено|Готово/); // never reads as success
+});
+
+test("route write: scenario 2 — GitHub did not confirm but a JSON error came back", () => {
+  // definite refusal (clean 409 conflict) -> NOT locked, retry allowed
+  const conflict = routeWriteResponse({ ok: false, conflict: true, message: "Дані змінилися." });
+  assert.equal(conflict.lock, false);
+  assert.equal(conflict.refresh, false);
+  assert.equal(conflict.msg.kind, "conflict");
+  // but an explicit outcome:"unknown" JSON error -> LOCK
+  const unknown = routeWriteResponse({ ok: false, outcome: "unknown", message: "Відповідь не надійшла." });
+  assert.equal(unknown.lock, true);
+  assert.equal(unknown.msg.kind, "uncertain");
+});
+
+test("route write: scenario 3 — failure BEFORE the write (transient) -> retry allowed, no lock", () => {
+  const r = routeWriteResponse({ ok: false, transient: true, message: "GitHub недоступний." });
+  assert.equal(r.lock, false);
+  assert.equal(r.refresh, false);
+  assert.equal(r.msg.kind, "conflict");
+});
+
+test("route write: bad input -> red error, no lock, no refresh", () => {
+  const r = routeWriteResponse({ ok: false, message: "Не вказано мову." });
+  assert.equal(r.lock, false);
+  assert.equal(r.refresh, false);
+  assert.equal(r.msg.kind, "err");
+});
+
+test("route check: definite yes/no unlocks; null keeps the lock; a failed check is not success", () => {
+  const yes = routeCheckResponse({ applied: true, message: "Схоже, опубліковано." });
+  assert.equal(yes.unlock, true);
+  assert.equal(yes.refresh, true);
+  assert.equal(yes.msg.kind, "ok");
+
+  const no = routeCheckResponse({ applied: false, message: "Схоже, НЕ опубліковано." });
+  assert.equal(no.unlock, true);
+  assert.equal(no.msg.kind, "conflict");
+
+  // scenario 4/5 — the check itself could not decide (read failed / another
+  // editor changed data): stay LOCKED, never a success.
+  const dunno = routeCheckResponse({ applied: null, message: "Результат поки невідомий." });
+  assert.equal(dunno.unlock, false);
+  assert.equal(dunno.refresh, false);
+  assert.equal(dunno.msg.kind, "uncertain");
+
+  const noReply = routeCheckResponse(null); // check request itself failed
+  assert.equal(noReply.unlock, false);
+  assert.equal(noReply.msg.kind, "uncertain");
+  assert.doesNotMatch(noReply.msg.text, /застосовано|опубліковано|збережено/i);
+});
+
+test("route check: a missing `applied` field is treated as undecided, not as false", () => {
+  const r = routeCheckResponse({ message: "щось" } as { message: string });
+  assert.equal(r.unlock, false);
+});
+
+test("scenario 7 — no request may fire while one is in flight, refreshing, or locked", () => {
+  assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: false, locked: false }), true);
+  assert.equal(shouldFireAction({ inFlight: true, busy: false, refreshing: false, locked: false }), false);
+  assert.equal(shouldFireAction({ inFlight: false, busy: true, refreshing: false, locked: false }), false);
+  // during the post-write refresh a second click must NOT fire another write
+  assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: true, locked: false }), false);
+  // and never while locked pending "Перевірити результат"
+  assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: false, locked: true }), false);
 });
