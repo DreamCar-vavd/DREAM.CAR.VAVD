@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`ee93d24`** (П40) ← `8827b1b` (П39 док) ← `f80fab7` ← `115520c`. Пізніші `zzz-*` коміти самоскасовуються. Останній НЕ-тестовий SHA — `ee93d24`. |
+| **Remote HEAD** | **`865eddd`** (П41) ← `62c8554` ← `5e46cc3`/`ee93d24` (П40) ← `8827b1b` ← `f80fab7`. Після `865eddd` — 3 `zzz` коміти живої перевірки очищення з **нульовим чистим дифом** (`865eddd..HEAD` порожній). Останній НЕ-тестовий SHA — `865eddd`. |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `ee93d24` | success |
-| Vercel Preview на `ee93d24` | success |
-| Тести / tsc / eslint | **340 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `865eddd` | success |
+| Vercel Preview на `865eddd` | success |
+| Тести / tsc / eslint | **352 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -54,7 +54,25 @@
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П40)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П41)
+
+- **П41 — узгоджений знімок для очищення + постер відео (задача 2026-09-10), `62c8554`+`865eddd`:**
+  - **§1** `readFile/readDir/mediaIndex` отримали `atSha`; `frozenMediaCandidates`,
+    `completeDeletion` (медіафаза — свіжий S2 після власного запису) та
+    `getPanelData` читають усе **закріплено на одному коміті** — статус картки
+    не з різних версій.
+  - **§2** github-режим: підтвердження очищення **вимагає** `headSha` (без нього =
+    застаріле). `deletePublishedMediaBatch` відхиляє **обрізане** базове дерево.
+  - **§3 жива перевірка на Preview** (`865eddd`, сесія власника): синтетичні `_pub`
+    `zzz-test-panel` через GitHub API → сухий прогін (count 1) → рух гілки →
+    підтвердження старим `headSha` = **409 конфлікт, 0 видалень** → новий сухий
+    прогін → коректне очищення **одним** комітом `panel: drop 2 unreferenced
+    media file(s)` (лише ті 2 шляхи). Чистий діф `865eddd..HEAD` порожній.
+  - **§4** `video.posterSrc` (локальний CMS) заморожується як фото: копія `_pub/`,
+    порівняння за blob-id, захист від очищення, `MediaMissingError`. 2 реальні
+    авто — плоский постер, заморозиться при наступній публікації, **без міграції**.
+  - **§5** Preview `/panel`: cold 3.7 с, warm ~2.0 с (новий код). Мережа −54
+    звернення / −39.5 МБ (виміряно). 352 pass.
 
 - **П40 — атомарне очищення `_pub` + git-дерево для визначення змін (задача 18:51), `ee93d24`:**
   - **§1** `cleanupFrozenMedia` — **двокроковий** (сухий прогін показує
