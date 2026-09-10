@@ -1,0 +1,30 @@
+{
+  "id": "zzz-test-panel",
+  "order": 100,
+  "status": "coming-soon",
+  "iconSrc": "/images/services/premium-3d/06-auto-moto-special-equipment-premium-3d.png",
+  "priceCurrency": "£",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ Тест панелі — видалити",
+    "shortDescription": "Тимчасовий матеріал для перевірки запису. DELETE ME.",
+    "longDescription": "Створено під час hosted-перевірки панелі на гілці codex/admin-panel-spike. Підлягає видаленню одразу після тесту.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Panel test — delete",
+    "shortDescription": "Temporary item to verify writes. DELETE ME.",
+    "longDescription": "Created during hosted panel verification on branch codex/admin-panel-spike. To be deleted right after the test.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Тест панели — удалить",
+    "shortDescription": "Временный материал для проверки записи. DELETE ME.",
+    "longDescription": "Создан во время hosted-проверки панели на ветке codex/admin-panel-spike. Подлежит удалению сразу после теста.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mtvjohbn-6xkccnk5"
+}
