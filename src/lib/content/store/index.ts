@@ -22,7 +22,16 @@ export class NotConnectedError extends Error {
  *                          silent local write that a redeploy would lose.
  */
 export async function getStorage(): Promise<PanelStorage> {
-  if (process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND !== "github") return new LocalFsStorage();
+  if (process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND !== "github") {
+    // `PANEL_CONTENT_ROOT` — dev/test only: point the local adapter at a throwaway
+    // copy of the content so a destructive UI check never touches the real repo.
+    // Ignored in production (that path is always github mode).
+    const root =
+      process.env.NODE_ENV !== "production" && process.env.PANEL_CONTENT_ROOT
+        ? process.env.PANEL_CONTENT_ROOT
+        : undefined;
+    return new LocalFsStorage(root ? { root } : {});
+  }
 
   const token = (await cookies()).get("keystatic-gh-access-token")?.value;
   if (!token) {
