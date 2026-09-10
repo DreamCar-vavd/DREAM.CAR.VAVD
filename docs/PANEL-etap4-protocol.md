@@ -293,17 +293,81 @@ Vercel success). Синтетичний матеріал — **лише** пог
 
 ## J. 375 px CSS-в'юпорт на авторизованому Preview — БЛОКЕР інструмента
 
-Перевірено на місці: `claude-in-chrome` `resize_window` міняє **розмір вікна
-ОС**, але `window.innerWidth` лишається **1471** — CSS-в'юпорт не змінюється
-(звірено: `innerWidth 1471`, `scrollWidth == clientWidth`, `hOverflow false`
-при OS-вікні 390 px). `mcp__Claude_Browser__resize_window mobile` (який дає
-**справжній** CSS-в'юпорт 375) не тримає GitHub-сесію Preview.
+Перевірено **двічі** (задачі 13:47 і 15:26): `claude-in-chrome` `resize_window`
+міняє **розмір вікна ОС**, але `window.innerWidth` лишається **1471** —
+CSS-в'юпорт не змінюється. Звірено 15:26 на самому Preview: після
+`resize_window {width:375}` → `{innerWidth: 1471, docScrollWidth: 1471,
+clientWidth: 1471}`. `mcp__Claude_Browser__resize_window` preset `mobile` дає
+**справжній** CSS-в'юпорт (`innerWidth: 375`, звірено), але не тримає
+GitHub-сесію Preview.
 
-**Потрібна одна дія власника:** відкрити Preview `/panel` у власному Chrome →
-DevTools (F12) → «Toggle device toolbar» (Ctrl/Cmd+Shift+M) → ширина **375** →
-надіслати знімок. Очікуване: без горизонтального скролу, кнопки/бейджі
-переносяться (як у локальному §G — розмітка `/panel` на Preview і локально
-однакова, це не публічна сторінка).
+**Потрібна одна дія власника (Chrome на Mac):**
+1. Відкрити `https://dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app/panel`
+   (увійти через GitHub, якщо попросить).
+2. `Cmd+Option+I` (DevTools) → іконка телефона зліва вгорі (`Cmd+Shift+M`) →
+   вгорі обрати «Responsive» і вписати ширину **375**, потім **320**.
+3. Прокрутити всю сторінку; надіслати 1–2 знімки.
+Очікуване (звірено локально на тому самому коді, §K): без горизонтального
+скролу; нав-пігулки й кнопки переносяться; повідомлення читаються.
+
+## K. Мобільна перевірка ЛОКАЛЬНО (справжній CSS-в'юпорт, задача 15:26)
+
+**Середовище:** `mcp__Claude_Browser__resize_window` preset `mobile` → реальний
+`window.innerWidth`, local `next dev` :3025 з `PANEL_CONTENT_ROOT=<копія>`
+(картка «modified», одна мова `needs-review`, синтетичний стале-рядок з довгим
+слагом). · **код `5221b83`**
+
+| Ширина | `innerWidth` | `scrollWidth`/`clientWidth` | h-overflow | Примітки |
+|---|---|---|---|---|
+| **375 px** | 375 | 375 / 375 | **немає** | нав-пігулки → 2 ряди; кнопки дій «Позначити перевіреним» 157×46, «Опублікувати зміни» 145×36, «Прибрати з сайту» 133×36 — усі ≥36 px; довгий непереносний рядок в описі й довгий стале-слаг переносяться |
+| **320 px** | 320 | 320 / 320 | **немає** | нав-пігулки → 3 ряди; «Переглянути чернетку…» переноситься в межах кнопки; усе реформатовано |
+
+- **Довге повідомлення про результат** (амбер «Відповідь від GitHub не
+  надійшла… Оновіть сторінку й перевірте…») на 375 px переноситься, без скролу.
+- **Семантика статусу:** `role="alert"`, `aria-live="assertive"` для
+  невизначеного результату (звірено); зелений/амбер `role="status"`,
+  `aria-live="polite"`.
+- **Клавіатурний фокус:** глобальне правило `:focus-visible { outline: 2px solid
+  var(--gold); outline-offset: 2px }` (звірено в таблицях стилів) — незалежне
+  від в'юпорта.
+- **Фокус після блокування** (задача 15:26): при переході дії в стан
+  «заблоковано» фокус переходить на кнопку «Перевірити результат» (звірено
+  наживо: `document.activeElement === <кнопка>`).
+- **Дрібне (не дефект):** інлайн-посилання `Редагувати в Keystatic →`
+  рендеряться ~24 px висотою — рівно поріг WCAG 2.5.8 AA (24×24 або відступи);
+  ширина 147 px, відступи достатні. Кнопки дій — ≥36 px.
+
+## L. Спостереження: Browser pane + streaming `/panel` (гіпотеза, не доведено)
+
+`/panel` має Suspense-межу (`loading.tsx`). У **прихованій** вкладці Browser pane
+або `claude-in-chrome` React-скрипт заміни fallback (`$RC(...)`) часто не
+відпрацьовує, доки не викликати `screenshot` (який форсує перемальовування) —
+`document.querySelector('main').textContent` тоді показує скелет, хоча curl того
+самого URL повертає повний HTML за ~0.5 с. **Гіпотеза:** `requestAnimationFrame`/
+`setTimeout`, на яких тримається `$RC`, гальмуються у фоновій/0×0 вкладці.
+Причинно **не доведено**; на поведінку самого коду в реальному браузері власника
+не впливає (там вкладка активна). Практичний висновок для тестів: після
+`navigate` робити `screenshot` перед читанням DOM, або ганяти кліки через
+`computer left_click ref`.
+
+---
+
+## M. Звірка технічних припущень першоджерелами (Context7 + вихідний код, задача 15:26)
+
+Встановлено: **Next.js 16.3.0**, **React 19.2.8**, **`@keystatic/core` 0.6.9**.
+
+| Твердження | Джерело / версія | Висновок | Зміна коду |
+|---|---|---|---|
+| `router.refresh()` **не** Promise | Next source `packages/next/src/client/components/app-router-instance.ts` (Context7): «The implementation calls `startTransition(...)` (which returns `void`) and has no return statement» + локальна дока `use-router.md` (без згадки про повернене значення) | Підтверджено. Наш код **не** трактує `router.refresh()` як Promise — покладається лише на `useTransition().isPending`. | — |
+| `isPending` тримається `true`, доки оновлений RSC не прибув і не відрендерився | React `reactjs/react.dev` `useTransition.md` (Context7): «`isPending` … remains `true` **until all associated Actions are complete and the final state is displayed**»; Next `navigator.ts`: «The navigator **owns the `startTransition`** for its operations»; Next `interactive-apps.md`: «React batches … the board update that `refresh()` triggers»; **емпірично** (Е2 A1/A2): 8 с рендер → блок 8.8 с, швидкий → 1.2 с | Підтверджено докою **і** заміром. `busy = isPending` — коректне джерело правди «ще оновлюється». | — |
+| Завершення `refresh` = доказ, що **саме наш** запис застосовано | React: `isPending false` = «the final state is **displayed**» — тобто панель показує свіжий серверний стан, але **не** каже, чий запис його дав | **Не плутаємо.** Тому задача 13:47 додала `checkActionResult` з `expectToken`: невизначений запис звіряється **окремою** лише-читаючою дією, а не завершенням refresh. «Готово — панель оновлено» показується лише коли **власна** відповідь дії була `ok`. | — (закрито в `fbdda32`/`b00cd82`) |
+| Три речі не змішані: завершення запису / refresh / показ нового стану | код: запис = `await fetch('/api/panel')`; refresh/показ = `isPending`; доказ конкретного запису = `checkActionResult` | Підтверджено читанням коду. | — |
+| Keystatic **Delete entry** (github-режим) = **один** прямий коміт | `@keystatic/core@0.6.9` `dist/keystatic-core-ui.js` — `useDeleteItem`: `createCommitMutation = gql\`mutation CreateCommit($input: CreateCommitOnBranchInput!) …\``; `mutate({ input: { branch, message: { headline: \`Delete \${basePath}\` }, expectedHeadOid: baseCommit, fileChanges: { deletions } } })` | Підтверджено з вихідного коду: **`createCommitOnBranch`** (атомарний підписаний коміт), guarded `expectedHeadOid`. Видаляє рівно `args.initialFiles` (JSON запису + його медіа з `getAllFilesInTree` по теці запису) — **більше нічого**. | — |
+| `review-state.json` — **власний стан нашої панелі**, який чистить наш код | `grep -rn "review-state" node_modules/@keystatic/core/` → **0 збігів**. Наш `panelStore.staleReviewSlugs`/`pruneReview` + `completeDeletion` + кнопка «Завершити видалення». **Наживо** (задача 13:47 §I): коміт `6c000a7` прибрав лише JSON; стале-рядок прибрав наш `f581540`. | Підтверджено докою (відсутність), кодом і живим спостереженням. | — |
+
+**Розбіжностей не виявлено.** Додаткового прогону Е2 не робилося (попередній
+доказ + першоджерела достатні). Задача 15:26 виявила окремі дефекти в
+«Перевірити результат» — див. журнал запис «Ревізія П44 — задача 15:26».
 
 ---
 
