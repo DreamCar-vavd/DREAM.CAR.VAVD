@@ -1697,7 +1697,9 @@ test("a panel action says the write outcome is UNKNOWN (no retry) when the respo
     published: v.published,
   });
   assert.equal(r.ok, false);
-  assert.equal((r as { transient?: boolean }).transient, true);
+  // The machine flag — NOT `transient` (which would mean "provably not written").
+  assert.equal((r as { outcome?: string }).outcome, "unknown");
+  assert.notEqual((r as { transient?: boolean }).transient, true);
   assert.match(r.message, /невідомо|перевірте|перш ніж повторюв/i);
 });
 

@@ -25,9 +25,24 @@ test("messageForResponse: a conflict is amber (reload-and-check), not a plain er
   assert.equal(m.text, "Дані змінилися.");
 });
 
-test("messageForResponse: an UNCERTAIN write outcome (transient) is amber, not a retry-now error", () => {
-  const m = messageForResponse({ ok: false, transient: true, message: "Відповідь не надійшла." });
-  assert.equal(m.kind, "conflict"); // -> gets the "Оновити" affordance, no blind retry
+test("messageForResponse: a transient backend failure is amber conflict — nothing was written, retry ok", () => {
+  const m = messageForResponse({ ok: false, transient: true, message: "GitHub недоступний." });
+  assert.equal(m.kind, "conflict"); // -> "Оновити" affordance, NOT a hard lock
+});
+
+test("messageForResponse: outcome:'unknown' is its own kind — the caller LOCKS the action", () => {
+  const m = messageForResponse({
+    ok: false,
+    outcome: "unknown",
+    message: "Відповідь від GitHub не надійшла…",
+  });
+  assert.equal(m.kind, "uncertain");
+  assert.equal(m.text, "Відповідь від GitHub не надійшла…");
+});
+
+test("messageForResponse: outcome:'unknown' wins even if transient is also set", () => {
+  const m = messageForResponse({ ok: false, outcome: "unknown", transient: true, message: "x" });
+  assert.equal(m.kind, "uncertain");
 });
 
 test("messageForResponse: bad input / auth / access is a red error (refresh won't help)", () => {

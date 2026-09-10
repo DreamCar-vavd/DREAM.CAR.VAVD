@@ -21,8 +21,11 @@ function respond(r: ActionResult) {
   if ("conflict" in r && r.conflict) return json(r, 409);
   if ("auth" in r && r.auth) return json(r, 401); // session ended
   if ("forbidden" in r && r.forbidden) return json(r, 403); // access refused
-  // `transient` = GitHub unreachable / rate-limited / write outcome unknown;
-  // the message itself tells the user to reload and check before retrying.
+  // `outcome:"unknown"` = a write was in flight and its result is genuinely
+  // unknown; the client must lock the action and force a read-only check.
+  if ("outcome" in r && r.outcome === "unknown") return json(r, 503);
+  // `transient` = GitHub unreachable / rate-limited; the write did NOT land,
+  // retry after a wait is safe.
   if ("transient" in r && r.transient) return json(r, 503);
   return json(r, 400);
 }

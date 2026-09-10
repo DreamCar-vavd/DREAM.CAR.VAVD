@@ -586,9 +586,20 @@ export type ActionResult =
       message: string;
       blockers?: GateFailure[];
       conflict?: boolean;
-      /** GitHub unreachable / rate-limited / a write's outcome is unknown — a
-       *  transient backend problem, not bad input. Trying again later is fine. */
+      /** GitHub unreachable or rate-limited BEFORE / instead of the write — a
+       *  transient backend problem, not bad input. The write provably did NOT
+       *  land, so trying again later is safe. NOT the same as `outcome:"unknown"`. */
       transient?: boolean;
+      /**
+       * The one machine-readable "how did the write end" flag. Set ONLY when a
+       * write was in flight and its result is genuinely unknown (a dropped
+       * connection AFTER the request left — `WriteUncertainError`). Absence means
+       * the write provably did not land (validation / conflict / auth / a
+       * pre-flight backend failure) — safe to retry. The client MUST NOT decide
+       * this from the message text: `outcome:"unknown"` → lock the action and
+       * force a read-only "Перевірити результат" before any retry.
+       */
+      outcome?: "unknown";
       /** 401 — the GitHub session ended; the user must sign in again. */
       auth?: boolean;
       /** 403 — access was refused (permissions narrowed / repo access lost);
@@ -605,8 +616,10 @@ const asConflict = (err: unknown): ActionResult | null =>
  *  - ConflictError         -> {conflict:true}, offer refresh
  *  - StorageAuthError (401) -> {auth:true}; message says sign in again
  *  - StorageForbiddenError (403) -> {forbidden:true}; access changed, re-login won't help
- *  - StorageRateLimitedError / StorageUnavailableError / WriteUncertainError
- *      -> {transient:true}; safe to try again (write-uncertain: reload & check first)
+ *  - WriteUncertainError  -> {outcome:"unknown"}; a write was in flight, result
+ *      genuinely unknown — the client locks and forces a read-only check first
+ *  - StorageRateLimitedError / StorageUnavailableError -> {transient:true}; the
+ *      write provably did not land (pre-flight / definite refusal) — safe to retry
  *  - anything else         -> generic failure with the message prefixed
  */
 function toActionError(err: unknown, prefix: string): ActionResult {
@@ -618,10 +631,13 @@ function toActionError(err: unknown, prefix: string): ActionResult {
     return { ok: false, message: err.message, forbidden: true };
   }
   if (err instanceof WriteUncertainError) {
-    return { ok: false, message: err.message, transient: true };
+    // The ONLY path that sets outcome:"unknown". A dropped connection AFTER the
+    // write request left GitHub — the commit may or may not have landed.
+    return { ok: false, message: err.message, outcome: "unknown" };
   }
   if (err instanceof StorageBackendError) {
-    // StorageUnavailableError / StorageRateLimitedError — both retriable.
+    // StorageUnavailableError / StorageRateLimitedError — the request never left
+    // or was definitively refused; nothing was written. Retriable after a wait.
     return { ok: false, message: err.message, transient: true };
   }
   return { ok: false, message: `${prefix}: ${(err as Error).message}` };

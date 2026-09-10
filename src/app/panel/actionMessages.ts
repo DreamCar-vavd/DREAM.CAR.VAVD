@@ -3,12 +3,16 @@
  * so they can be unit-tested without a DOM.
  *
  * The three states the owner must be able to tell apart:
- *  - "ok"       — the server confirmed the change; the panel is refreshing.
- *  - "conflict" — a version moved, the backend is degraded, or a write's outcome
- *                 is UNKNOWN: reload and check the current state before retrying
- *                 (never a blind retry). Rendered amber with an "Оновити" button.
- *  - "err"      — bad input / auth / access: a refresh will not help; the message
- *                 says what to do. Rendered red, announced assertively.
+ *  - "ok"        — the server confirmed the change; the panel is refreshing.
+ *  - "conflict"  — a version moved or the backend is degraded but the write
+ *                  provably did NOT land: reload and (optionally) retry.
+ *                  Rendered amber with an "Оновити" button.
+ *  - "uncertain" — a write was in flight and its outcome is genuinely UNKNOWN
+ *                  (`outcome:"unknown"`, or a dropped browser→server response).
+ *                  The action LOCKS; the only way forward is a read-only
+ *                  "Перевірити результат". Rendered amber, announced assertively.
+ *  - "err"       — bad input / auth / access: a refresh will not help; the
+ *                  message says what to do. Rendered red, announced assertively.
  */
 
 export interface ActionResponse {
@@ -16,12 +20,14 @@ export interface ActionResponse {
   message: string;
   conflict?: boolean;
   transient?: boolean;
+  /** The machine flag — set by the server ONLY when a write's result is unknown. */
+  outcome?: "unknown";
   auth?: boolean;
   forbidden?: boolean;
   blockers?: { kind: string }[];
 }
 
-export type MsgKind = "ok" | "err" | "conflict";
+export type MsgKind = "ok" | "err" | "conflict" | "uncertain";
 export interface ActionMessage {
   kind: MsgKind;
   text: string;
@@ -40,7 +46,9 @@ export function messageForResponse(data: ActionResponse, refreshing = false): Ac
       text: refreshing ? `${data.message} Оновлюємо панель…` : data.message,
     };
   }
-  // conflict / transient (unknown write outcome) -> reload-and-check
+  // A write in flight whose result is unknown — the caller LOCKS the action.
+  if (data.outcome === "unknown") return { kind: "uncertain", text: data.message + extra };
+  // Version moved / backend degraded, but nothing was written — reload, retry ok.
   if (data.conflict || data.transient) return { kind: "conflict", text: data.message + extra };
   return { kind: "err", text: data.message + extra };
 }

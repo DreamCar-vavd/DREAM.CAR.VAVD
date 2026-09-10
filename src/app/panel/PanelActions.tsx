@@ -96,14 +96,16 @@ function StatusLine({ msg, children }: { msg: ActionMessage; children?: React.Re
   const tone =
     msg.kind === "ok"
       ? "text-green-700 dark:text-green-400"
-      : msg.kind === "conflict"
+      : msg.kind === "conflict" || msg.kind === "uncertain"
         ? "text-amber-700 dark:text-amber-400"
         : "text-red-600";
+  // "uncertain" and "err" both need attention now — announce them assertively.
+  const assertive = msg.kind === "err" || msg.kind === "uncertain";
   return (
     <span
       className={`text-xs ${tone}`}
-      role={msg.kind === "err" ? "alert" : "status"}
-      aria-live={msg.kind === "err" ? "assertive" : "polite"}
+      role={assertive ? "alert" : "status"}
+      aria-live={assertive ? "assertive" : "polite"}
     >
       {msg.text}
       {children}
@@ -166,14 +168,26 @@ export function PanelButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, versions }),
       });
-      const data = (await res.json()) as ActionResponse;
-      setMsg(messageForResponse(data, data.ok));
-      if (data.ok) refresh();
+      let data: ActionResponse | null = null;
+      try {
+        data = (await res.json()) as ActionResponse;
+      } catch {
+        data = null; // sent, but no structured answer — treat as unknown outcome
+      }
+      // Lock on EITHER path a write's result can be unknown: the server said so
+      // (`outcome:"unknown"`), or no parseable response came back at all.
+      if (!data || (!data.ok && data.outcome === "unknown")) {
+        setUncertain({ tokenBefore: stateToken ?? "", checking: false });
+        setMsg(data ? messageForResponse(data) : { kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
+      } else {
+        setMsg(messageForResponse(data, data.ok));
+        if (data.ok) refresh();
+      }
     } catch {
-      // No response — the write may or may not have landed. Lock this action
-      // and make the owner CHECK (read-only) before anything can be repeated.
+      // No response at all — the write may or may not have landed. Lock this
+      // action and make the owner CHECK (read-only) before anything is repeated.
       setUncertain({ tokenBefore: stateToken ?? "", checking: false });
-      setMsg({ kind: "conflict", text: NETWORK_UNCERTAIN_MSG });
+      setMsg({ kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
       inFlight.current = false;
@@ -289,10 +303,24 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "cleanup-frozen-media", confirm, headSha, versions: {} }),
       });
-      const data = (await res.json()) as ActionResponse & {
-        cleanup?: { count: number; totalBytes: number; headSha: string };
-      };
-      if (data.ok && data.cleanup && !confirm) {
+      let data:
+        | (ActionResponse & { cleanup?: { count: number; totalBytes: number; headSha: string } })
+        | null = null;
+      try {
+        data = (await res.json()) as ActionResponse & {
+          cleanup?: { count: number; totalBytes: number; headSha: string };
+        };
+      } catch {
+        data = null; // sent, but no structured answer — treat as unknown outcome
+      }
+      if (!data || (!data.ok && data.outcome === "unknown")) {
+        // A confirm whose result is unknown MUST lock — the delete commit may
+        // have landed. A dry run can't be "uncertain" (it writes nothing), but
+        // if the server ever says so we still lock, conservatively.
+        setPlan(null);
+        setUncertain({ checking: false });
+        setMsg(data ? messageForResponse(data) : { kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
+      } else if (data.ok && data.cleanup && !confirm) {
         setPlan({ count: data.cleanup.count, headSha: data.cleanup.headSha, forVersion: publishedVersion });
         setMsg({ kind: "ok", text: data.message });
       } else {
@@ -306,7 +334,7 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
     } catch {
       setPlan(null);
       setUncertain({ checking: false });
-      setMsg({ kind: "conflict", text: NETWORK_UNCERTAIN_MSG });
+      setMsg({ kind: "uncertain", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
       inFlight.current = false;
