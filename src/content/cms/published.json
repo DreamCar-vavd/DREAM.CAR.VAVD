@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-10T13:17:25.975Z",
+  "publishedAt": "2026-09-10T15:47:54.354Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -640,6 +640,47 @@
           "Информация уточняется"
         ],
         "result": "Информация уточняется."
+      }
+    },
+    {
+      "id": "zzz-photo-ab",
+      "order": 999,
+      "kind": "album",
+      "year": "",
+      "photos": [
+        {
+          "image": "/images/cms/gallery/zzz-photo-ab/_pub/8e9d45ba41ab6f8019b60d8b.png",
+          "caption": "ZZZ alt A — синє тестове фото"
+        }
+      ],
+      "videoUrl": "",
+      "showContactCta": true,
+      "uk": {
+        "title": "ZZZ Тест фото A→B (uk)",
+        "shortDescription": "Синтетичний матеріал для перевірки заміни фото. DELETE ME.",
+        "longDescription": "",
+        "service": "Тест-послуга",
+        "clientRequest": "",
+        "completedItems": [],
+        "result": ""
+      },
+      "en": {
+        "title": "ZZZ photo A→B test (en)",
+        "shortDescription": "Synthetic material to verify photo replacement. DELETE ME.",
+        "longDescription": "",
+        "service": "Test service",
+        "clientRequest": "",
+        "completedItems": [],
+        "result": ""
+      },
+      "ru": {
+        "title": "ZZZ Тест фото A→B (ru)",
+        "shortDescription": "Синтетический материал для проверки замены фото. DELETE ME.",
+        "longDescription": "",
+        "service": "Тест-услуга",
+        "clientRequest": "",
+        "completedItems": [],
+        "result": ""
       }
     }
   ],
