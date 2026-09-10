@@ -1,0 +1,31 @@
+{
+  "id": "zzz-photo-ab",
+  "order": 999,
+  "kind": "album",
+  "photos": [
+    {
+      "image": "/images/cms/gallery/zzz-photo-ab/photos/0/image.png",
+      "caption": "ZZZ alt A — синє тестове фото"
+    }
+  ],
+  "showContactCta": true,
+  "uk": {
+    "title": "ZZZ Тест фото A→B (uk)",
+    "shortDescription": "Синтетичний матеріал для перевірки заміни фото. DELETE ME.",
+    "service": "Тест-послуга",
+    "completedItems": []
+  },
+  "en": {
+    "title": "ZZZ photo A→B test (en)",
+    "shortDescription": "Synthetic material to verify photo replacement. DELETE ME.",
+    "service": "Test service",
+    "completedItems": []
+  },
+  "ru": {
+    "title": "ZZZ Тест фото A→B (ru)",
+    "shortDescription": "Синтетический материал для проверки замены фото. DELETE ME.",
+    "service": "Тест-услуга",
+    "completedItems": []
+  },
+  "bornAt": "mtvozjun-ma4dqtnu"
+}
