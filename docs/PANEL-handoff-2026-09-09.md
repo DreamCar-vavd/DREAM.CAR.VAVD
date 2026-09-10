@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`865eddd`** (П41) ← `62c8554` ← `5e46cc3`/`ee93d24` (П40) ← `8827b1b` ← `f80fab7`. Після `865eddd` — 3 `zzz` коміти живої перевірки очищення з **нульовим чистим дифом** (`865eddd..HEAD` порожній). Останній НЕ-тестовий SHA — `865eddd`. |
+| **Remote HEAD** | **`7ac1cc4`** (П42) ← `8a866e7` (док П41) ← `865eddd` (П41 §4) ← `62c8554` (П41 §1–2) ← `5e46cc3`/`ee93d24` (П40). Між `865eddd`↔`8a866e7` — 3 `zzz` коміти живої перевірки очищення, **чистий діф нульовий**. Останній НЕ-тестовий SHA — `7ac1cc4`. |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `865eddd` | success |
-| Vercel Preview на `865eddd` | success |
-| Тести / tsc / eslint | **352 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `7ac1cc4` | success |
+| Vercel Preview на `7ac1cc4` | success |
+| Тести / tsc / eslint | **354 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -54,7 +54,20 @@
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П41)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П42)
+
+- **П42 — паралельний `readDir` + індикація + захист від подвійного кліку (задача 2026-09-10 10:23), `7ac1cc4`:**
+  - **§2** `GitHubStorage.readDir` читає JSON колекції через `ConcurrencyGate`
+    (ширина 8), спільний на всі 5 колекцій. Порядок / version / `atSha` / помилки
+    / бюджет часу збережені. **Тепле відкриття `/panel` на Preview: 2.55 → 1.5 с
+    (−40 %)** за однакових умов.
+  - **§3** новий `src/app/panel/loading.tsx` (скелет + спінер); `PanelButton` /
+    `CleanupFrozenMediaButton` — синхронний `useRef` in-flight guard (2 швидкі
+    кліки не дублюють запит), після помилки інтерфейс лишається придатним.
+  - **§4** `docs/patches/dacia-poster-freeze.patch` — окремий, **НЕ застосований**
+    патч на `posterSrc` 2 Dacia (2 рядки `published.json` → наявні байт-ідентичні
+    `_pub`-копії). Перевірено в окремому worktree, `git apply --check` чисто.
+  - 354 pass, tsc 0, eslint 0, build OK. Реальний контент не змінювався.
 
 - **П41 — узгоджений знімок для очищення + постер відео (задача 2026-09-10), `62c8554`+`865eddd`:**
   - **§1** `readFile/readDir/mediaIndex` отримали `atSha`; `frozenMediaCandidates`,
