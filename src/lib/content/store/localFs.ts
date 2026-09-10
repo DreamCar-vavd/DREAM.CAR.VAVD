@@ -51,16 +51,46 @@ export class LocalFsStorage implements PanelStorage {
 
   /**
    * Absolute path for a WRITE / DELETE target, hard-checked to resolve INSIDE
-   * `this.root/public/images/cms/` (or the given `subtree`). `..`, an absolute
-   * `repoPath`, or anything that would land outside throws — a second line of
-   * defence behind the `assert*MediaPath` regexes, and the reason a stray path
-   * can never delete real card folders.
+   * `this.root/<subtree>/`. Three lines of defence, behind the `assert*MediaPath`
+   * regexes:
+   *  1. lexical: `..` / an absolute `repoPath` / anything landing outside throws;
+   *  2. symlink: the real path of the nearest EXISTING ancestor must still sit
+   *     inside the real subtree (or be an ancestor of it still inside the real
+   *     root) — so a symlinked path component (`…/_pub` -> `/etc`) is caught
+   *     even though the lexical check cannot see it;
+   *  3. the callers only ever `rm` a single file, never a directory.
    */
-  private mutablePath(repoPath: string, subtree = "public/images/cms"): string {
-    const base = path.join(this.root, subtree) + path.sep;
+  private async mutablePath(repoPath: string, subtree = "public/images/cms"): Promise<string> {
+    const baseDir = path.join(this.root, subtree);
     const full = path.resolve(this.root, repoPath);
-    if (full !== base.slice(0, -1) && !full.startsWith(base)) {
+    if (full !== baseDir && !full.startsWith(baseDir + path.sep)) {
       throw new Error(`LocalFsStorage: refusing to touch "${repoPath}" — outside ${subtree}`);
+    }
+
+    // `this.root` always exists; resolve it once (temp dirs are often symlinks).
+    const realRoot = await fs.realpath(this.root);
+    const realBase = path.join(realRoot, subtree);
+    let probe = full;
+    // Climb to the first path that actually exists on disk.
+    for (;;) {
+      try {
+        const real = await fs.realpath(probe);
+        const insideBase = real === realBase || real.startsWith(realBase + path.sep);
+        const ancestorOfBase =
+          (realBase + path.sep).startsWith(real + path.sep) &&
+          (real === realRoot || real.startsWith(realRoot + path.sep));
+        if (!insideBase && !ancestorOfBase) {
+          throw new Error(
+            `LocalFsStorage: refusing to touch "${repoPath}" — resolves outside ${subtree} (symlink?)`,
+          );
+        }
+        break;
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("refusing to touch")) throw err;
+        const parent = path.dirname(probe);
+        if (parent === probe) break; // reached filesystem root without a hit
+        probe = parent;
+      }
     }
     return full;
   }
@@ -99,7 +129,7 @@ export class LocalFsStorage implements PanelStorage {
     expectedVersion: string,
   ): Promise<Versioned<string>> {
     assertAllowedFile(file);
-    const target = this.mutablePath(file, "src/content/cms");
+    const target = await this.mutablePath(file, "src/content/cms");
     const current = await readOr(target, null);
     if ((current ? hash(current) : "") !== expectedVersion) {
       throw new ConflictError(file.endsWith("review-state.json") ? "перевірки перекладів" : "знімок");
@@ -167,7 +197,7 @@ export class LocalFsStorage implements PanelStorage {
 
   async putPublishedMedia(repoPath: string, bytes: Uint8Array): Promise<void> {
     assertPublishedMediaPath(repoPath);
-    const target = this.mutablePath(repoPath);
+    const target = await this.mutablePath(repoPath);
     try {
       const existing = await fs.readFile(target);
       if (Buffer.from(bytes).equals(existing)) return; // content-addressed no-op
@@ -197,7 +227,7 @@ export class LocalFsStorage implements PanelStorage {
     const out: { path: string; outcome: "deleted" | "already-absent" }[] = [];
     for (const p of paths) {
       assertPublishedMediaPath(p); // regex: …/<slug>/_pub/<hex>.<ext>
-      const target = this.mutablePath(p); // + resolved-path containment check
+      const target = await this.mutablePath(p); // + resolved-path containment check
       const existed = await fs
         .stat(target)
         .then((s) => s.isFile())

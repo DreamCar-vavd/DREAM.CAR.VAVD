@@ -389,6 +389,13 @@ export interface PanelData {
   branch: string | null;
   versions: Versions;
   /**
+   * The branch head every read on this render was pinned to (`null` in local
+   * mode). A cleanup dry-run plan is computed against this exact commit, so the
+   * client drops a pending plan the moment it moves — `versions.published` is
+   * ONE file's token and cannot stand in for the branch head.
+   */
+  headSha: string | null;
+  /**
    * review-state.json rows whose slug no longer backs any working card (a card
    * deleted straight from Keystatic — its delete never touches review-state).
    * They do not colour the dashboard; the next panel write drops them.
@@ -438,7 +445,8 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   // review-state and the media tree must all describe the same version, or a
   // card's status could be built from working files at one commit and a media
   // tree at another. In local mode `atSha` is null and ignored.
-  const atSha = (await storage.headSha()) ?? undefined;
+  const atShaOrNull = await storage.headSha();
+  const atSha = atShaOrNull ?? undefined;
   const dirs = await Promise.all(
     KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir, atSha)),
   );
@@ -564,6 +572,7 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
     mode: storage.mode,
     branch: storage.branch,
     versions,
+    headSha: atShaOrNull,
     staleReviewSlugs: stale,
   };
 }

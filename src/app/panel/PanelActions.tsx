@@ -287,23 +287,27 @@ export function PanelButton({
  * into "Підтвердити …" and the second click deletes exactly that set against
  * that head. A publish landing in between makes the confirm a no-op conflict.
  *
- * `publishedVersion` — the panel's published.json token: when it changes (any
- * publish, incl. this session's refresh) a pending dry-run plan is stale, so we
- * drop it and make the owner re-run the check.
+ * The dry-run plan is bound to the exact branch head it was computed against
+ * (`plan.headSha`). The client drops a pending plan the moment the branch head
+ * (`headSha` prop, from the server render) moves — a single file's token
+ * (`publishedVersion`) cannot stand in for the branch head, so it is only a
+ * secondary signal for local mode (which has no branch).
  */
-export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersion?: string }) {
+export function CleanupFrozenMediaButton({
+  publishedVersion,
+  headSha,
+}: {
+  publishedVersion?: string;
+  headSha?: string | null;
+}) {
   const { busy: refreshing, slow: refreshSlow, done: refreshDone, refresh } = useRefresh();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<ActionMessage | null>(null);
-  // The dry-run plan is pinned to the branch head it was computed against
-  // (`headSha`). If `publishedVersion` (published.json token) moves — a publish
-  // landed — that snapshot is gone, so the plan is stale: drop it and make the
-  // owner re-run the check. Adjusted during render (reset-on-prop-change), not
-  // in an effect.
   const [plan, setPlan] = useState<{
     count: number;
     headSha: string;
     paths: string[];
+    forHead?: string | null;
     forVersion?: string;
   } | null>(null);
   const inFlight = useRef(false);
@@ -311,7 +315,13 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
   // read-only check can verify exactly that set of files is gone.
   const [uncertain, setUncertain] = useState<{ checking: boolean; planPaths: string[] } | null>(null);
 
-  if (plan && plan.forVersion !== publishedVersion) {
+  // A plan is stale if the branch head it was computed against has moved
+  // (github mode), or — local mode, no branch — if published.json changed.
+  const planStale =
+    plan != null &&
+    ((headSha != null && plan.forHead != null && plan.forHead !== headSha) ||
+      plan.forVersion !== publishedVersion);
+  if (planStale) {
     setPlan(null);
     if (msg) setMsg(null);
   }
@@ -390,6 +400,7 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
           count: data.cleanup.count,
           headSha: data.cleanup.headSha,
           paths: data.cleanup.paths ?? [],
+          forHead: headSha ?? null,
           forVersion: publishedVersion,
         });
         setMsg({ kind: "ok", text: data.message });

@@ -538,7 +538,10 @@ export default async function PanelPage() {
           публікує. Ніколи не чіпає фото, потрібні поточній опублікованій версії.
         </p>
         <div className="mt-2">
-          <CleanupFrozenMediaButton publishedVersion={data.versions.published} />
+          <CleanupFrozenMediaButton
+            publishedVersion={data.versions.published}
+            headSha={data.headSha}
+          />
         </div>
       </div>
     </main>

@@ -157,3 +157,56 @@ test("sandbox: putPublishedMedia / writeFile also refuse to escape the tree", as
     await sbx.cleanup();
   }
 });
+
+test("sandbox: a write/delete THROUGH a symlinked path component is refused", async () => {
+  const sbx = await sandbox();
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "dcv-panel-evil-"));
+  try {
+    // `…/zzz-s/_pub` is a symlink pointing OUT of the sandbox — the lexical
+    // containment check cannot see this; the realpath climb must.
+    await fs.mkdir(path.join(sbx.root, "public/images/cms/services/zzz-s"), { recursive: true });
+    await fs.symlink(outside, path.join(sbx.root, "public/images/cms/services/zzz-s/_pub"));
+    const victim = "public/images/cms/services/zzz-s/_pub/aaaaaaaaaaaaaaaaaaaaaaaa.jpg";
+
+    await assert.rejects(() => sbx.storage.putPublishedMedia(victim, jpg("x")), /symlink|outside/i);
+    await assert.rejects(
+      () => sbx.storage.deletePublishedMediaBatch([victim], null),
+      /symlink|outside/i,
+    );
+    assert.deepEqual(await fs.readdir(outside), [], "nothing was written outside the sandbox");
+  } finally {
+    await sbx.cleanup();
+    assert.ok(path.resolve(outside).startsWith(path.resolve(os.tmpdir()) + path.sep));
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("sandbox: the cleanup dry-run plan is bound to the branch head it was computed against", async () => {
+  const sbx = await sandbox();
+  try {
+    await sbx.write("src/content/cms/services/zzz-a.json", svc("zzz-a"));
+    await sbx.write("src/content/cms/cars/.keep", "");
+    await sbx.write("src/content/cms/gallery/.keep", "");
+    await sbx.write("src/content/cms/promos/.keep", "");
+    await sbx.write("public/images/cms/services/zzz-a/photos/0/image.jpg", jpg("A"));
+    await sbx.write(
+      "src/content/cms/published.json",
+      JSON.stringify({ publishedAt: "t", cars: [], gallery: [], services: [JSON.parse(svc("zzz-a"))] }),
+    );
+    await sbx.write("src/content/cms/review-state.json", "{}");
+    await freezePublishedMedia(sbx.storage);
+    await sbx.write("public/images/cms/services/zzz-a/_pub/deadbeefdeadbeef.jpg", jpg("OLD"));
+
+    const dry = await cleanupFrozenMedia(sbx.storage, {});
+    assert.ok(dry.ok && dry.cleanup);
+    // local mode has no branch -> headSha is "" on the plan and null on the panel,
+    // but the plan carries the EXACT file set so the confirm/check work off that.
+    assert.deepEqual(dry.cleanup!.paths, [
+      "public/images/cms/services/zzz-a/_pub/deadbeefdeadbeef.jpg",
+    ]);
+    const panel = await (await import("../panelStore")).getPanelData(sbx.storage);
+    assert.equal(panel.headSha, null); // exposed for the client to bind the plan to
+  } finally {
+    await sbx.cleanup();
+  }
+});
