@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
 import { getLeadsStore, type Lead } from "@/lib/leads/store";
+import { leadsListErrorView } from "@/lib/leads/loadError";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +102,11 @@ export default async function LeadsPage({
   try {
     page = await store.list({ limit: PAGE_SIZE, cursor });
   } catch (err) {
-    loadError = (err as Error).message;
+    // The raw pg / DNS error carries the DB host, port or role — never put it
+    // in the UI or the logs. Show a fixed message; log only a coarse code.
+    const view = leadsListErrorView(err);
+    loadError = view.message;
+    console.error(`[panel/leads] list failed (${view.logCode})`);
   }
 
   return (
@@ -118,7 +123,7 @@ export default async function LeadsPage({
 
       {loadError && (
         <p className="mt-4 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300">
-          Не вдалося завантажити список: {loadError}
+          {loadError}
         </p>
       )}
 

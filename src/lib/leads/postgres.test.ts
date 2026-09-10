@@ -66,6 +66,32 @@ test("create: a concurrent insert wins the race (0 rows from INSERT) -> re-selec
   assert.match(calls[2].text, /SELECT id FROM leads WHERE idempotency_key = \$1/);
 });
 
+test("create: a failing db query rejects — the caller (contact route) swallows it and still emails", async () => {
+  const db: Queryable = {
+    async query() {
+      throw Object.assign(new Error("connect ECONNREFUSED 10.0.0.4:5432"), { code: "ECONNREFUSED" });
+    },
+  };
+  await assert.rejects(() => createPgLeadsStore(db).create(input, KEYS), /ECONNREFUSED/);
+});
+
+test("list: an empty table -> no rows, no cursor, total 0", async () => {
+  const { db } = fakeDb([{ rows: [] }, { rows: [{ n: "0" }] }]);
+  const page = await createPgLeadsStore(db).list({ limit: 20 });
+  assert.deepEqual(page, { leads: [], nextCursor: null, total: 0 });
+});
+
+test("list: a read failure rejects (surfaced by the page as a generic message, not the raw error)", async () => {
+  const db: Queryable = {
+    async query() {
+      throw Object.assign(new Error('password authentication failed for user "leads_app"'), {
+        code: "28P01",
+      });
+    },
+  };
+  await assert.rejects(() => createPgLeadsStore(db).list({ limit: 20 }));
+});
+
 test("list: first page requests limit+1, orders newest-first, excludes soft-deleted", async () => {
   const rows = Array.from({ length: 21 }, (_, n) => ({
     id: `id-${n}`,

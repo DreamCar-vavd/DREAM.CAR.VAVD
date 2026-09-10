@@ -18,7 +18,7 @@
 | Роль | Права | Де використовується |
 |---|---|---|
 | **міграційна** (owner / `neondb_owner`) | `CREATE`, `ALTER`, індекси — тобто DDL зі `schema.sql` | лише `npm run leads:migrate`, вручну |
-| **застосунку** | лише `SELECT`, `INSERT`, `UPDATE (deleted_at)` на таблиці `leads`; **без** `CREATE` / `DROP` / доступу до інших таблиць | `LEADS_DATABASE_URL` у Vercel |
+| **застосунку** | лише `SELECT`, `INSERT` на таблиці `leads`; **без** `UPDATE` / `DELETE` / `CREATE` / `DROP` / доступу до інших таблиць | `LEADS_DATABASE_URL` у Vercel |
 
 Створення обмеженої ролі застосунку (виконати міграційною роллю **один раз**):
 
@@ -27,11 +27,28 @@ CREATE ROLE leads_app LOGIN PASSWORD '<згенерований-пароль>';
 GRANT CONNECT ON DATABASE <db> TO leads_app;
 GRANT USAGE ON SCHEMA public TO leads_app;
 GRANT SELECT, INSERT ON leads TO leads_app;
-GRANT UPDATE (deleted_at) ON leads TO leads_app;
+-- НЕ надавати UPDATE/DELETE: рантайм-адаптер (src/lib/leads/postgres.ts) робить
+-- лише SELECT і INSERT ... ON CONFLICT DO NOTHING RETURNING id — звірено із
+-- запитами адаптера (задача 16:08, блок 4). Soft-delete deleted_at для
+-- політики зберігання — окрема ручна дія власника міграційною роллю.
 ```
 
 `LEADS_DATABASE_URL` у Vercel = connection string саме ролі `leads_app`
 (не owner).
+
+**Точні запити рантайму** (звірка мінімальних прав, `src/lib/leads/postgres.ts`):
+
+| Операція | SQL | Потрібне право |
+|---|---|---|
+| dedup-перевірка | `SELECT id FROM leads WHERE idempotency_key IN ($1,$2) …` | `SELECT` |
+| запис заявки | `INSERT INTO leads (…) VALUES (…) ON CONFLICT (idempotency_key) DO NOTHING RETURNING id` | `INSERT` |
+| re-select при гонці | `SELECT id FROM leads WHERE idempotency_key = $1` | `SELECT` |
+| список | `SELECT … FROM leads WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT $n` | `SELECT` |
+| лічильник | `SELECT count(*) FROM leads WHERE deleted_at IS NULL` | `SELECT` |
+| одна заявка | `SELECT … FROM leads WHERE id = $1 AND deleted_at IS NULL` | `SELECT` |
+
+`id` — `gen_random_uuid()` за замовчуванням (не sequence), `created_at` — `now()`;
+окремих прав на sequence не треба.
 
 ## TLS і спосіб зʼєднання
 
@@ -78,8 +95,8 @@ GRANT UPDATE (deleted_at) ON leads TO leads_app;
   idempotency_key, deleted_at`).
 
 Після підключення на Preview:
-- `/panel/leads` → банер «Демонстраційні дані» **зникає**, список порожній
-  («Заявок поки немає»);
+- `/panel/leads` → блок «Сховище заявок не налаштоване» **зникає**, список
+  порожній («Заявок поки немає») (на hosted-Preview демо-банера не було);
 - надіслати синтетичну заявку через форму на Preview → з'являється рядок;
 - надіслати її **ще раз одразу** → **новий рядок не з'являється**
   (ідемпотентність);
@@ -109,10 +126,12 @@ GRANT UPDATE (deleted_at) ON leads TO leads_app;
 ## 1. Результат для бізнесу
 
 Зараз заявки з форми йдуть на email (Formspree) — працює, але їх **не видно в
-панелі**: `/panel/leads` показує демо-дані. Після Б3 власник бачить **реальні
-заявки** списком у `/panel/leads` (ім'я, телефон, email, послуга, авто,
-повідомлення, час) — одне місце для всіх звернень, з пагінацією й без дублів
-від повторних надсилань форми. Email-сповіщення лишається як є.
+панелі**. На hosted-Preview/Production `/panel/leads` показує «Сховище заявок
+не налаштоване» (не демо — демо-рядки лишень у локальному dev або за явним
+`LEADS_DEMO_MODE=1`; звірено задачею 16:08, блок 2). Після Б3 власник бачить
+**реальні заявки** списком у `/panel/leads` (ім'я, телефон, email, послуга,
+авто, повідомлення, час) — одне місце для всіх звернень, з пагінацією й без
+дублів від повторних надсилань форми. Email-сповіщення лишається як є.
 
 ## 2. Що вже готове в коді (нічого писати не треба)
 
@@ -145,8 +164,9 @@ GRANT UPDATE (deleted_at) ON leads TO leads_app;
 - **Допоміжна (лише локально, не в Vercel):** `LEADS_DEMO_MODE=1` — вмикає
   демо-режим у dev; у hosted без `LEADS_DATABASE_URL` показує «Сховище заявок
   не налаштоване», **не** демо.
-- **Ролі БД:** `neondb_owner` (міграційна, DDL) і `leads_app` (застосунку —
-  `SELECT, INSERT` на `leads` + `UPDATE (deleted_at)`, без `CREATE`/`DROP`).
+- **Ролі БД:** `neondb_owner` (міграційна, DDL + ручний soft-delete) і
+  `leads_app` (застосунку — лише `SELECT, INSERT` на `leads`, без
+  `UPDATE`/`DELETE`/`CREATE`/`DROP`).
 - **Таблиця:** `leads` (колонки: `id, created_at, name, phone, email, service,
   vehicle, message, idempotency_key, deleted_at`).
 - **Файл поза Git:** `.env.migrate` (у `.gitignore`; видалити після міграції).
@@ -169,8 +189,9 @@ Value змінної (це робить власник) або в локальн
 ## 6. Перевірка успіху
 
 Після redeploy Preview (авторизована сесія):
-1. `/panel/leads` → банер «Демонстраційні дані» **зник**; список порожній
-   («Заявок поки немає»).
+1. `/panel/leads` → блок «Сховище заявок не налаштоване» **зник**; список
+   порожній («Заявок поки немає»). (На hosted-Preview демо-банера не було —
+   до Б3 там саме «не налаштоване».)
 2. Надіслати **синтетичну** заявку через форму на Preview (ім'я «ZZZ Test»,
    тестовий телефон/email, повідомлення «DELETE ME») → за кілька секунд рядок
    з'являється у `/panel/leads`.
@@ -229,3 +250,129 @@ $0.106/CU-година + $0.35/ГБ-місяць, без місячного мі
   (одноразово) і драйвити живу перевірку в браузері власника. Секрети в чат не
   передавати. Production-змінні (`LEADS_DATABASE_URL` для Production) — **поза**
   цим етапом.
+
+---
+
+# Шлях заявки: Production vs Preview (звірка коду, задача 16:08 блок 3)
+
+Звірено з кодом (`src/app/api/contact/route.ts`, `src/lib/leads/store.ts`,
+`src/lib/leads/deliver.ts`) — без надсилання форми, без значень env.
+
+## A. Поточний Production (сайт на `main`, гілка коду без БД-адаптера в дії)
+
+```
+Форма (src/components/**, клієнт)
+  │  POST /api/contact  (JSON)
+  ▼
+src/app/api/contact/route.ts
+  ├─ origin/content-type/honeypot/валідація
+  ├─ getWritableLeadsStore()
+  │     └─ resolveLeadsMode(): немає LEADS_DATABASE_URL → "not-configured"
+  │        → повертає null  →  крок БД ПОВНІСТЮ пропускається
+  └─ email-канал: fetch(CONTACT_FORM_ENDPOINT)  →  Formspree  →  пошта власника
+                     (redirect:"error", timeout 10 с)
+        │
+        ▼
+   resolveLeadResponse({ hasStore:false, savedToDb:false, email })  →  200 / 502 / 504
+```
+
+Наслідок: **на Production заявка ніде не зберігається в БД** — лише email.
+`/panel/leads` на Production-хості: «Сховище заявок не налаштоване».
+
+## B. Preview після Б3 (Neon підключено ТІЛЬКИ до Preview)
+
+```
+Форма на Preview-деплої
+  │  POST /api/contact
+  ▼
+route.ts  (той самий код, інше середовище)
+  ├─ getWritableLeadsStore()
+  │     └─ resolveLeadsMode(): LEADS_DATABASE_URL заданий (Vercel → Preview,
+  │        Branch codex/admin-panel-spike) → "database"
+  │        → createPgLeadsStore(pool)
+  │     └─ store.create(input, deriveIdempotencyKeys(input))
+  │          INSERT INTO leads … ON CONFLICT DO NOTHING     ← best-effort, try/catch
+  │            (помилка → console.warn БЕЗ PII, email далі)
+  └─ email-канал: Formspree  →  пошта власника (як і був)
+        │
+        ▼
+   resolveLeadResponse({ hasStore:true, savedToDb, email })  →  200(+code) / 502 / 504
+
+Neon (гілка preview) ──select──►  /panel/leads на Preview  (dynamic, no-store,
+                                   за storage-session-гейтом)
+```
+
+## Ключове питання: чи побачить панель заявки з ПОТОЧНОГО Production, якщо Neon під'єднано лише до Preview?
+
+**Ні.** Причини, з коду й з моделі Vercel:
+
+1. `LEADS_DATABASE_URL` — змінна **на середовище** (Vercel Environment = Preview,
+   Branch = `codex/admin-panel-spike`). Production-деплой (`main`) її не отримує
+   → `resolveLeadsMode()` там = `not-configured` → `getWritableLeadsStore()`
+   повертає `null` → `route.ts` не робить жодного `INSERT`.
+2. Немає іншого маршруту даних: Production `/api/contact` пише лише в email;
+   Formspree не має конектора до Neon; `/panel/leads` читає **тільки** свою
+   `LEADS_DATABASE_URL` (тобто preview-гілку).
+3. Отже заявки з живого сайту в панель **не потраплять**, доки БД не під'єднано
+   до Production-середовища окремо (розділ нижче).
+
+Показувати власнику заявки з Production у панелі можна **лише** після окремого
+кроку «Б3-prod»: своя Neon-гілка `main`, `LEADS_DATABASE_URL` у Vercel
+Environment = **Production**, redeploy Production. Це окреме рішення власника й
+поза поточним дозволом.
+
+## Розбивка пакета Б3
+
+| Етап | Що дає | Дозвіл |
+|---|---|---|
+| **Б3-preview** (цей) | тестова Neon-гілка + `LEADS_DATABASE_URL` у Preview; синтетичні заявки з Preview-форми осідають у панелі; жива перевірка адаптера/ідемпотентності/пагінації | у межах поточного завдання (міграція з `.env.migrate`, жива перевірка) |
+| **Б3-prod** (окремо) | окрема Neon-гілка `main` + `LEADS_DATABASE_URL` у Production; реальні заявки з сайту в панелі | **потрібне окреме рішення власника**: створення prod-бази, ротація/зберігання пароля, політика retention/експорту/видалення персональних даних, GDPR-обовʼязки |
+| Поза дозволом зараз | зміна `main`, Production env, DNS, тарифів; hard-delete даних; автоматичний retention | — |
+
+---
+
+# Готовність адаптера: звірка поведінки (задача 16:08 блок 4)
+
+Переглянуто `schema.sql`, `scripts/leads-migrate.mjs`, `src/lib/leads/postgres.ts`,
+`deriveIdempotencyKeys`, обробку помилок. Наявні тести
+(`postgres.test.ts` 11 → 14, `idempotency.test.ts`, `deliver.test.ts`) не
+дублюються. Додано лише непокриті випадки.
+
+## Узгодження дизайну з фактичним кодом
+
+- **Коли заявку вважати прийнятою.** Відвідувач отримує `200`, якщо спрацював
+  **хоча б один** тривкий канал: БД-рядок існує **або** email пішов. Обидва
+  впали → `502`/`504` (`resolveLeadResponse`, сценарії Г). `create()` повертає
+  `{id, inserted}`; `inserted:false` на дедуп-збігу теж рахується як
+  `savedToDb:true` (рядок уже є) — повторне надсилання не стає помилкою.
+- **Що таке «повтор».** Той самий `name|телефон-цифри|email|message` у тому ж
+  або сусідньому 10-хв бакеті (вікно 10–20 хв). Повтор **не** створює новий
+  рядок — повертає наявний `id`, `inserted:false`. **Email надсилається на
+  кожну спробу** незалежно від `inserted` (`route.ts` завжди доходить до
+  email-кроку; `idempotency.test.ts` це фіксує). Тобто повторний сабміт за
+  15 хв → 1 рядок у БД, але може бути 2 листи — навмисно (email — головний
+  канал власника, дедуп лише для тривкої копії).
+- **Чи губиться email при збої БД.** Ні. `route.ts` обгортає `leadsStore.create`
+  у `try/catch`, ковтає помилку (`console.warn` фіксованим рядком, без PII) і
+  **безумовно** виконує email-крок далі. Сценарій В: БД впала + email ок →
+  `200 EMAILED_NOT_SAVED`.
+
+## Виправлений дефект: витік деталей підключення в UI/логах
+
+`src/app/panel/leads/page.tsx` раніше рендерив сиру помилку
+(`Не вдалося завантажити список: {err.message}`). Повідомлення `pg`/DNS містять
+хост/порт/роль/назву БД (`getaddrinfo ENOTFOUND …neon.tech`,
+`ECONNREFUSED …:5432`, `password authentication failed for user "leads_app"`).
+Тепер: новий `src/lib/leads/loadError.ts` → фіксований текст у панель, у
+серверний лог лише коарс-код (`ENOTFOUND`, `28P01`, …). Тести —
+`src/lib/leads/loadError.test.ts` (7). Ані `route.ts`, ані адаптер не логують
+рядок помилки з деталями.
+
+## Рекомендація (потребує рішення власника, НЕ зроблено)
+
+Адаптер має `connectionTimeoutMillis: 5000`, але **не** має ліміту на
+тривалість запиту. Здеградована БД може затримати `/api/contact` на весь
+таймаут функції. Пропозиція окремим кроком: додати `statement_timeout`
+(через `?options=-c%20statement_timeout%3D4000` у connection string або в
+пулі). Не критично для кількох заявок на день; не змінюю в межах цього
+завдання.

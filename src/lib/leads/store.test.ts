@@ -2,6 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getLeadsStore, resolveLeadsMode } from "./store";
 
+// `@types/node` types NODE_ENV as read-only; the runtime object is a plain
+// mutable env map. This narrow helper keeps the tests honest without `any`.
+const env = process.env as Record<string, string | undefined>;
+function setEnv(key: string, value: string | undefined): void {
+  if (value === undefined) delete env[key];
+  else env[key] = value;
+}
+
 test("resolveLeadsMode: DB url wins; else demo in dev / when explicitly on; else not-configured", () => {
   const orig = { url: process.env.LEADS_DATABASE_URL, demo: process.env.LEADS_DEMO_MODE };
   try {
@@ -20,6 +28,49 @@ test("resolveLeadsMode: DB url wins; else demo in dev / when explicitly on; else
     else process.env.LEADS_DATABASE_URL = orig.url;
     if (orig.demo === undefined) delete process.env.LEADS_DEMO_MODE;
     else process.env.LEADS_DEMO_MODE = orig.demo;
+  }
+});
+
+test("HOSTED (NODE_ENV=production) with no LEADS_DATABASE_URL and no LEADS_DEMO_MODE -> 'not-configured', never demo", () => {
+  // This is what runs on the Vercel Preview / Production deployment: the panel
+  // must NOT show synthetic rows there — the owner could mistake them for real
+  // enquiries. Demo is opt-in (LEADS_DEMO_MODE=1) or local-dev only.
+  const orig = {
+    url: process.env.LEADS_DATABASE_URL,
+    demo: process.env.LEADS_DEMO_MODE,
+    env: process.env.NODE_ENV,
+  };
+  try {
+    setEnv("LEADS_DATABASE_URL", undefined);
+    setEnv("LEADS_DEMO_MODE", undefined);
+    setEnv("NODE_ENV", "production");
+    assert.equal(resolveLeadsMode(), "not-configured");
+
+    // Explicit opt-in still works even in production (a deliberate test toggle).
+    setEnv("LEADS_DEMO_MODE", "1");
+    assert.equal(resolveLeadsMode(), "demo");
+  } finally {
+    setEnv("LEADS_DATABASE_URL", orig.url);
+    setEnv("LEADS_DEMO_MODE", orig.demo);
+    setEnv("NODE_ENV", orig.env);
+  }
+});
+
+test("not-configured store: empty list, null everything — and it is NOT the demo store", async () => {
+  const orig = { url: process.env.LEADS_DATABASE_URL, demo: process.env.LEADS_DEMO_MODE, env: process.env.NODE_ENV };
+  try {
+    setEnv("LEADS_DATABASE_URL", undefined);
+    setEnv("LEADS_DEMO_MODE", undefined);
+    setEnv("NODE_ENV", "production");
+    const store = await getLeadsStore();
+    assert.equal(store.kind, "not-configured");
+    const page = await store.list({ limit: 20 });
+    assert.deepEqual(page, { leads: [], nextCursor: null, total: null });
+    assert.equal(await store.get("demo-001"), null);
+  } finally {
+    setEnv("LEADS_DATABASE_URL", orig.url);
+    setEnv("LEADS_DEMO_MODE", orig.demo);
+    setEnv("NODE_ENV", orig.env);
   }
 });
 
