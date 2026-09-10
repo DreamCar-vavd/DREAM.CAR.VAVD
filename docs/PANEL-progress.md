@@ -14,13 +14,18 @@
 ## Поточний стан
 
 - **Гілка:** `codex/admin-panel-spike` · **PR #26** (draft) · `main` @ `ce1977af` (не чіпається)
-- **Remote HEAD:** `8dd6cbc` — Ревізія П44 (задача 2026-09-10 12:50) завершена.
-  Останній код — `ba9d236`; `cea07bf`+`8dd6cbc` — нуль-нетто (жива UI-перевірка
-  очищення на Preview). CI + Vercel на `ba9d236` — **success**. **400 тестів
-  pass**, tsc 0, eslint 0, build OK, content:guard OK. Ланцюг ревізії:
-  `8dd6cbc`(нуль) ← `cea07bf`(нуль) ← `ba9d236`(Е5) ← `a87d188`(Е4 §4) ←
-  `fbdda32`(Е3 §3) ← `1438378`(Е3 §2) ← `86fd9be`(докreview) ← `6d0360a`(старий tip).
-  `git diff 21d9db4..8dd6cbc -- public/ src/content/` — **порожній**.
+- **Remote HEAD:** `a5be7fd` — задача 13:47 закрита (Е3 captured-target + повний
+  Keystatic-цикл Preview). Останній **код** — `500d692`. CI + Vercel на `500d692`
+  — **success**. **402 тести pass**, tsc 0, eslint 0, build OK, content:guard OK.
+  Ланцюг 13:47: `a5be7fd`(протокол §I/§J) ← `f581540`…`5a516fd`(zzz-цикл через
+  UI, нуль-нетто, 8 комітів) ← `500d692`(rendered-UI + `PANEL_CONTENT_ROOT`) ←
+  `b00cd82`(captured-target check) ← `ee5c9a5`(задача 12:50 Е7) ← … ← `8dd6cbc`.
+  `git diff 500d692..a5be7fd -- public/ src/content/` — **порожній**;
+  `git diff 21d9db4..a5be7fd -- public/ src/content/` — **лише
+  `published.json.publishedAt`** (штатний `publishItem`).
+  **ВІДКРИТЕ (єдине):** справжній CSS-в'юпорт 375 px на **авторизованому**
+  Preview `/panel` — блокер інструмента, потрібна 1 дія власника
+  (`docs/PANEL-etap4-protocol.md` §J). Локальний 375 px — окремий доказ (§G).
 - **Remote HEAD (до ревізії):** `866b271` — П44 Е1–Е4 (частково), задача 2026-09-10 11:49.
   Останній не-тестовий **код** — `21d9db4`. Ланцюг: `866b271` ← `2c4720e` ←
   `34d0ae0` (3 `zzz-e4` коміти живої перевірки Е4, **чистий діф нульовий**) ←
@@ -201,11 +206,45 @@ Blob (відео), реальна Postgres БД (заявки). Прийманн
 завданням; без force-push і руйнівного reset (ref-update `cea07bf`/`8dd6cbc` —
 не-force, через `/git/refs` PATCH `force=false`).
 
-**Відкрите (чесно):** повний Keystatic-цикл `zzz-test-panel` через UI на Preview
-не проганявся (потребує тривало активної сесії власника; покрито П35 + 400
-тестами); справжній 375 px саме на Preview `/panel` — інструмент не емулює
-CSS-viewport для авторизованої Chrome-сесії, знято локально (розмітка
-ідентична). Раніше відкриті блокери власника Б1–Б5 — без змін, поза цією задачею.
+---
+
+### Ревізія П44 — задача 13:47 (доопрацювання Е3 + приймання Preview)
+
+Продовження задачі 12:50. Закрито:
+- **§1–2 (`b00cd82` + `500d692`) — «Перевірити результат» звіряє ПОЧАТКОВУ ціль.**
+  `checkActionResult` більше не виводить вердикт із поточних властивостей рядка.
+  `getPanelData` віддає `row.publishTargetToken` (`publishContentToken` —
+  frozen-photo-safe хеш) + `row.localeTextToken[locale]` (= що пише
+  `confirmLocale`). `PanelButton` заморожує токен у `uncertain.capturedToken`
+  при блокуванні (не перечитує з props), надсилає як `check.expectToken`;
+  `null` зберігає токен для повторів. Сервер:
+  - publish → знімок містить матеріал **І** його `publishContentToken` ==
+    захоплений → `applied:true`; є з іншим контентом → `null` («опубліковано
+    іншу версію… не повторюйте»); відсутній → `false`.
+  - confirm-locale → хеш рядка review == захоплений → `true` (+ «текст змінили»,
+    якщо робочий поплив); рядок є з іншим хешем → `null` («іншим текстом…
+    прочитайте»); нема → `false`.
+  Читає `published.json`/`review-state` напряму; помилка читання → `null`.
+  **Через відрендерений UI** (local `PANEL_CONTENT_ROOT=<копія>`, справжні
+  кнопки, лічильник `fetch`): H1 publish-А-урвалась+Б-опублікував-іншу →
+  блок лишається, `expectToken` пережив перерендер, publish POST = 1;
+  H2 confirm-А-виконалось+текст-став-Б → «підтвердження застосовано… перегляньте
+  картку», розблок, confirm POST = 1. Юніт: exact `applied === null`. **402 тести.**
+- **§3 (`5a516fd`…`f581540`) — повний цикл `zzz-test-panel` через UI на Preview**
+  (фінальний код `500d692`): Keystatic create → 3× «Позначити перевіреним» →
+  «Опублікувати» (сайт 200) → перегляд сторінки → «Прибрати з сайту» (сайт 404)
+  → Keystatic «Yes, delete» → «Завершити видалення (1)». Деталі —
+  `docs/PANEL-etap4-protocol.md` §I. `git diff 500d692..f581540 -- src/content
+  public/images` — **порожній**; vs `21d9db4` — лише `published.json.publishedAt`.
+- **Нове тест-середовище:** `PANEL_CONTENT_ROOT` (dev/test, ignored in prod) —
+  `getStorage()` у local-режимі резолвить контент відносно цього шляху.
+
+**Відкрите (єдине):** справжній CSS-в'юпорт 375 px на **авторизованому** Preview
+`/panel` — `claude-in-chrome resize_window` міняє лише вікно ОС (`innerWidth`
+лишається 1471, звірено); Browser pane з реальним 375 не тримає GitHub-сесію
+Preview. **1 дія власника:** Preview `/panel` → DevTools device toolbar 375 →
+знімок (`docs/PANEL-etap4-protocol.md` §J). Локальний 375 (§G) — окремий доказ.
+Раніше відкриті блокери власника Б1–Б5 — без змін, поза цією задачею.
 
 ---
 

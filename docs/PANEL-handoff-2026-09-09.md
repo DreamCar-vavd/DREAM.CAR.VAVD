@@ -12,16 +12,16 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`8dd6cbc`** (нуль-нетто UI-перевірка Е6) ← `cea07bf` (нуль-нетто) ← `ba9d236` (Е5) ← `a87d188` (Е4 §4) ← `fbdda32` (Е3 §3) ← `1438378` (Е3 §2) ← `86fd9be` (докreview) ← `6d0360a` ← `866b271` (П44 Е1–Е4 частк.). **Останній НЕ-тестовий код — `ba9d236`.** |
+| **Remote HEAD** | **`a5be7fd`** (протокол §I/§J) ← `f581540`…`5a516fd` (zzz-цикл через UI, нуль-нетто, 8 комітів) ← `500d692` (rendered-UI + `PANEL_CONTENT_ROOT`) ← `b00cd82` (captured-target check) ← `ee5c9a5` (задача 12:50) ← … ← `8dd6cbc`. **Останній код — `500d692`.** |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `ba9d236` | success |
-| Vercel Preview на `ba9d236` | success |
-| Тести / tsc / eslint | **400 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `500d692` | success |
+| Vercel Preview на `500d692` | success |
+| Тести / tsc / eslint | **402 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
-**Реальний контент на HEAD `8dd6cbc`:** `git diff 21d9db4..HEAD -- public/ src/content/`
+**Реальний контент на HEAD `a5be7fd`:** `git diff 21d9db4..HEAD -- public/ src/content/`
 **порожній** (звірено). 49 `_pub`-файлів. Зміни П38–П44 у контенті — лише
 `bornAt` (17 карток), namespaced review-ключі, `_pub`-шляхи фото та `publishedAt`
 у `published.json` (див. записи П38/П39 у журналі; бізнес-тексти й ціни — ні).
@@ -30,39 +30,41 @@
 
 ---
 
-## П44 + Ревізія П44 — ЗАВЕРШЕНО (2026-09-10 12:50)
+## П44 + Ревізія П44 (12:50 + 13:47) — ЗАВЕРШЕНО
 
-**Стан:** усі етапи ревізії (2–7) закриті. Tip гілки — `8dd6cbc` (останній
-**код** — `ba9d236`; `cea07bf`/`8dd6cbc` — нуль-нетто жива UI-перевірка).
-CI + Vercel на `ba9d236` — **success**. **400 тестів**, tsc/eslint/build/
-content:guard — зелені. `main` @ `ce1977af` — не зрушений.
-Почати новий чат від актуальної `origin/codex/admin-panel-spike`
-(`git fetch && git merge --ff-only`).
+**Стан:** Tip гілки — `a5be7fd`; останній **код** — `500d692`. CI + Vercel на
+`500d692` — **success**. **402 тести**, tsc/eslint/build/content:guard — зелені.
+`main` @ `ce1977af` — не зрушений. Почати новий чат від актуальної
+`origin/codex/admin-panel-spike` (`git fetch && git merge --ff-only`).
 
-**Що зроблено ревізією (деталі — `docs/PANEL-progress.md` запис «Ревізія П44»,
-цільові тести — `docs/PANEL-etap4-protocol.md` розділи E–G):**
-- `1438378` — машинна ознака `outcome:"unknown"` (лише `WriteUncertainError`)
-  наскрізь; блокує повтор незалежно від ділянки обриву.
-- `fbdda32` — `check-result` = окрема лише-читаюча дія, звіряє **конкретний**
-  очікуваний ефект; `applied:null` / помилка читання → блок лишається.
-- `a87d188` — symlink-guard у `LocalFsStorage.mutablePath`; план очищення
-  прив'язано до `headSha` гілки (`getPanelData.headSha`).
-- `ba9d236` — чисті хелпери маршрутизації + 8 сценаріїв задачі + «check = 0
-  writes».
-- `cea07bf`/`8dd6cbc` — жива UI-перевірка очищення на Preview → **1** атомарний
-  коміт. Локальні знімки станів (lock / check→applied / check→null / 375 px).
-- `<Е7 коміт>` — інструкція власнику + журнал + протокол + цей файл + опис PR #26.
+**Задача 12:50 (деталі — `docs/PANEL-progress.md`, тести — `PANEL-etap4-protocol.md` E–G):**
+- `1438378` — машинна ознака `outcome:"unknown"` (лише `WriteUncertainError`).
+- `fbdda32` — `check-result` = окрема лише-читаюча дія (звіряла конкретний ефект).
+- `a87d188` — symlink-guard; план очищення прив'язано до `headSha`.
+- `ba9d236` — чисті хелпери маршрутизації + 8 сценаріїв.
+- `cea07bf`/`8dd6cbc` — жива UI-перевірка **очищення** на Preview → 1 атомарний коміт.
+- `ee5c9a5` — інструкція власнику + журнал + протокол + PR #26.
 
-**Що ЩЕ НЕ зроблено (чесно):**
-- Повний Keystatic-цикл `zzz-test-panel` через UI саме на Preview (створення→
-  публікація→видалення) — потребує тривало активної сесії власника; покрито
-  П35 + 400 тестами. Цикл **очищення** через кнопку — виконано.
-- Справжній 375 px саме на Preview `/panel` — знято локально (розмітка
-  ідентична). Блокери власника Б1–Б5 — без змін, поза цією задачею.
+**Задача 13:47 (деталі — `PANEL-etap4-protocol.md` §H/§I/§J):**
+- `b00cd82` + `500d692` — «Перевірити результат» звіряє **ПОЧАТКОВУ захоплену
+  ціль** (`publishTargetToken` / `localeTextToken[locale]`), не властивості
+  рядка після оновлення. H1 (publish-А-урвалась + Б-опублікував-іншу → блок
+  лишається, `applied:null`), H2 (confirm-А-виконалось + текст-Б → «застосовано…
+  перегляньте картку», розблок) — перевірено **через відрендерений UI** з
+  лічильником запитів (без повторного запису). Нове: `PANEL_CONTENT_ROOT`.
+- `5a516fd`…`f581540` — **повний цикл `zzz-test-panel` через UI на Preview**
+  (create→3× confirm→publish→view→unpublish→delete→complete-deletion),
+  нуль-нетто, `git diff 500d692..f581540 -- src/content public/` порожній.
+- `a5be7fd` — протокол §I/§J.
 
-**Взірці:** знімки станів — у цій сесії чату (lock / check-applied / check-null /
-375 px) + `docs/PANEL-etap4-protocol.md` розділи E–G. Старіші —
-`~/Desktop/DREAM.CAR.VAVD-panel-samples-20260910/` (П42/П43, той самий UI).
+**Відкрите (єдине):** справжній CSS-в'юпорт **375 px на авторизованому Preview**
+`/panel` — блокер інструмента (`claude-in-chrome` міняє лише вікно ОС;
+`innerWidth` лишається 1471). **1 дія власника:** Preview `/panel` → DevTools
+device toolbar 375 → знімок (`PANEL-etap4-protocol.md` §J). Локальний 375 (§G) —
+окремий доказ. Блокери власника Б1–Б5 — без змін, поза задачею.
+
+**Взірці:** `~/Desktop/DREAM.CAR.VAVD-panel-samples-20260910/task-1347/PROTOCOL.md`
++ `docs/PANEL-etap4-protocol.md` §H/§I/§J. Знімки станів — у сесіях чату.
 
 **Патч постерів Dacia** — `docs/patches/dacia-poster-freeze.patch` +
 `README-dacia-poster-freeze.md`, підготовлений, **НЕ застосований**, не чіпати.
