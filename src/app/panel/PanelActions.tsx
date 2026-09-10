@@ -1,34 +1,78 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   busyLabelFor,
+  checkResultMessage,
   messageForResponse,
   NETWORK_UNCERTAIN_MSG,
+  PANEL_REFRESHED_MSG,
+  REFRESH_SLOW_MSG,
   type ActionMessage,
   type ActionResponse,
 } from "./actionMessages";
 
+/** After this long still refreshing, add a "taking longer than usual" hint. */
+const REFRESH_SLOW_MS = 6000;
+
 /**
- * `router.refresh()` re-fetches the server component but resolves synchronously
- * and (in this Next version) does not keep a `useTransition` pending for the
- * network round-trip — so on its own it gives the owner no "refreshing" cue
- * while `/panel` re-renders (a few seconds against GitHub). This holds a visible
- * `refreshing` flag for a bounded window after the call; the real end-state is
- * the freshly rendered panel that replaces it.
+ * Drives `router.refresh()` and reports **real** completion.
+ *
+ * `router.refresh()` re-fetches the server component and merges the new RSC
+ * payload; wrapped in `startTransition`, `useTransition`'s `isPending` stays
+ * true until that fresh data has arrived and rendered (Next App Router
+ * semantics) — so `busy` is the source of truth for "still refreshing", NOT a
+ * timer. The timer only flips `slow` on for a longer-than-usual wait so the UI
+ * can say so; it never ends the wait or claims success. `done` is set on the
+ * pending true→false edge — i.e. only after a confirmed refresh — and stays set
+ * until the next `refresh()` (the caller shows a brief "оновлено" note).
  */
-function useSoftRefresh(holdMs = 2500): { refreshing: boolean; refresh: () => void } {
+function useRefresh(): {
+  busy: boolean;
+  slow: boolean;
+  done: boolean;
+  refresh: () => void;
+} {
   const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPending, startTransition] = useTransition();
+  // `gen` bumps on each refresh; `doneGen`/`slowGen` say which refresh reached
+  // that state. All state, so nothing is read off a ref during render.
+  const [gen, setGen] = useState(0);
+  const [slowGen, setSlowGen] = useState(-1);
+  const [doneGen, setDoneGen] = useState(-1);
+  const [wasPending, setWasPending] = useState(false);
+
   const refresh = useCallback(() => {
-    setRefreshing(true);
-    router.refresh();
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setRefreshing(false), holdMs);
-  }, [router, holdMs]);
-  return { refreshing, refresh };
+    setGen((g) => g + 1);
+    setSlowGen(-1);
+    startTransition(() => router.refresh());
+  }, [router]);
+
+  // Completion edge (all-state "detect a change" pattern, no effect): the
+  // transition settled -> this refresh is done.
+  if (wasPending !== isPending) {
+    setWasPending(isPending);
+    if (wasPending && !isPending) {
+      setSlowGen(-1);
+      setDoneGen(gen);
+    }
+  }
+
+  // The only timer: after a while still pending, surface a "taking longer" hint.
+  // It never ends the wait or claims success — `isPending` alone does that.
+  useEffect(() => {
+    if (!isPending) return;
+    const t = setTimeout(() => setSlowGen(gen), REFRESH_SLOW_MS);
+    return () => clearTimeout(t);
+  }, [isPending, gen]);
+
+  return {
+    busy: isPending,
+    slow: isPending && slowGen === gen && gen > 0,
+    done: !isPending && doneGen === gen && gen > 0,
+    refresh,
+  };
 }
 
 export interface PanelVersions {
@@ -74,6 +118,7 @@ export function PanelButton({
   disabled,
   variant = "default",
   confirmText,
+  stateToken,
 }: {
   payload: ActionPayload;
   versions: PanelVersions;
@@ -81,17 +126,36 @@ export function PanelButton({
   disabled?: boolean;
   variant?: "default" | "primary" | "danger" | "solid";
   confirmText?: string;
+  /** A string from the server render that CHANGES iff this action took effect
+   *  (e.g. a row's publishState). Lets "Перевірити результат" say whether a
+   *  lost-response write actually landed. */
+  stateToken?: string;
 }) {
-  const { refreshing, refresh } = useSoftRefresh();
+  const { busy: refreshing, slow: refreshSlow, done: refreshDone, refresh } = useRefresh();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<ActionMessage | null>(null);
-  // Synchronous guard: `busy`/`refreshing` only disable on the next render, so
-  // two fast clicks — or a click during the post-action refresh — could fire a
-  // second request against stale versions. This blocks it immediately.
+  // Synchronous guard: state only disables on the next render, so two fast
+  // clicks — or a click during the post-action refresh — could fire a second
+  // request against stale versions. This blocks it immediately.
   const inFlight = useRef(false);
+  // Set when a response is LOST. The action is then locked until the owner runs
+  // a read-only "Перевірити результат" (`checking`), after which the fresh
+  // `stateToken` is compared to `tokenBefore` to say whether the write landed.
+  const [uncertain, setUncertain] = useState<{ tokenBefore: string; checking: boolean } | null>(null);
+
+  // The "Перевірити результат" refresh just settled — compare then unlock.
+  if (uncertain?.checking && refreshDone) {
+    const applied = stateToken === undefined ? null : stateToken !== uncertain.tokenBefore;
+    setMsg(checkResultMessage(applied));
+    setUncertain(null);
+  }
+  const checkResult = () => {
+    setUncertain((u) => (u ? { ...u, checking: true } : u));
+    refresh();
+  };
 
   async function run() {
-    if (inFlight.current || busy || refreshing) return;
+    if (inFlight.current || busy || refreshing || uncertain) return;
     if (confirmText && !window.confirm(confirmText)) return;
     inFlight.current = true;
     setBusy(true);
@@ -106,8 +170,9 @@ export function PanelButton({
       setMsg(messageForResponse(data, data.ok));
       if (data.ok) refresh();
     } catch {
-      // No response — the write may or may not have landed. Reload and check,
-      // do NOT retry blindly. Deliberately different wording from a confirmed save.
+      // No response — the write may or may not have landed. Lock this action
+      // and make the owner CHECK (read-only) before anything can be repeated.
+      setUncertain({ tokenBefore: stateToken ?? "", checking: false });
       setMsg({ kind: "conflict", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
@@ -126,22 +191,46 @@ export function PanelButton({
   }[variant];
 
   const working = busy || refreshing;
+  const label = busy
+    ? busyLabelFor(payload.action)
+    : refreshing
+      ? busyLabelFor("refresh")
+      : children;
+  const note =
+    refreshSlow ? REFRESH_SLOW_MSG : refreshDone && msg?.kind === "ok" ? PANEL_REFRESHED_MSG : null;
+
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <button
         type="button"
         onClick={run}
-        disabled={disabled || working}
+        disabled={disabled || working || !!uncertain}
         aria-busy={working}
         className={`${base} ${styles}`}
       >
-        {working ? busyLabelFor(busy ? payload.action : "refresh") : children}
+        {label}
       </button>
       {msg && (
         <StatusLine msg={msg}>
-          {msg.kind === "conflict" && (
-            <button type="button" className="ml-2 underline" onClick={refresh}>
-              Оновити
+          {note && <span className="ml-1 text-neutral-500">· {note}</span>}
+          {uncertain && (
+            <button
+              type="button"
+              className="ml-2 underline disabled:no-underline disabled:opacity-50"
+              disabled={refreshing}
+              onClick={checkResult}
+            >
+              {uncertain.checking && refreshing ? busyLabelFor("check-result") : "Перевірити результат"}
+            </button>
+          )}
+          {!uncertain && msg.kind === "conflict" && (
+            <button
+              type="button"
+              className="ml-2 underline disabled:no-underline disabled:opacity-50"
+              disabled={refreshing}
+              onClick={refresh}
+            >
+              {refreshing ? busyLabelFor("refresh") : "Оновити"}
             </button>
           )}
         </StatusLine>
@@ -161,25 +250,36 @@ export function PanelButton({
  * drop it and make the owner re-run the check.
  */
 export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersion?: string }) {
-  const { refreshing, refresh } = useSoftRefresh();
+  const { busy: refreshing, slow: refreshSlow, done: refreshDone, refresh } = useRefresh();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<ActionMessage | null>(null);
-  const [plan, setPlan] = useState<{ count: number; headSha: string } | null>(null);
+  // The dry-run plan is pinned to the branch head it was computed against
+  // (`headSha`). If `publishedVersion` (published.json token) moves — a publish
+  // landed — that snapshot is gone, so the plan is stale: drop it and make the
+  // owner re-run the check. Adjusted during render (reset-on-prop-change), not
+  // in an effect.
+  const [plan, setPlan] = useState<{ count: number; headSha: string; forVersion?: string } | null>(null);
   const inFlight = useRef(false);
+  const [uncertain, setUncertain] = useState<{ checking: boolean } | null>(null);
 
-  // A publish (or the post-cleanup refresh) moved the branch — the shown plan is
-  // stale, so drop it and make the owner re-run the check; a confirm against it
-  // would only conflict. Adjusted during render (the "reset state on prop
-  // change" pattern), not in an effect.
-  const [seenVersion, setSeenVersion] = useState(publishedVersion);
-  if (publishedVersion !== seenVersion) {
-    setSeenVersion(publishedVersion);
-    if (plan) setPlan(null);
+  if (plan && plan.forVersion !== publishedVersion) {
+    setPlan(null);
     if (msg) setMsg(null);
   }
+  if (uncertain?.checking && refreshDone) {
+    setUncertain(null);
+    setMsg({
+      kind: "conflict",
+      text: "Стан оновлено — подивіться, чи лишилися зайві копії, і за потреби запустіть очищення ще раз.",
+    });
+  }
+  const checkResult = () => {
+    setUncertain((u) => (u ? { checking: true } : u));
+    refresh();
+  };
 
   async function call(confirm: boolean, headSha?: string) {
-    if (inFlight.current || busy || refreshing) return;
+    if (inFlight.current || busy || refreshing || uncertain) return;
     inFlight.current = true;
     setBusy(true);
     setMsg(null);
@@ -193,7 +293,7 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
         cleanup?: { count: number; totalBytes: number; headSha: string };
       };
       if (data.ok && data.cleanup && !confirm) {
-        setPlan({ count: data.cleanup.count, headSha: data.cleanup.headSha });
+        setPlan({ count: data.cleanup.count, headSha: data.cleanup.headSha, forVersion: publishedVersion });
         setMsg({ kind: "ok", text: data.message });
       } else {
         setPlan(null);
@@ -205,6 +305,7 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
       }
     } catch {
       setPlan(null);
+      setUncertain({ checking: false });
       setMsg({ kind: "conflict", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
@@ -214,7 +315,18 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
 
   const cls =
     "inline-flex min-h-[36px] items-center rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed";
-  const working = busy || refreshing;
+  const working = busy || refreshing || !!uncertain;
+  const note = refreshSlow ? REFRESH_SLOW_MSG : refreshDone && msg?.kind === "ok" ? PANEL_REFRESHED_MSG : null;
+  const confirmLabel = busy
+    ? busyLabelFor("cleanup-confirm")
+    : refreshing
+      ? busyLabelFor("refresh")
+      : null;
+  const idleLabel = busy
+    ? busyLabelFor("cleanup-dry-run")
+    : refreshing
+      ? busyLabelFor("refresh")
+      : null;
   return (
     <span className="inline-flex flex-col items-start gap-1">
       {plan ? (
@@ -222,11 +334,11 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
           <button
             type="button"
             disabled={working}
-            aria-busy={working}
+            aria-busy={busy || refreshing}
             onClick={() => call(true, plan.headSha)}
             className={`${cls} border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950`}
           >
-            {working ? busyLabelFor("cleanup-confirm") : `Підтвердити — прибрати ${plan.count}`}
+            {confirmLabel ?? `Підтвердити — прибрати ${plan.count}`}
           </button>
           <button
             type="button"
@@ -244,29 +356,50 @@ export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersio
         <button
           type="button"
           disabled={working}
-          aria-busy={working}
+          aria-busy={busy || refreshing}
           onClick={() => call(false)}
           className={`${cls} border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800`}
         >
-          {working ? busyLabelFor("cleanup-dry-run") : "Прибрати старі копії фото"}
+          {idleLabel ?? "Прибрати старі копії фото"}
         </button>
       )}
-      {msg && <StatusLine msg={msg} />}
+      {msg && (
+        <StatusLine msg={msg}>
+          {note && <span className="ml-1 text-neutral-500">· {note}</span>}
+          {uncertain && (
+            <button
+              type="button"
+              className="ml-2 underline disabled:no-underline disabled:opacity-50"
+              disabled={refreshing}
+              onClick={checkResult}
+            >
+              {uncertain.checking && refreshing ? busyLabelFor("check-result") : "Перевірити результат"}
+            </button>
+          )}
+        </StatusLine>
+      )}
     </span>
   );
 }
 
 export function RefreshButton() {
-  const { refreshing, refresh } = useSoftRefresh();
+  const { busy: refreshing, slow: refreshSlow, refresh } = useRefresh();
   return (
-    <button
-      type="button"
-      onClick={refresh}
-      disabled={refreshing}
-      aria-busy={refreshing}
-      className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-neutral-800"
-    >
-      {refreshing ? busyLabelFor("refresh") : "Оновити стан"}
-    </button>
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        onClick={refresh}
+        disabled={refreshing}
+        aria-busy={refreshing}
+        className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-neutral-800"
+      >
+        {refreshing ? busyLabelFor("refresh") : "Оновити стан"}
+      </button>
+      {refreshSlow && (
+        <span className="text-[11px] text-neutral-500" role="status" aria-live="polite">
+          {REFRESH_SLOW_MSG}
+        </span>
+      )}
+    </span>
   );
 }

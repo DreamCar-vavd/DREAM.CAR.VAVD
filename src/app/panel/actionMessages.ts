@@ -47,12 +47,33 @@ export function messageForResponse(data: ActionResponse, refreshing = false): Ac
 
 /**
  * No response came back (timeout / dropped connection). The write MAY or MAY NOT
- * have landed, so the owner must reload and check — not retry blindly. This is
- * deliberately different wording from a confirmed save.
+ * have landed, so the owner must **check the current state** — not retry blindly.
+ * The action stays locked until that check runs (see `CHECK_RESULT_*`).
  */
 export const NETWORK_UNCERTAIN_MSG =
   "Відповідь від сервера не отримано — невідомо, чи застосовано дію. " +
-  "Оновіть панель і перевірте поточний стан, перш ніж повторювати.";
+  "Натисніть «Перевірити результат» (лише читає стан) перед тим, як повторювати.";
+
+/** Post-refresh reads the panel's fresh state and compares it to before the lost
+ *  action. We can only say "схоже" — the read is honest about its certainty. */
+export function checkResultMessage(applied: boolean | null): ActionMessage {
+  if (applied === true) {
+    return { kind: "ok", text: "Схоже, зміну вже застосовано — панель показує новий стан. Повторювати не треба." };
+  }
+  if (applied === false) {
+    return { kind: "conflict", text: "Схоже, зміну НЕ застосовано — стан незмінний. Можна повторити дію." };
+  }
+  return {
+    kind: "conflict",
+    text: "Стан прочитати не вдалося — результат досі невизначений. Спробуйте «Перевірити результат» ще раз.",
+  };
+}
+
+/** Shown while a refresh is taking longer than usual — a hint, not a failure. */
+export const REFRESH_SLOW_MSG = "Оновлення триває довше, ніж зазвичай…";
+
+/** Shown once, right after a confirmed `router.refresh()` settled. */
+export const PANEL_REFRESHED_MSG = "Готово — панель оновлено.";
 
 /** A verb phrase for the button while its request is in flight — never a bare "…". */
 export function busyLabelFor(action: string): string {
@@ -69,6 +90,8 @@ export function busyLabelFor(action: string): string {
       return "Перевіряємо…";
     case "cleanup-confirm":
       return "Прибираємо копії…";
+    case "check-result":
+      return "Перевіряємо стан…";
     case "refresh":
       return "Оновлюємо…";
     default:

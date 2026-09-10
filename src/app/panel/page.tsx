@@ -132,6 +132,7 @@ function OrphanRow({
           versions={versions}
           variant="danger"
           confirmText={`Прибрати «${row.id}» з сайту? Робочої картки вже немає — щоб повернути матеріал, доведеться створити її заново в Keystatic.`}
+          stateToken={String(row.publishedExists)}
         >
           Прибрати з сайту
         </PanelButton>
@@ -174,6 +175,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
                 <PanelButton
                   payload={{ action: "confirm-locale", kind, id: row.id, locale }}
                   versions={versions}
+                  stateToken={status}
                 >
                   Позначити перевіреним
                 </PanelButton>
@@ -197,6 +199,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
           versions={versions}
           variant="primary"
           disabled={row.blockers.length > 0 || row.publishState === "in-sync"}
+          stateToken={row.publishState}
         >
           {row.publishedExists ? "Опублікувати зміни" : "Опублікувати"}
         </PanelButton>
@@ -206,6 +209,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
             versions={versions}
             variant="danger"
             confirmText={`Прибрати «${row.id}» з сайту? Робоча картка лишиться в панелі.`}
+            stateToken={String(row.publishedExists)}
           >
             Прибрати з сайту
           </PanelButton>
@@ -307,7 +311,12 @@ function PendingDeletions({
         згодом створити знову — вона все одно потребуватиме нового підтвердження мов.
       </p>
       <div className="mt-3">
-        <PanelButton payload={{ action: "complete-deletion" }} versions={versions} variant="solid">
+        <PanelButton
+          payload={{ action: "complete-deletion" }}
+          versions={versions}
+          variant="solid"
+          stateToken={String(slugs.length)}
+        >
           Завершити видалення ({slugs.length})
         </PanelButton>
       </div>

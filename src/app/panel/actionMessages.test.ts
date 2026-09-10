@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { busyLabelFor, messageForResponse, NETWORK_UNCERTAIN_MSG } from "./actionMessages";
+import {
+  busyLabelFor,
+  checkResultMessage,
+  messageForResponse,
+  NETWORK_UNCERTAIN_MSG,
+  PANEL_REFRESHED_MSG,
+  REFRESH_SLOW_MSG,
+} from "./actionMessages";
 
 test("messageForResponse: a confirmed write is green; while the panel refreshes it says so", () => {
   const settled = messageForResponse({ ok: true, message: "Опубліковано." });
@@ -39,12 +46,34 @@ test("messageForResponse: blockers count is appended for a gated publish", () =>
   assert.match(m.text, /\(2 пункт\(и\)\)/);
 });
 
-test("the network-uncertain message tells the owner to reload and check, not retry", () => {
+test("the network-uncertain message points at the read-only check, not a blind retry", () => {
   assert.match(NETWORK_UNCERTAIN_MSG, /не отримано/);
-  assert.match(NETWORK_UNCERTAIN_MSG, /Оновіть панель/);
-  assert.match(NETWORK_UNCERTAIN_MSG, /перш ніж повторювати/);
-  // and it is worded differently from a confirmed save
+  assert.match(NETWORK_UNCERTAIN_MSG, /Перевірити результат/);
+  assert.match(NETWORK_UNCERTAIN_MSG, /лише читає стан/);
+  assert.match(NETWORK_UNCERTAIN_MSG, /перед тим, як повторювати/);
   assert.doesNotMatch(NETWORK_UNCERTAIN_MSG, /^Опубліковано|^Збережено/);
+});
+
+test("checkResultMessage: says applied / not applied / undetermined — always hedged", () => {
+  const yes = checkResultMessage(true);
+  assert.equal(yes.kind, "ok");
+  assert.match(yes.text, /вже застосовано|застосовано/);
+  assert.match(yes.text, /[Пп]овторювати не треба|не треба/);
+
+  const no = checkResultMessage(false);
+  assert.equal(no.kind, "conflict");
+  assert.match(no.text, /НЕ застосовано/);
+  assert.match(no.text, /повторити/);
+
+  const dunno = checkResultMessage(null);
+  assert.equal(dunno.kind, "conflict");
+  assert.match(dunno.text, /невизначений|не вдалося/);
+});
+
+test("REFRESH_SLOW_MSG is a hint, not a failure; PANEL_REFRESHED_MSG confirms done", () => {
+  assert.match(REFRESH_SLOW_MSG, /довше/);
+  assert.doesNotMatch(REFRESH_SLOW_MSG, /помилк|не вдалося|збій/i);
+  assert.match(PANEL_REFRESHED_MSG, /оновлено/);
 });
 
 test("busyLabelFor: every action has a spoken verb phrase, never a bare ellipsis", () => {
@@ -55,6 +84,7 @@ test("busyLabelFor: every action has a spoken verb phrase, never a bare ellipsis
     "complete-deletion",
     "cleanup-dry-run",
     "cleanup-confirm",
+    "check-result",
     "refresh",
     "something-new",
   ]) {
