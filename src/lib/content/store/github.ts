@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ConcurrencyGate } from "./concurrencyGate";
 import {
   ConflictError,
   StorageAuthError,
@@ -65,29 +66,6 @@ const DEFAULT_OPERATION_TIMEOUT_MS = 20_000;
  * at this width that is ~3 waves instead of ~16 sequential round-trips.
  */
 const READ_CONCURRENCY = 8;
-
-/**
- * A bounded-concurrency gate. `run` resolves the task in submission order of
- * acquisition; at most `max` tasks execute at once, the rest queue. A task's
- * rejection propagates to its own `run` caller only — the gate keeps draining.
- */
-class ConcurrencyGate {
-  private active = 0;
-  private readonly waiters: Array<() => void> = [];
-  constructor(private readonly max: number) {}
-  async run<R>(task: () => Promise<R>): Promise<R> {
-    if (this.active >= this.max) {
-      await new Promise<void>((resolve) => this.waiters.push(resolve));
-    }
-    this.active += 1;
-    try {
-      return await task();
-    } finally {
-      this.active -= 1;
-      this.waiters.shift()?.();
-    }
-  }
-}
 
 export class GitHubStorage implements PanelStorage {
   readonly mode = "github" as const;
