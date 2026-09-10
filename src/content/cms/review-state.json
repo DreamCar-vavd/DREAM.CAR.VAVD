@@ -253,20 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "gallery:zzz-photo-ab": {
-    "instance": "mtvozjun-ma4dqtnu",
-    "uk": {
-      "hash": "a2b0ab1caece898387a1b0c4fe57d683bfa42b2d3ca46e013c3f51e02e14fe1d",
-      "at": "2026-09-10T15:46:58.808Z"
-    },
-    "en": {
-      "hash": "b5d253502e7eb32401c175932ddfd6392dd1f7d1574d4b65b4ea9efcf9398d9f",
-      "at": "2026-09-10T15:47:24.777Z"
-    },
-    "ru": {
-      "hash": "3d3e8f8db3a3f2c2cb95c0ddcb66b1e6d19ceb9dbc646303ed5ca424c5807951",
-      "at": "2026-09-10T15:47:37.961Z"
-    }
   }
 }
