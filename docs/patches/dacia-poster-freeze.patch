@@ -1,0 +1,22 @@
+diff --git a/src/content/cms/published.json b/src/content/cms/published.json
+index a663f09..551629e 100644
+--- a/src/content/cms/published.json
++++ b/src/content/cms/published.json
+@@ -122,7 +122,7 @@
+       "video": {
+         "mode": "legacy-file",
+         "src": "/images/cms/cars/dacia-sandero-2022/video/dacia-walkaround.mp4",
+-        "posterSrc": "/images/cms/cars/dacia-sandero-2022/photos/0/image.jpg"
++        "posterSrc": "/images/cms/cars/dacia-sandero-2022/_pub/56890ea5391a495c6dc81ce0.jpg"
+       },
+       "uk": {
+         "title": "Dacia Sandero",
+@@ -199,7 +199,7 @@
+       "video": {
+         "mode": "legacy-file",
+         "src": "/images/cms/cars/dacia-sandero-comfort-2019/video/12-walkaround.mp4",
+-        "posterSrc": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
++        "posterSrc": "/images/cms/cars/dacia-sandero-comfort-2019/_pub/5f369d5b086b093691aa6696.jpeg"
+       },
+       "uk": {
+         "title": "Dacia Sandero Comfort",

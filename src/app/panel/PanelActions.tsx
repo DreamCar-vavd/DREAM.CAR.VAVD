@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 export interface PanelVersions {
   car: string;
@@ -38,9 +38,15 @@ export function PanelButton({
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err" | "conflict"; text: string } | null>(null);
+  // Synchronous guard: `busy` state updates on the next render, so two fast
+  // clicks could both pass `disabled` and fire the request twice. This blocks
+  // the second one immediately.
+  const inFlight = useRef(false);
 
   async function run() {
+    if (inFlight.current) return;
     if (confirmText && !window.confirm(confirmText)) return;
+    inFlight.current = true;
     setBusy(true);
     setMsg(null);
     try {
@@ -74,6 +80,7 @@ export function PanelButton({
       });
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
@@ -135,8 +142,11 @@ export function CleanupFrozenMediaButton() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err" | "conflict"; text: string } | null>(null);
   const [pending, setPending] = useState<{ count: number; headSha: string } | null>(null);
+  const inFlight = useRef(false);
 
   async function call(confirm: boolean, headSha?: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setMsg(null);
     try {
@@ -171,6 +181,7 @@ export function CleanupFrozenMediaButton() {
       });
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 

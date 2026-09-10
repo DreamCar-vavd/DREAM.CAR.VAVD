@@ -127,6 +127,66 @@ test("readDir lists the fixed dir, fetches each file, version = tree of blob sha
   assert.equal(calls.filter((c) => c.url.includes("/cars/") && c.url.includes(".json")).length, 2);
 });
 
+test("readDir reads its JSON files with bounded parallelism, preserving order + version", async () => {
+  const N = 20;
+  const list = Array.from({ length: N }, (_, i) => ({ name: `f${String(i).padStart(2, "0")}.json`, sha: `s${i}`, type: "file" }));
+  let inFlight = 0;
+  let peak = 0;
+  const impl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/contents/src/content/cms/cars?ref=")) {
+      return new Response(JSON.stringify(list), { status: 200 });
+    }
+    inFlight += 1;
+    peak = Math.max(peak, inFlight);
+    await new Promise((r) => setTimeout(r, 15));
+    inFlight -= 1;
+    const m = url.match(/f(\d\d)\.json/)!;
+    return new Response(
+      JSON.stringify({ content: b64(`{"n":${Number(m[1])}}`), sha: `s${Number(m[1])}`, encoding: "base64" }),
+      { status: 200 },
+    );
+  };
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  const started = Date.now();
+  const r = await gh.readDir("src/content/cms/cars");
+  const elapsed = Date.now() - started;
+
+  // order preserved despite concurrency
+  assert.deepEqual(r.data.map((e) => e.name), list.map((f) => f.name));
+  assert.deepEqual(r.data.map((e) => JSON.parse(e.text).n), Array.from({ length: N }, (_, i) => i));
+  assert.equal(r.version, list.map((f) => `${f.name}:${f.sha}`).join("|"));
+  // parallel, but capped: >1 concurrent, never more than the gate width
+  assert.ok(peak > 1, `expected concurrency, saw peak ${peak}`);
+  assert.ok(peak <= 8, `expected <= 8 in flight, saw peak ${peak}`);
+  // 20 files at 15ms, 8-wide ≈ 3 waves ≈ 45ms — nowhere near 20×15=300ms serial
+  assert.ok(elapsed < 200, `expected parallel speed, took ${elapsed}ms`);
+});
+
+test("the concurrency cap is shared across ALL collections' readDir calls at once", async () => {
+  const dirs = ["cars", "gallery", "services"] as const;
+  const perDir = 10;
+  let inFlight = 0;
+  let peak = 0;
+  const impl: typeof fetch = async (input) => {
+    const url = String(input);
+    const listMatch = url.match(/\/contents\/src\/content\/cms\/(cars|gallery|services)\?ref=/);
+    if (listMatch) {
+      const body = Array.from({ length: perDir }, (_, i) => ({ name: `f${i}.json`, sha: `${listMatch[1]}${i}`, type: "file" }));
+      return new Response(JSON.stringify(body), { status: 200 });
+    }
+    inFlight += 1;
+    peak = Math.max(peak, inFlight);
+    await new Promise((r) => setTimeout(r, 15));
+    inFlight -= 1;
+    return new Response(JSON.stringify({ content: b64("{}"), sha: "x", encoding: "base64" }), { status: 200 });
+  };
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await Promise.all(dirs.map((d) => gh.readDir(`src/content/cms/${d}`)));
+  // 3 dirs × 10 files = 30 concurrent submissions, but ONE shared gate
+  assert.ok(peak > 1 && peak <= 8, `shared cap breached or no parallelism: peak ${peak}`);
+});
+
 test("deployStatus maps GitHub deployment status to panel states + flags a test branch", async () => {
   const make = (state: string) =>
     fakeGitHub({
@@ -261,8 +321,8 @@ test("deployStatus degrades to 'unknown' when GitHub is unreachable (no throw, c
   assert.equal("isTest" in d && d.isTest, true);
 });
 
-test("the whole-instance budget caps a slow directory listing — no unbounded total wait", async () => {
-  const listBody = Array.from({ length: 20 }, (_, i) => ({
+test("the whole-instance budget still caps a slow directory read — bounded parallelism does not defeat it", async () => {
+  const listBody = Array.from({ length: 60 }, (_, i) => ({
     name: `f${i}.json`,
     sha: `s${i}`,
     type: "file",
@@ -279,7 +339,7 @@ test("the whole-instance budget caps a slow directory listing — no unbounded t
                 { status: 200 },
               ),
         );
-      }, 25);
+      }, 50);
     });
   const gh = new GitHubStorage({
     ...CFG,
@@ -288,8 +348,10 @@ test("the whole-instance budget caps a slow directory listing — no unbounded t
     operationTimeoutMs: 120,
   });
   const started = Date.now();
+  // 60 files at 8-wide × 50ms would need ~400ms of GitHub time; the 120ms
+  // budget aborts the requests that start after the deadline.
   await assert.rejects(() => gh.readDir("src/content/cms/cars"), StorageUnavailableError);
-  assert.ok(Date.now() - started < 400, "stopped at the budget, did not wait for all 20 files");
+  assert.ok(Date.now() - started < 600, "stopped at the budget, did not wait for all 60 files");
 });
 
 test("401 on a read = the session is gone -> StorageAuthError", async () => {

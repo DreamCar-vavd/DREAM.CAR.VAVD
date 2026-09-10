@@ -56,6 +56,39 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
  */
 const DEFAULT_OPERATION_TIMEOUT_MS = 20_000;
 
+/**
+ * Ceiling on GitHub content reads in flight AT ONCE through one storage
+ * instance — shared across every `readDir` a page render fans out (all five
+ * collections together), so a directory with many files no longer serialises
+ * its JSON reads yet a render never bursts dozens of requests at GitHub (which
+ * trips its secondary rate limit). One render ≈ 5 listings + ~16 file reads;
+ * at this width that is ~3 waves instead of ~16 sequential round-trips.
+ */
+const READ_CONCURRENCY = 8;
+
+/**
+ * A bounded-concurrency gate. `run` resolves the task in submission order of
+ * acquisition; at most `max` tasks execute at once, the rest queue. A task's
+ * rejection propagates to its own `run` caller only — the gate keeps draining.
+ */
+class ConcurrencyGate {
+  private active = 0;
+  private readonly waiters: Array<() => void> = [];
+  constructor(private readonly max: number) {}
+  async run<R>(task: () => Promise<R>): Promise<R> {
+    if (this.active >= this.max) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+    this.active += 1;
+    try {
+      return await task();
+    } finally {
+      this.active -= 1;
+      this.waiters.shift()?.();
+    }
+  }
+}
+
 export class GitHubStorage implements PanelStorage {
   readonly mode = "github" as const;
   readonly branch: string;
@@ -65,6 +98,8 @@ export class GitHubStorage implements PanelStorage {
   private readonly requestTimeoutMs: number;
   /** Absolute time (ms epoch) after which no further request may start. */
   private readonly deadline: number;
+  /** Shared across every `readDir` on this instance — see READ_CONCURRENCY. */
+  private readonly readGate = new ConcurrencyGate(READ_CONCURRENCY);
 
   constructor(cfg: GitHubStorageConfig) {
     this.cfg = cfg;
@@ -219,8 +254,8 @@ export class GitHubStorage implements PanelStorage {
 
   async readDir(dir: AllowedDir, atSha?: string): Promise<Versioned<DirEntry[]>> {
     assertAllowedDir(dir);
-    const { status, body, headers } = await this.gh(
-      this.repoUrl(`/contents/${dir}?ref=${this.refOr(atSha)}`),
+    const { status, body, headers } = await this.readGate.run(() =>
+      this.gh(this.repoUrl(`/contents/${dir}?ref=${this.refOr(atSha)}`)),
     );
     if (status === 404) return { data: [], version: "" };
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
@@ -228,11 +263,17 @@ export class GitHubStorage implements PanelStorage {
     const files = (body as { name: string; sha: string; type: string }[])
       .filter((e) => e.type === "file" && e.name.endsWith(".json") && !e.name.startsWith("."))
       .sort((a, b) => a.name.localeCompare(b.name));
-    const entries: DirEntry[] = [];
-    for (const e of files) {
-      const c = await this.getContent(`${dir}/${e.name}`, atSha);
-      entries.push({ name: e.name, text: c.text ?? "{}" });
-    }
+    // Read the JSON files with BOUNDED parallelism, shared across every kind's
+    // readDir (this.readGate). `Promise.all` preserves array order, so `entries`
+    // still lines up with `files`; a single failure rejects the whole call, as
+    // the old sequential loop did; each request still checks the time budget.
+    const entries = await Promise.all(
+      files.map((e) =>
+        this.readGate
+          .run(() => this.getContent(`${dir}/${e.name}`, atSha))
+          .then((c): DirEntry => ({ name: e.name, text: c.text ?? "{}" })),
+      ),
+    );
     // Version = tree of blob SHAs; changes iff any file in the dir changes.
     return { data: entries, version: files.map((e) => `${e.name}:${e.sha}`).join("|") };
   }
