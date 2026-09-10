@@ -192,12 +192,19 @@ function rebuildSnapshot(prev: Snapshot, kindKey: KindKey, nextList: unknown[]):
 const IMG_EXT_RE = /\.(jpe?g|png|webp)$/i;
 const PUB_SEG = `/${PUBLISHED_MEDIA_DIR}/`;
 
-/** Public image URLs a snapshot item points at (photos[] for most kinds; the
- *  single `image` for promos). */
+/** Public image URLs a snapshot item points at, in a STABLE order: photos[]
+ *  first (or the single `image` for promos), then the car video poster. Used
+ *  both to plan frozen copies and to compare slot-by-slot, so the two lists
+ *  must line up. */
 function itemImageUrls(kindKey: KindKey, item: Record<string, unknown>): string[] {
   if (kindKey === "promo") return [String(item.image ?? "")].filter(Boolean);
   const photos = Array.isArray(item.photos) ? (item.photos as Record<string, unknown>[]) : [];
-  return photos.map((p) => String(p?.image ?? "")).filter(Boolean);
+  const urls = photos.map((p) => String(p?.image ?? ""));
+  if (kindKey === "car") {
+    const video = item.video as { posterSrc?: unknown } | undefined;
+    urls.push(String(video?.posterSrc ?? "")); // kept even when "" -> dropped by filter
+  }
+  return urls.filter(Boolean);
 }
 /** A copy of `item` with each image URL swapped per `rewrite` (old -> new). */
 function withRewrittenImages(
@@ -211,13 +218,22 @@ function withRewrittenImages(
     return next ? { ...item, image: next } : item;
   }
   const photos = Array.isArray(item.photos) ? (item.photos as Record<string, unknown>[]) : [];
-  return {
+  const out: Record<string, unknown> = {
     ...item,
     photos: photos.map((p) => {
       const next = rewrite.get(String(p?.image ?? ""));
       return next ? { ...p, image: next } : p;
     }),
   };
+  if (kindKey === "car" && item.video && typeof item.video === "object") {
+    const video = { ...(item.video as Record<string, unknown>) };
+    const next = rewrite.get(String(video.posterSrc ?? ""));
+    if (next) {
+      video.posterSrc = next;
+      out.video = video;
+    }
+  }
+  return out;
 }
 
 const mediaHash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex").slice(0, 24);
@@ -225,16 +241,17 @@ const frozenRel = (dir: string, slug: string, hash: string, ext: string) =>
   `images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${hash}.${ext}`;
 
 /**
- * Plan the frozen copy of every photo this item references: read each working
- * file, hash it, and return the `_pub/` copies to write plus the item with its
- * URLs rewritten. NOTHING is written here.
+ * Plan the frozen copy of every image this item references — the `photos[]` and,
+ * for a car, the video `posterSrc` when it is a local CMS image — by reading
+ * each working file, hashing it, and returning the `_pub/` copies to write plus
+ * the item with its URLs rewritten. NOTHING is written here.
  *
- * A card that names a photo whose file is genuinely missing → `MediaMissingError`
- * (publish must abort; the previous published photos stay live). A network /
- * auth / rate-limit failure propagates its own typed error. An OPTIONAL photo
- * that was never filled in never reaches this (empty `image` is dropped by
- * `itemImageUrls`). A URL already under `_pub/`, or one that is not a CMS image
- * path at all, is passed through untouched.
+ * A card that names an image whose file is genuinely missing → `MediaMissingError`
+ * (publish must abort; the previous published images stay live). A network /
+ * auth / rate-limit failure propagates its own typed error. An OPTIONAL image
+ * that was never filled in never reaches this (empty `image`/`posterSrc` is
+ * dropped by `itemImageUrls`). A URL already under `_pub/`, an external link, or
+ * a path outside `/images/cms/` is passed through untouched.
  */
 async function planFrozenMedia(
   storage: PanelStorage,
@@ -248,6 +265,7 @@ async function planFrozenMedia(
   const puts: { path: string; bytes: Uint8Array }[] = [];
   for (const url of itemImageUrls(kindKey, item)) {
     if (url.includes(PUB_SEG)) continue; // already frozen
+    if (rewrite.has(url)) continue; // same file named twice (e.g. poster == photo 0)
     if (!url.startsWith("/images/cms/") || !IMG_EXT_RE.test(url)) continue; // not our media
     const bytes = await storage.readMedia(`public${url}`); // throws on network/auth/etc.
     if (bytes === null) throw new MediaMissingError(`public${url}`); // named file is gone
@@ -295,7 +313,11 @@ function inSyncIgnoringFrozenPhotos(
   const stripPhotoUrls = (o: Record<string, unknown>) => {
     if (kindKey === "promo") return { ...o, image: "" };
     const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
-    return { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
+    const out: Record<string, unknown> = { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
+    if (kindKey === "car" && o.video && typeof o.video === "object") {
+      out.video = { ...(o.video as Record<string, unknown>), posterSrc: "" };
+    }
+    return out;
   };
   if (stable(stripPhotoUrls(pub)) !== stable(stripPhotoUrls(item))) return false;
 

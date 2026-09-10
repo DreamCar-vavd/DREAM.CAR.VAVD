@@ -1139,6 +1139,128 @@ test("§4 a photo over 1 MB freezes byte-identically, reads back 'in-sync', and 
   );
 });
 
+// ---------------------------------------------------------------------------
+// Car video poster (task 2026-09-10 §4) — a published image like any photo
+// ---------------------------------------------------------------------------
+
+const carWithPoster = (over: Record<string, unknown> = {}) =>
+  carJson({
+    id: "c1",
+    photos: [{ image: "/images/cms/cars/c1/photos/0/image.jpg", caption: "" }],
+    video: { mode: "legacy-file", src: "/images/cms/cars/c1/video/x.mp4", posterSrc: "/images/cms/cars/c1/photos/1/image.jpg" },
+    ...over,
+  });
+
+function carPosterStore() {
+  const s = baseStore();
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carWithPoster() }]);
+  s.seedFile("src/content/cms/review-state.json", JSON.stringify(carReviewAll));
+  s.seedMedia("public/images/cms/cars/c1/photos/0/image.jpg", jpgBytes("photo0"));
+  s.seedMedia("public/images/cms/cars/c1/photos/1/image.jpg", jpgBytes("poster"));
+  return s;
+}
+const carSnap = (s: FakeStorage) => JSON.parse(s.files.get("src/content/cms/published.json")!).cars[0];
+const carRow = async (s: FakeStorage) =>
+  (await getPanelData(s)).groups.find((g) => g.kind === "car")!.rows[0].publishState;
+
+test("§4 poster: publish freezes the car video poster into _pub/ (a new frozen path appears)", async () => {
+  const s = carPosterStore();
+  const v = await versions(s);
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal(r.ok, true, r.message);
+  const poster = carSnap(s).video.posterSrc;
+  assert.match(poster, /^\/images\/cms\/cars\/c1\/_pub\/[a-f0-9]{24}\.jpg$/);
+  assert.ok(s.media.has(`public${poster}`));
+  assert.ok(s.media.has("public/images/cms/cars/c1/photos/1/image.jpg")); // working file kept
+  assert.equal(await carRow(s), "in-sync"); // no phantom change
+});
+
+test("§4 poster: replacing the poster in a draft reads as 'modified'", async () => {
+  const s = carPosterStore();
+  const v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal(await carRow(s), "in-sync");
+  // Same path, new bytes (Keystatic re-upload).
+  s.seedMedia("public/images/cms/cars/c1/photos/1/image.jpg", jpgBytes("poster-v2"));
+  assert.equal(await carRow(s), "modified");
+});
+
+test("§4 poster: a draft poster edit does NOT change the published poster until re-publish", async () => {
+  const s = carPosterStore();
+  let v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  const publishedPoster = carSnap(s).video.posterSrc;
+  const frozenBytes = [...s.media.get(`public${publishedPoster}`)!];
+
+  s.seedMedia("public/images/cms/cars/c1/photos/1/image.jpg", jpgBytes("poster-v2"));
+  // The published snapshot still points at the OLD frozen copy, bytes intact.
+  assert.equal(carSnap(s).video.posterSrc, publishedPoster);
+  assert.deepEqual([...s.media.get(`public${publishedPoster}`)!], frozenBytes);
+
+  // Re-publish: the new poster is frozen and the snapshot moves to it.
+  v = await versions(s);
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal(r.ok, true, r.message);
+  assert.notEqual(carSnap(s).video.posterSrc, publishedPoster);
+});
+
+test("§4 poster: a poster naming a missing file blocks publish; the previous published poster stays", async () => {
+  const s = carPosterStore();
+  let v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  const publishedBefore = s.files.get("src/content/cms/published.json")!;
+
+  s.media.delete("public/images/cms/cars/c1/photos/1/image.jpg"); // poster file gone
+  s.seedDir("src/content/cms/cars", [{ name: "c1.json", text: carWithPoster({ price: "£2" }) }]);
+  v = await versions(s);
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal(r.ok, false);
+  assert.match(r.message, /фото|Фото/);
+  assert.notEqual((r as { transient?: boolean }).transient, true);
+  assert.equal(s.files.get("src/content/cms/published.json"), publishedBefore);
+});
+
+test("§4 poster: an empty optional poster is fine — no error, nothing frozen for it", async () => {
+  const s = carPosterStore();
+  s.seedDir("src/content/cms/cars", [
+    { name: "c1.json", text: carWithPoster({ video: { mode: "none", src: "", posterSrc: "" } }) },
+  ]);
+  const v = await versions(s);
+  const r = await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(carSnap(s).video.posterSrc, "");
+  // Only the one photo got a frozen copy.
+  assert.equal([...s.media.keys()].filter((k) => k.includes("/_pub/")).length, 1);
+});
+
+test("§4 poster: the frozen poster is protected from cleanup (still referenced)", async () => {
+  const s = carPosterStore();
+  const v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  const poster = carSnap(s).video.posterSrc;
+  const c = await cleanupFrozenMedia(s, {}); // dry run
+  assert.equal(c.ok, true);
+  assert.equal((c as { cleanup?: unknown }).cleanup, undefined); // nothing to remove
+  assert.ok(s.media.has(`public${poster}`));
+});
+
+test("§4 poster: a poster pointing at photo 0 shares one frozen copy (no double freeze)", async () => {
+  const s = carPosterStore();
+  s.seedDir("src/content/cms/cars", [
+    {
+      name: "c1.json",
+      text: carWithPoster({
+        video: { mode: "legacy-file", src: "/images/cms/cars/c1/video/x.mp4", posterSrc: "/images/cms/cars/c1/photos/0/image.jpg" },
+      }),
+    },
+  ]);
+  const v = await versions(s);
+  await publishItem(s, "car", "c1", { working: v.car, review: v.review, published: v.published });
+  const car = carSnap(s);
+  assert.equal(car.photos[0].image, car.video.posterSrc); // same frozen path
+  assert.equal([...s.media.keys()].filter((k) => k.includes("/_pub/")).length, 1);
+});
+
 test("publishing one slug never touches another slug's frozen _pub folder", async () => {
   const s = photoStore();
   // s1 already published with a frozen photo.
