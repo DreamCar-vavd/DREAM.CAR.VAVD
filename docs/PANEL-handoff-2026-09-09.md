@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`7ac1cc4`** (П42) ← `8a866e7` (док П41) ← `865eddd` (П41 §4) ← `62c8554` (П41 §1–2) ← `5e46cc3`/`ee93d24` (П40). Між `865eddd`↔`8a866e7` — 3 `zzz` коміти живої перевірки очищення, **чистий діф нульовий**. Останній НЕ-тестовий SHA — `7ac1cc4`. |
+| **Remote HEAD** | **`b3d8543`** (П43) ← `f53f8fa` ← `1e923c6` ← `d95f9db`/`7ac1cc4` (П42) ← `8a866e7` (П41) ← `5e46cc3`/`ee93d24` (П40). Між `865eddd`↔`8a866e7` — 3 `zzz` коміти живої перевірки очищення, **чистий діф нульовий**. Останній НЕ-тестовий SHA — `b3d8543`. |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `7ac1cc4` | success |
-| Vercel Preview на `7ac1cc4` | success |
-| Тести / tsc / eslint | **354 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `1e923c6`/`f53f8fa`/`b3d8543` | success |
+| Vercel Preview на `b3d8543` | success |
+| Тести / tsc / eslint | **374 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -54,7 +54,22 @@
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П42)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П43)
+
+- **П43 — фікс гонки `ConcurrencyGate` + життєвий цикл кнопок (задача 2026-09-10 10:55), `1e923c6`+`f53f8fa`+`b3d8543`:**
+  - **§1** ґейт передавав місце очікувачу з вікном, у яке новий `run()` міг
+    перехопити дозвіл → `max+1` активних. Фікс: пряма передача дозволу (`active`
+    не падає, поки черга непорожня). Винесено в `store/concurrencyGate.ts` +
+    `concurrencyGate.test.ts` (розгортка вікна race; наївний ламається, фікс —
+    ні). Ліміт лишається 8.
+  - **§2** guard кнопок на `busy||refreshing`; описові мітки («Публікується…»);
+    розрізнення «збережено» vs «відповідь не отримано»; `aria-live` статуси;
+    `CleanupFrozenMediaButton` скидає застарілий план при зміні `publishedVersion`.
+    Чиста логіка → `actionMessages.ts` + 7 тестів.
+  - **§3** `useSoftRefresh` — видимий стан `refreshing` ~2.5 с після дії
+    (`router.refresh()` не тримає `useTransition` pending). `loading.tsx`
+    підтверджено на прямому відкритті (перший чанк HTML має скелет).
+  - 374 pass · tsc 0 · eslint 0 · build OK. Реальний контент недоторканий.
 
 - **П42 — паралельний `readDir` + індикація + захист від подвійного кліку (задача 2026-09-10 10:23), `7ac1cc4`:**
   - **§2** `GitHubStorage.readDir` читає JSON колекції через `ConcurrencyGate`
