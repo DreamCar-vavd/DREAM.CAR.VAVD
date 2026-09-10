@@ -12,21 +12,79 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`b3d8543`** (П43) ← `f53f8fa` ← `1e923c6` ← `d95f9db`/`7ac1cc4` (П42) ← `8a866e7` (П41) ← `5e46cc3`/`ee93d24` (П40). Між `865eddd`↔`8a866e7` — 3 `zzz` коміти живої перевірки очищення, **чистий діф нульовий**. Останній НЕ-тестовий SHA — `b3d8543`. |
+| **Remote HEAD** | **`866b271`** (П44 Е1–Е4 частково) ← `2c4720e` ← `34d0ae0` (3 `zzz-e4` коміти живої перевірки Е4, **чистий діф нульовий**) ← `21d9db4` (П44 Е2+Е3) ← `9246455` (П44 Е1) ← `5a2299a` (док П43) ← `b3d8543` ← `f53f8fa` ← `1e923c6` ← `d95f9db`/`7ac1cc4` (П42). **Останній НЕ-тестовий код — `21d9db4`.** |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `1e923c6`/`f53f8fa`/`b3d8543` | success |
-| Vercel Preview на `b3d8543` | success |
-| Тести / tsc / eslint | **374 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `9246455`/`21d9db4` | success |
+| Vercel Preview на `21d9db4` | success (deployment `21d9db4bf`) |
+| Тести / tsc / eslint | **379 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
-**Єдина зміна КОНТЕНТУ проти `604c27e`** (початок цієї роботи):
-`src/content/cms/published.json` → поле `publishedAt`
-(`2026-09-06T00:00:00Z` → `2026-09-09T14:31:45Z`) — штатна зміна `publishItem`
-після тесту `zzz-test-panel`. `review-state.json` — байт-у-байт як `604c27e`.
-Решта змін у `f6e522f` — новий код + docs + тести. `git grep zzz` у
-`src/content/**`/`public/**` = нічого (окрім протоколу `docs/PANEL-test-zzz-run-20260909.md`).
+**Реальний контент на HEAD `866b271`:** `git diff HEAD -- public/ src/content/`
+**порожній** (звірено). 49 `_pub`-файлів. Зміни П38–П44 у контенті — лише
+`bornAt` (17 карток), namespaced review-ключі, `_pub`-шляхи фото та `publishedAt`
+у `published.json` (див. записи П38/П39 у журналі; бізнес-тексти й ціни — ні).
+Усі `zzz-*` коміти живої перевірки самоскасовуються (додано+прибрано,
+чистий діф нульовий) — на HEAD жодних `zzz` файлів немає.
+
+---
+
+## НАСТУПНИЙ КРОК П44 (для нового чату — почати звідси)
+
+**Стан:** П44 Е1–Е3 закінчені й задеплоєні; Е4 частково; Е5 не почато.
+Почати від актуальної `origin/codex/admin-panel-spike` (`git fetch && git
+merge --ff-only`); контрольна точка коду — `21d9db4`, tip — `866b271`.
+
+**Що вже є (не переробляти):**
+- Е1 (`9246455`) — `LocalFsStorage({ root })` + `mutablePath()` guard +
+  `src/lib/content/store/localFs.test.ts` (пісочниця в `os.tmpdir()`).
+- Е2 (`21d9db4`) — `useRefresh()` у `src/app/panel/PanelActions.tsx`:
+  завершення = `useTransition().isPending` false; таймер `REFRESH_SLOW_MS=6000`
+  лише для підказки `slow`. Виміряно: 8с рендер → блок 8.8с (не 2.5), швидкий →
+  1.2с.
+- Е3 (`21d9db4`) — стан `uncertain` у `PanelButton`/`CleanupFrozenMediaButton`;
+  кнопка «Перевірити результат» (лише `router.refresh()`); `stateToken` порівняння
+  → `checkResultMessage` («схоже, застосовано/НЕ застосовано/невизначений»);
+  жодного авто-запису. Хелпери в `src/app/panel/actionMessages.ts` (+тести).
+- Е4 частково — локальні протоколи A–D (Playwright + `fetch`-стаби) пройдені;
+  Preview: звичайний цикл очищення на синтетичних `_pub` `zzz-e4` через `POST
+  /api/panel` — один атомарний коміт `866b271`.
+
+**Що лишилося:**
+1. **Е4 залишок:**
+   - Знімки саме **Preview** ключових станів (очікування / «триває довше» /
+     конфлікт / невизначений запис / «Перевірити результат» → результат).
+     Сесія власника у фоновій вкладці Chrome періодично «замерзає» — надійніше
+     через Playwright проти Preview, АБО попросити власника відкрити вкладку.
+   - `docs/PANEL-etap4-protocol.md` — текстовий протокол A–D + Preview-цикл, для
+     кожного взірця вказати середовище (local dev / Preview) і SHA (`21d9db4`).
+   - «Звичайний цикл» на Preview через **кнопку в UI** на погодженому
+     `zzz-test-panel` (не лише `POST`) — з повним прибиранням.
+2. **Е5 — інструкція власнику** (`docs/PANEL-owner-guide.md`, оновити **лише
+   змінені частини**): як зрозуміти «збережено» (зелений статус); «ще
+   оновлюється» (кнопка «Оновлюємо…», заблокована); «Оновлення триває довше…»;
+   що натиснути після втраченої відповіді (**«Перевірити результат»**, не
+   повторювати дію); як перевірити результат на Preview; як відновити конкретну
+   версію в окремій копії (`git clone --branch codex/admin-panel-spike … &&
+   git checkout <SHA>`; для приватних налаштувань — окремо).
+3. Після Е4/Е5: оновити журнал за фактом, звірити фінальний SHA з CI +
+   deployment.
+
+**Взірці цієї сесії:** `~/Desktop/DREAM.CAR.VAVD-panel-samples-20260910/`
+(panel-wide-1280, panel-mobile-375, panel-loading-skeleton,
+panel-conflict-message, panel-uncertain-write-message, scenario-recording.md) —
+з П42/П43, показують той самий UI; для П44 Е4 потрібні **свіжі Preview**-знімки.
+
+**Патч постерів Dacia** — `docs/patches/dacia-poster-freeze.patch` +
+`README-dacia-poster-freeze.md`, підготовлений, **НЕ застосований**, не чіпати.
+
+**Межі:** `main`/Production/DNS/тарифи/доступи/секрети не чіпати; реальні
+матеріали не редагувати; без міграцій, фонових сесій, force-push, руйнівного
+reset; Blob/Neon/content-guard→main — поза цим завданням. Руйнівні локальні
+перевірки — **лише** в тимчасовій теці (`fs.mkdtemp(os.tmpdir())` через
+`new LocalFsStorage({ root })`), на Preview — **лише** `zzz-test-panel` з
+прибиранням, **ніколи** `rm -rf` на теки реального контенту.
 
 ---
 
@@ -34,27 +92,53 @@
 
 | Шлях | Стан | Призначення |
 |---|---|---|
-| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | HEAD старий; dev-сервер `:3000` працює (сервер власника) | «канонічна» ізольована копія. **НЕ виконувати тут `git reset --hard`** — там може бути запущений сервер власника `:3000`. Якщо потрібна свіжа копія для роботи — брати `dcv-panel-dev-20260909/repo` або робити новий окремий клон, не чіпаючи цю папку. |
-| `/Users/apple/Projects/dcv-panel-dev-20260909/repo` | HEAD `codex/admin-panel-spike` tip, чисто, є `node_modules` + prod-збірка | робоча копія цієї серії (П38). Локальний dev тесту був `:3011`. `git fetch && git merge --ff-only origin/codex/admin-panel-spike` перед роботою. |
-| `/Users/apple/Projects/dcv-restore-verify-20260909/repo` | HEAD `604c27e` | базовий стан для порівняння + `TEST-LOG.md` + `/baseline/` (знімки `published.json`/`review-state.json`/хеші на момент П35). |
-| `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` | worktree для Б1-setup; `.env` (4 секрети, git-ignored) + `.env.local`; dev `:3010` (pid ~95334) | **не видаляти** доки секрети не покладено у захищене сховище власника. |
+| `/Users/apple/Projects/dcv-panel-dev-20260909/repo` | HEAD `codex/admin-panel-spike` tip (`866b271`), чисто, є `node_modules` + prod-збірка | **робоча копія — працювати тут.** `git fetch && git merge --ff-only origin/codex/admin-panel-spike` перед роботою. |
+| `/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906` | HEAD старий; dev-сервер власника (`:3000`, default) | **НЕ чіпати, НЕ `reset --hard`** — там сервер власника. |
+| `/Users/apple/Projects/DREAM.CAR.VAVD-panel-setup-verify` | worktree Б1-setup; `.env` (4 секрети, git-ignored); dev `:3010` (webpack) | **не видаляти** доки секрети не в захищеному сховищі власника. |
+| `/Users/apple/Projects/dcv-panel-restore-verify-20260909` | клон гілки, HEAD близький до tip | копія для перевірки відновлення (П40/П41). Можна `git fetch && checkout` до потрібного SHA. |
+| `/Users/apple/Projects/dcv-restore-verify-20260909/repo` | HEAD `604c27e` | старий базовий стан для порівняння. |
 
 **Рекомендація новому чату:** працювати в `dcv-panel-dev-20260909/repo`
-(`git fetch && git merge --ff-only origin/codex/admin-panel-spike`) АБО зробити
-свіжий окремий клон. **Не** робити `reset --hard` у папці сервера власника
-`…-admin-panel-20260906`.
+(`git fetch && git merge --ff-only origin/codex/admin-panel-spike`).
+**Не** робити `reset --hard` у папці сервера власника `…-admin-panel-20260906`.
 
 ---
 
-## 3. Запущені сервери — НЕ ЧІПАТИ
+## 3. Запущені сервери власника — НЕ ЧІПАТИ
 
-- **`:3000`** — `next dev` у `DREAM.CAR.VAVD-admin-panel-20260906`. Сервер власника. **НЕ чіпати, НЕ `reset --hard` у цій папці.**
-- **`:3010`** — `next dev` у `…-panel-setup-verify`. Б1-setup-сервер, github-режим.
-- Свої dev-сервери піднімати на **іншому порту** (напр. `:3011`, `:3012`). У `next dev` публічні сторінки мають строгий CSP без `unsafe-eval` → клієнтський JS (лайтбокси) **не працює в dev**; для перевірки інтерактиву робити `npm run build && npx next start --port <вільний>`.
+- **`:3000`** — `next dev` у `DREAM.CAR.VAVD-admin-panel-20260906`. Сервер власника.
+- **`:3010`** — `next dev --webpack` у `…-panel-setup-verify`. Б1-setup, github-режим.
+- Свої dev-сервери піднімати на **вільному порту** (`:3023`+). Для локальної
+  демонстрації повільної відповіді: `PANEL_DEV_SLOW_MS=8000 npm run dev -- -p 3025`
+  (env-прапорець ігнорується у production; додано у П42). `/panel` у local-режимі
+  працює (localFs); `RefreshButton` («Оновити стан») рендериться **лише** в
+  github-режимі (на Preview), локально його немає. Клієнтський JS у `next dev`
+  працює для `/panel` (це не публічна сторінка з жорстким CSP).
+- **Після роботи — глушити свої сервери** (`lsof -ti:<port> | xargs kill -9`).
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П43)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П44)
+
+- **П44 — ізоляція тестів + справжній контроль оновлення + захист від повторного запису (задача 2026-09-10 11:49), `9246455`+`21d9db4` (Е1–Е3 done; Е4 частково; Е5 не почато):**
+  - **Е1** `LocalFsStorage({ root })` + `mutablePath()` (кожна ціль запису/
+    видалення жорстко всередині `<root>/public/images/cms/` або
+    `src/content/cms/`; `deletePublishedMediaBatch` — лише файл, не тека).
+    Пісочниця `src/lib/content/store/localFs.test.ts` у `os.tmpdir()`.
+    Зафіксовано інцидент (ручний `rm -rf` на реальну `_pub`-теку, відновлено;
+    логіка панелі коректна).
+  - **Е2** `useRefresh()`: завершення = `isPending` false (Next App Router),
+    таймер лише для підказки «Оновлення триває довше…». Виміряно локально:
+    8с→блок 8.8с (не 2.5), швидкий→1.2с.
+  - **Е3** стан `uncertain` + кнопка «Перевірити результат» (лише читання) +
+    `stateToken` порівняння → «схоже, застосовано/НЕ/невизначений»; авто-
+    запису немає.
+  - **Е4** локальні протоколи A–D пройдені (подвійний клік → 1 POST; втрачена
+    відповідь після виконаного запису → блок → перевірка → розблок, запис
+    подіяв); Preview-цикл очищення на синтетичних `zzz-e4` → атомарний
+    `866b271`. **Залишок:** знімки Preview, `docs/PANEL-etap4-protocol.md`,
+    цикл через кнопку UI.
+  - **Е5** не почато — інструкція власнику.
 
 - **П43 — фікс гонки `ConcurrencyGate` + життєвий цикл кнопок (задача 2026-09-10 10:55), `1e923c6`+`f53f8fa`+`b3d8543`:**
   - **§1** ґейт передавав місце очікувачу з вікном, у яке новий `run()` міг
