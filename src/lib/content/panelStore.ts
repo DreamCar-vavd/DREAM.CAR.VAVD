@@ -125,8 +125,13 @@ function pruneReview(review: ReviewState, liveKeys: ReadonlySet<string>): Review
  * iff any kind does. Best-effort at cleanup call sites (a read failure must not
  * sink the surrounding action).
  */
-async function collectWorkingSlugs(storage: PanelStorage): Promise<Set<string>> {
-  const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
+async function collectWorkingSlugs(
+  storage: PanelStorage,
+  atSha?: string,
+): Promise<Set<string>> {
+  const dirs = await Promise.all(
+    KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir, atSha)),
+  );
   const keys = new Set<string>();
   KIND_ORDER.forEach((kindKey, i) => {
     const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
@@ -407,13 +412,21 @@ export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
   // non-essential, so if the backend gives no usable answer the content still
   // renders and the banner shows "unknown" (which the banner never styles as a
   // successful build).
-  const dirs = await Promise.all(KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir)));
+  // Pin every content read to ONE commit S: working cards, published.json,
+  // review-state and the media tree must all describe the same version, or a
+  // card's status could be built from working files at one commit and a media
+  // tree at another. In local mode `atSha` is null and ignored.
+  const atSha = (await storage.headSha()) ?? undefined;
+  const dirs = await Promise.all(
+    KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir, atSha)),
+  );
   const [publishedF, reviewF, mediaIndex, deploy] = await Promise.all([
-    storage.readFile(PUBLISHED),
-    storage.readFile(REVIEW),
-    // ONE consistent snapshot of every CMS image (git blob ids). NOT caught —
-    // an incomplete tree must never let a stale card read as "in sync".
-    storage.mediaIndex(),
+    storage.readFile(PUBLISHED, atSha),
+    storage.readFile(REVIEW, atSha),
+    // ONE consistent snapshot of every CMS image (git blob ids), pinned to S.
+    // NOT caught — an incomplete tree must never let a stale card read as "in
+    // sync".
+    storage.mediaIndex(atSha),
     storage.deployStatus().catch((err): DeployStatus => {
       if (err instanceof StorageBackendError) {
         return { state: "unknown", reason: "не вдалося перевірити стан збірки" };
@@ -810,8 +823,14 @@ export async function completeDeletion(
   expected: { review: string },
 ): Promise<ActionResult> {
   return runAction("Не вдалося завершити видалення", async () => {
-    const workingSlugs = await collectWorkingSlugs(storage);
-    const reviewF = await storage.readFile(REVIEW);
+    // Phase 1 — one consistent snapshot S1: working cards and review-state are
+    // read pinned to it so a Keystatic commit landing mid-read cannot make a
+    // still-present card look deleted.
+    const s1 = await storage.headSha();
+    const [workingSlugs, reviewF] = await Promise.all([
+      collectWorkingSlugs(storage, s1 ?? undefined),
+      storage.readFile(REVIEW, s1 ?? undefined),
+    ]);
     if (reviewF.version !== expected.review) {
       return { ok: false, conflict: true, message: new ConflictError("перевірки перекладів").message };
     }
@@ -825,24 +844,32 @@ export async function completeDeletion(
       `${JSON.stringify(pruneReview(review, workingSlugs), null, 2)}\n`,
       expected.review,
     );
-    // A slug now gone from both working cards AND the published snapshot: its
-    // `_pub/` copies are dead. Sweep them with the same branch-guarded batch the
-    // manual cleanup uses. Best-effort — the review rows are already pruned.
+    // Phase 2 — the review write moved the branch, so take a FRESH consistent
+    // snapshot S2. A slug gone from working cards AND the published snapshot
+    // (both read at S2) has dead `_pub/` copies; sweep them with the same
+    // branch-guarded batch the manual cleanup uses (guarded by S2). Best-effort
+    // — the review rows are already pruned; a ConflictError here just defers the
+    // media sweep to "Прибрати старі копії фото".
     let mediaNote = "";
     try {
-      const [index, headSha, publishedF] = await Promise.all([
-        storage.mediaIndex(),
-        storage.headSha(),
-        storage.readFile(PUBLISHED),
+      const s2 = await storage.headSha();
+      const [index, publishedF, workingAtS2] = await Promise.all([
+        storage.mediaIndex(s2 ?? undefined),
+        storage.readFile(PUBLISHED, s2 ?? undefined),
+        collectWorkingSlugs(storage, s2 ?? undefined),
       ]);
       const referenced = referencedFrozenPaths(parseSnapshot(publishedF.data));
-      const staleSlugs = new Set(stale.map((k) => (k.includes(":") ? k.slice(k.indexOf(":") + 1) : k)));
+      // Only slugs still unbacked at S2 (owner may have re-created one in the gap).
+      const stillStale = stale.filter((k) => !workingAtS2.has(k));
+      const staleSlugs = new Set(
+        stillStale.map((k) => (k.includes(":") ? k.slice(k.indexOf(":") + 1) : k)),
+      );
       const dead = [...index.keys()].filter((p) => {
         const m = p.match(/^public\/images\/cms\/[^/]+\/([^/]+)\/_pub\//);
         return m && staleSlugs.has(m[1]) && FROZEN_PATH_RE.test(p) && !referenced.has(p);
       });
       if (dead.length > 0) {
-        const done = (await storage.deletePublishedMediaBatch(dead, headSha)).filter(
+        const done = (await storage.deletePublishedMediaBatch(dead, s2)).filter(
           (o) => o.outcome === "deleted",
         ).length;
         if (done > 0) mediaNote = ` Прибрано ${done} копі(ю/ї/й) фото.`;
@@ -895,14 +922,20 @@ function humanBytes(n: number): string {
   return n >= 1024 * 1024 ? `${(n / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1024))} КБ`;
 }
 
-/** The `_pub/` files no current published entry points at, from ONE branch tree. */
+/**
+ * The `_pub/` files no current published entry points at — computed from ONE
+ * consistent commit: `headSha` is read first, then `published.json` and the
+ * media tree are BOTH read pinned to it. Without the pin a publish landing
+ * between the three reads could leave the plan referencing one version of
+ * published.json and a different version of the tree.
+ */
 async function frozenMediaCandidates(
   storage: PanelStorage,
 ): Promise<{ paths: string[]; totalBytes: number; headSha: string | null }> {
-  const [publishedF, index, headSha] = await Promise.all([
-    storage.readFile(PUBLISHED),
-    storage.mediaIndex(),
-    storage.headSha(),
+  const headSha = await storage.headSha();
+  const [publishedF, index] = await Promise.all([
+    storage.readFile(PUBLISHED, headSha ?? undefined),
+    storage.mediaIndex(headSha ?? undefined),
   ]);
   const referenced = referencedFrozenPaths(parseSnapshot(publishedF.data));
   const paths: string[] = [];
@@ -928,12 +961,18 @@ async function frozenMediaCandidates(
  *    pushes non-force; a `ConflictError` means a publish landed in between —
  *    re-run the dry run). The result reports what was actually removed vs what
  *    was already gone — never "прибрано N" for an unconfirmed delete.
+ *
+ * In github mode a confirm MUST carry the dry-run's `headSha` and it must still
+ * match — a confirm with no `headSha` cannot bypass the version check.
  */
 export async function cleanupFrozenMedia(
   storage: PanelStorage,
   opts: { confirm?: boolean; headSha?: string | null } = {},
 ): Promise<ActionResult> {
   return runAction("Не вдалося прибрати старі копії", async () => {
+    // ONE consistent snapshot: `headSha` (S) is read first inside
+    // `frozenMediaCandidates`, and `published.json` + the media tree are read
+    // pinned to S. The delete batch is guarded with the same S.
     const { paths, totalBytes, headSha } = await frozenMediaCandidates(storage);
 
     if (paths.length === 0) {
@@ -948,7 +987,14 @@ export async function cleanupFrozenMedia(
         cleanup: { count: paths.length, totalBytes, headSha: headSha ?? "" },
       };
     }
-    if (opts.headSha !== undefined && (opts.headSha ?? "") !== (headSha ?? "")) {
+    // github mode: a confirm is only valid against the exact head the user was
+    // shown. No `headSha` on the request → treat as stale, never as "skip the
+    // check". local mode has no branch, so `headSha` is null on both sides.
+    const staleConfirm =
+      storage.mode === "github"
+        ? !opts.headSha || opts.headSha !== (headSha ?? "")
+        : opts.headSha !== undefined && (opts.headSha ?? "") !== (headSha ?? "");
+    if (staleConfirm) {
       return {
         ok: false,
         conflict: true,

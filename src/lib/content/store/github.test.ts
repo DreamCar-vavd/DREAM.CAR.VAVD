@@ -625,3 +625,46 @@ test("deletePublishedMediaBatch rejects a non-_pub path before any network call"
   );
   assert.equal(calls.length, 0);
 });
+
+test("deletePublishedMediaBatch refuses a TRUNCATED base tree — never treats a present file as already-absent", async () => {
+  const { impl, calls } = fakeGitHub(
+    batchRoutes({
+      "/git/trees": (init?: RequestInit) =>
+        init?.method === "POST"
+          ? { status: 201, body: { sha: "NEWTREE" } }
+          : { status: 200, body: { truncated: true, tree: [] } },
+    }),
+  );
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(
+    () => gh.deletePublishedMediaBatch(["public/images/cms/services/s1/_pub/bbbbbbbb.jpg"], "HEAD1"),
+    StorageUnavailableError,
+  );
+  assert.ok(!calls.some((c) => c.method === "POST")); // no commit built on a partial view
+});
+
+test("readFile/readDir/mediaIndex pinned to a commit sha read at ?ref=<sha>, not the branch", async () => {
+  const { impl, calls } = fakeGitHub({
+    "/contents/src/content/cms/published.json": () => ({
+      status: 200,
+      body: { content: b64('{"publishedAt":"x"}'), sha: "pubsha", encoding: "base64" },
+    }),
+    "/git/commits/PIN123": () => ({ status: 200, body: { sha: "PIN123", tree: { sha: "PT" } } }),
+    "/git/trees/PT": () => ({
+      status: 200,
+      body: {
+        truncated: false,
+        tree: [{ path: "public/images/cms/x/_pub/a.jpg", type: "blob", sha: "B1", size: 5 }],
+      },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await gh.readFile("src/content/cms/published.json", "PIN123");
+  await gh.mediaIndex("PIN123");
+  // readFile went to the pinned ref, never the branch ref.
+  assert.ok(calls.some((c) => c.url.includes("published.json?ref=PIN123")));
+  assert.ok(!calls.some((c) => c.url.includes("published.json?ref=codex%2Ftest")));
+  // mediaIndex used the pinned commit directly — no branch-head lookup.
+  assert.ok(calls.some((c) => c.url.includes("/git/commits/PIN123")));
+  assert.ok(!calls.some((c) => c.url.includes("/commits/codex%2Ftest")));
+});

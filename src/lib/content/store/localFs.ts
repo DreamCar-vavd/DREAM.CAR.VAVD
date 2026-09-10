@@ -31,7 +31,8 @@ export class LocalFsStorage implements PanelStorage {
   readonly mode = "local" as const;
   readonly branch = null;
 
-  async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
+  async readDir(dir: AllowedDir, _atSha?: string): Promise<Versioned<DirEntry[]>> {
+    void _atSha; // local mode: single writer, no branch to pin to
     assertAllowedDir(dir);
     let names: string[] = [];
     try {
@@ -51,7 +52,8 @@ export class LocalFsStorage implements PanelStorage {
     };
   }
 
-  async readFile(file: AllowedFile): Promise<Versioned<string | null>> {
+  async readFile(file: AllowedFile, _atSha?: string): Promise<Versioned<string | null>> {
+    void _atSha; // local mode: single writer, no branch to pin to
     assertAllowedFile(file);
     const text = await readOr(abs(file), null);
     return { data: text, version: text ? hash(text) : "" };
@@ -90,7 +92,8 @@ export class LocalFsStorage implements PanelStorage {
       .digest("hex");
   }
 
-  async mediaIndex(): Promise<Map<string, { id: string; size: number }>> {
+  async mediaIndex(_atSha?: string): Promise<Map<string, { id: string; size: number }>> {
+    void _atSha; // local mode: single writer, no branch to pin to
     const root = abs("public/images/cms");
     const out = new Map<string, { id: string; size: number }>();
     const walk = async (dir: string): Promise<void> => {

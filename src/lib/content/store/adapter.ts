@@ -227,10 +227,16 @@ export interface PanelStorage {
    */
   readonly branch: string | null;
 
-  /** `*.json` files (dotfiles excluded), sorted by name, + a combined version. */
-  readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>>;
+  /**
+   * `*.json` files (dotfiles excluded), sorted by name, + a combined version.
+   * `atSha` pins the read to ONE commit (github mode) so several reads that must
+   * agree on a version don't drift as the branch moves; ignored in local mode
+   * (single writer, no branch).
+   */
+  readDir(dir: AllowedDir, atSha?: string): Promise<Versioned<DirEntry[]>>;
 
-  readFile(file: AllowedFile): Promise<Versioned<string | null>>;
+  /** `atSha` — see `readDir`: pins the read to one commit in github mode. */
+  readFile(file: AllowedFile, atSha?: string): Promise<Versioned<string | null>>;
 
   /** Rejects with ConflictError if the stored version != expectedVersion. */
   writeFile(file: AllowedFile, text: string, expectedVersion: string): Promise<Versioned<string>>;
@@ -254,9 +260,11 @@ export interface PanelStorage {
    * branch: `repoPath -> { id, size }` where `id` is a content identity (the git
    * blob id in github mode). Two paths with the same `id` are byte-identical.
    * One request in github mode; a filesystem walk in local mode. Rejects on a
-   * backend failure — an incomplete tree must never read as "all in sync".
+   * backend failure — an incomplete (truncated) tree must never read as "all in
+   * sync". `atSha` pins it to one commit — pass the same value used for the
+   * matching `readFile`/`readDir` so a decision never mixes versions.
    */
-  mediaIndex(): Promise<Map<string, { id: string; size: number }>>;
+  mediaIndex(atSha?: string): Promise<Map<string, { id: string; size: number }>>;
 
   /** Bytes of a CMS image (any working or published path). null when absent. */
   readMedia(repoPath: string): Promise<Uint8Array | null>;

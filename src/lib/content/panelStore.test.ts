@@ -89,8 +89,26 @@ class FakeStorage implements PanelStorage {
   deploy: DeployStatus = { state: "ready" };
   /** stand-in for the branch HEAD; every write bumps it. */
   head = "head-0";
+  /** state as of each PAST head — so a read pinned to an old sha sees old data. */
+  private history = new Map<
+    string,
+    { files: Map<string, string>; dirs: Map<string, DirEntry[]>; media: Map<string, Uint8Array> }
+  >();
+  /** Snapshot the CURRENT state under the current head, then advance. Call
+   *  BEFORE mutating, so `head-N` in history is the state at head-N. */
   private bump() {
+    this.history.set(this.head, {
+      files: new Map(this.files),
+      dirs: new Map([...this.dirs].map(([k, v]) => [k, v.map((e) => ({ ...e }))])),
+      media: new Map(this.media),
+    });
     this.head = `head-${Number(this.head.slice(5)) + 1}`;
+  }
+  /** The maps to read from for a given pin (current live state when unpinned or
+   *  pinned to a head with no recorded history — e.g. the current head). */
+  private viewAt(atSha?: string) {
+    const h = atSha ? this.history.get(atSha) : undefined;
+    return h ?? { files: this.files, dirs: this.dirs, media: this.media };
   }
 
   seedDir(dir: AllowedDir, entries: DirEntry[]) {
@@ -107,9 +125,9 @@ class FakeStorage implements PanelStorage {
   async headSha() {
     return this.head;
   }
-  async mediaIndex() {
+  async mediaIndex(atSha?: string) {
     const out = new Map<string, { id: string; size: number }>();
-    for (const [p, b] of this.media) {
+    for (const [p, b] of this.viewAt(atSha).media) {
       if (p.startsWith("public/images/cms/")) out.set(p, { id: gitBlobId(b), size: b.length });
     }
     return out;
@@ -120,8 +138,8 @@ class FakeStorage implements PanelStorage {
   async putPublishedMedia(repoPath: string, bytes: Uint8Array) {
     const cur = this.media.get(repoPath);
     if (cur && gitBlobId(cur) === gitBlobId(bytes)) return; // content-addressed no-op
-    this.media.set(repoPath, bytes);
     this.bump();
+    this.media.set(repoPath, bytes);
   }
   async listPublishedMedia(dirPath: string) {
     return [...this.media.keys()]
@@ -133,36 +151,35 @@ class FakeStorage implements PanelStorage {
     if (expectedHeadSha !== null && expectedHeadSha !== this.head) {
       throw new ConflictError("гілка"); // branch moved since the plan
     }
+    const willDelete = paths.some((p) => this.media.has(p));
+    if (willDelete) this.bump(); // snapshot pre-delete state under the old head
     const out: { path: string; outcome: "deleted" | "already-absent" }[] = [];
-    let any = false;
     for (const p of paths) {
       const existed = this.media.delete(p);
-      if (existed) any = true;
       out.push({ path: p, outcome: existed ? "deleted" : "already-absent" });
     }
-    if (any) this.bump();
     return out;
   }
 
-  async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
+  async readDir(dir: AllowedDir, atSha?: string): Promise<Versioned<DirEntry[]>> {
     assertAllowedDir(dir);
-    const entries = this.dirs.get(dir) ?? [];
+    const entries = this.viewAt(atSha).dirs.get(dir) ?? [];
     return {
       data: entries,
       version: entries.length ? hash(entries.map((e) => `${e.name}:${e.text}`).join("\n")) : "",
     };
   }
-  async readFile(file: AllowedFile): Promise<Versioned<string | null>> {
+  async readFile(file: AllowedFile, atSha?: string): Promise<Versioned<string | null>> {
     assertAllowedFile(file);
-    const text = this.files.get(file) ?? null;
+    const text = this.viewAt(atSha).files.get(file) ?? null;
     return { data: text, version: text ? hash(text) : "" };
   }
   async writeFile(file: AllowedFile, text: string, expected: string): Promise<Versioned<string>> {
     assertAllowedFile(file);
     const cur = this.files.get(file) ?? null;
     if ((cur ? hash(cur) : "") !== expected) throw new ConflictError("файл");
-    this.files.set(file, text);
     this.bump();
+    this.files.set(file, text);
     return { data: text, version: hash(text) };
   }
   async deployStatus() {
@@ -918,6 +935,126 @@ test("cleanupFrozenMedia confirm is a conflict (deletes nothing) when the branch
   const c = await cleanupFrozenMedia(s, { confirm: true, headSha: "head-does-not-match" });
   assert.equal((c as { conflict?: boolean }).conflict, true);
   assert.ok(s.media.has(`public${url}`)); // untouched
+});
+
+test("§1 cleanup reads its plan from ONE pinned commit — a publish mid-read cannot strand the current photo", async () => {
+  const s = photoStore();
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  // Replace A -> B and publish B, so a stale _pub/<A> now exists.
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+  v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const urlB = svcPhotoUrls(s)[0];
+
+  // Between cleanup's headSha() and its pinned reads, an INDEPENDENT request
+  // fully publishes C (writeFrozenMedia + published.json) — head advances.
+  const realIndex = s.mediaIndex.bind(s);
+  let fired = false;
+  s.mediaIndex = async (atSha?: string) => {
+    if (!fired) {
+      fired = true;
+      s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("C"));
+      s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "2" }) }]);
+      const vv = await versions(s);
+      const rc = await publishItem(s, "service", "s1", { working: vv.service, review: vv.review, published: vv.published });
+      assert.equal(rc.ok, true, rc.message);
+    }
+    return realIndex(atSha);
+  };
+  const urlC0 = svcPhotoUrls(s)[0];
+
+  let batchPaths: string[] | null = null;
+  const realBatch = s.deletePublishedMediaBatch.bind(s);
+  s.deletePublishedMediaBatch = async (paths, sha) => {
+    batchPaths = paths;
+    return realBatch(paths, sha);
+  };
+
+  const c = await cleanupFrozenMedia(s, { confirm: true, headSha: await s.headSha() });
+  // The plan was built entirely from the pinned commit, so it NEVER lists the
+  // photo the (newer) published version needs...
+  if (batchPaths) assert.ok(!(batchPaths as string[]).some((p) => p === `public${svcPhotoUrls(s)[0]}`));
+  // ...and the branch-guarded batch refuses because head moved.
+  assert.equal((c as { conflict?: boolean }).conflict, true);
+  // The freshly published photo is intact.
+  assert.ok(s.media.has(`public${svcPhotoUrls(s)[0]}`));
+  assert.notEqual(svcPhotoUrls(s)[0], urlB);
+  void urlC0;
+});
+
+test("§1 completeDeletion media sweep is a fresh pinned snapshot — a concurrent publish is never clobbered", async () => {
+  const s = photoStore();
+  // Publish s1, then a second service s2 that we will delete.
+  s.seedDir("src/content/cms/services", [
+    { name: "s1.json", text: svcWithPhoto() },
+    { name: "s2.json", text: svcJson({ id: "s2", photos: [{ image: "/images/cms/services/s2/photos/0/image.jpg", caption: "" }] }) },
+  ]);
+  s.seedMedia("public/images/cms/services/s2/photos/0/image.jpg", jpgBytes("S2"));
+  s.seedFile(
+    "src/content/cms/review-state.json",
+    JSON.stringify({
+      ...svcReviewAll,
+      "service:s2": {
+        uk: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        en: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+        ru: { hash: sha(serviceConfirmedText(SVC_L)), at: "t" },
+      },
+    }),
+  );
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  v = await versions(s);
+  await publishItem(s, "service", "s2", { working: v.service, review: v.review, published: v.published });
+
+  // Keystatic deletes s2 (working card + its published entry gone).
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto() }]);
+  v = await versions(s);
+  await unpublishItem(s, "service", "s2", { published: v.published });
+  const s1Url = svcPhotoUrls(s)[0];
+
+  // Right after completeDeletion writes review-state, a concurrent request
+  // re-publishes s1 with a new photo — head moves again before the media sweep.
+  const realIndex = s.mediaIndex.bind(s);
+  let fired = false;
+  s.mediaIndex = async (atSha?: string) => {
+    if (!fired) {
+      fired = true;
+      s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("S1v2"));
+      s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "9" }) }]);
+      const vv = await versions(s);
+      await publishItem(s, "service", "s1", { working: vv.service, review: vv.review, published: vv.published });
+    }
+    return realIndex(atSha);
+  };
+
+  v = await versions(s);
+  const r = await completeDeletion(s, { review: v.review });
+  assert.equal(r.ok, true, r.message);
+  // review rows pruned regardless...
+  assert.ok(!("service:s2" in JSON.parse(s.files.get("src/content/cms/review-state.json")!)));
+  // ...and s1's freshly published photo is untouched (the sweep either used a
+  // consistent snapshot or backed off on the version conflict).
+  assert.ok(s.media.has(`public${svcPhotoUrls(s)[0]}`));
+  void s1Url;
+});
+
+test("§2 github-mode: a confirm with NO headSha does not bypass the version check", async () => {
+  const s = photoStore(); // FakeStorage.mode === "github"
+  let v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  s.seedMedia("public/images/cms/services/s1/photos/0/image.jpg", jpgBytes("B"));
+  s.seedDir("src/content/cms/services", [{ name: "s1.json", text: svcWithPhoto({ priceAmount: "1" }) }]);
+  v = await versions(s);
+  await publishItem(s, "service", "s1", { working: v.service, review: v.review, published: v.published });
+  const staleUrl = [...s.media.keys()].find(
+    (k) => k.includes("/_pub/") && !svcPhotoUrls(s).some((u: string) => `public${u}` === k),
+  )!;
+
+  const c = await cleanupFrozenMedia(s, { confirm: true }); // no headSha at all
+  assert.equal((c as { conflict?: boolean }).conflict, true);
+  assert.ok(s.media.has(staleUrl)); // nothing deleted
 });
 
 test("§4 cleanup surfaces a delete-batch failure as transient — never a false 'прибрано N'", async () => {

@@ -191,9 +191,17 @@ export class GitHubStorage implements PanelStorage {
     throw new StorageForbiddenError("доступ відхилено (403)");
   }
 
-  private async getContent(repoPath: string): Promise<{ text: string | null; sha: string }> {
+  /** A commit sha to read at, or the moving branch ref when none is pinned. */
+  private refOr(atSha?: string) {
+    return atSha ? encodeURIComponent(atSha) : this.ref();
+  }
+
+  private async getContent(
+    repoPath: string,
+    atSha?: string,
+  ): Promise<{ text: string | null; sha: string }> {
     const { status, body, headers } = await this.gh(
-      this.repoUrl(`/contents/${repoPath}?ref=${this.ref()}`),
+      this.repoUrl(`/contents/${repoPath}?ref=${this.refOr(atSha)}`),
     );
     if (status === 404) return { text: null, sha: "" };
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
@@ -209,10 +217,10 @@ export class GitHubStorage implements PanelStorage {
     return { text: b64decode(b.content), sha: f.sha };
   }
 
-  async readDir(dir: AllowedDir): Promise<Versioned<DirEntry[]>> {
+  async readDir(dir: AllowedDir, atSha?: string): Promise<Versioned<DirEntry[]>> {
     assertAllowedDir(dir);
     const { status, body, headers } = await this.gh(
-      this.repoUrl(`/contents/${dir}?ref=${this.ref()}`),
+      this.repoUrl(`/contents/${dir}?ref=${this.refOr(atSha)}`),
     );
     if (status === 404) return { data: [], version: "" };
     GitHubStorage.rejectIfUnauthorized(status, headers, body);
@@ -222,16 +230,16 @@ export class GitHubStorage implements PanelStorage {
       .sort((a, b) => a.name.localeCompare(b.name));
     const entries: DirEntry[] = [];
     for (const e of files) {
-      const c = await this.getContent(`${dir}/${e.name}`);
+      const c = await this.getContent(`${dir}/${e.name}`, atSha);
       entries.push({ name: e.name, text: c.text ?? "{}" });
     }
     // Version = tree of blob SHAs; changes iff any file in the dir changes.
     return { data: entries, version: files.map((e) => `${e.name}:${e.sha}`).join("|") };
   }
 
-  async readFile(file: AllowedFile): Promise<Versioned<string | null>> {
+  async readFile(file: AllowedFile, atSha?: string): Promise<Versioned<string | null>> {
     assertAllowedFile(file);
-    const c = await this.getContent(file);
+    const c = await this.getContent(file, atSha);
     return { data: c.text, version: c.sha };
   }
 
@@ -384,8 +392,8 @@ export class GitHubStorage implements PanelStorage {
     return sha;
   }
 
-  async mediaIndex(): Promise<Map<string, { id: string; size: number }>> {
-    const head = await this.branchHeadSha();
+  async mediaIndex(atSha?: string): Promise<Map<string, { id: string; size: number }>> {
+    const head = atSha ?? (await this.branchHeadSha());
     if (!head) throw new StorageUnavailableError("дерево медіафайлів");
     const commit = await this.gh(this.repoUrl(`/git/commits/${head}`));
     GitHubStorage.rejectIfUnauthorized(commit.status, commit.headers, commit.body);
@@ -433,10 +441,17 @@ export class GitHubStorage implements PanelStorage {
     const treeRes = await this.gh(this.repoUrl(`/git/trees/${baseTree}?recursive=1`));
     GitHubStorage.rejectIfUnauthorized(treeRes.status, treeRes.headers, treeRes.body);
     if (treeRes.status !== 200) throw new StorageUnavailableError("дерево гілки");
+    const treeBody = treeRes.body as {
+      tree: { path: string; type: string }[];
+      truncated?: boolean;
+    };
+    if (treeBody.truncated) {
+      // A partial listing would misreport a still-present file as already-absent
+      // (silently skipping its deletion). Refuse rather than act on it.
+      throw new StorageUnavailableError("дерево гілки завелике для одного запиту");
+    }
     const present = new Set(
-      (treeRes.body as { tree: { path: string; type: string }[] }).tree
-        .filter((e) => e.type === "blob")
-        .map((e) => e.path),
+      treeBody.tree.filter((e) => e.type === "blob").map((e) => e.path),
     );
     const toDelete = paths.filter((p) => present.has(p));
     const outcomes: { path: string; outcome: "deleted" | "already-absent" }[] = paths.map((p) => ({
