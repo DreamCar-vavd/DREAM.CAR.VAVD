@@ -12,12 +12,12 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`f80fab7`** (П39 + фікси) + пізніші коміти живої перевірки (`zzz-*`, самоскасовуються). Останній НЕ-тестовий SHA — `f80fab7`. |
+| **Remote HEAD** | **`ee93d24`** (П40) ← `8827b1b` (П39 док) ← `f80fab7` ← `115520c`. Пізніші `zzz-*` коміти самоскасовуються. Останній НЕ-тестовий SHA — `ee93d24`. |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `f80fab7` | success |
-| Vercel Preview на `f80fab7` | success |
-| Тести / tsc / eslint | **326 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `ee93d24` | success |
+| Vercel Preview на `ee93d24` | success |
+| Тести / tsc / eslint | **340 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
@@ -54,7 +54,26 @@
 
 ---
 
-## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П39)
+## 4. Що зроблено цією серією (журнал — `docs/PANEL-progress.md`, записи П35–П40)
+
+- **П40 — атомарне очищення `_pub` + git-дерево для визначення змін (задача 18:51), `ee93d24`:**
+  - **§1** `cleanupFrozenMedia` — **двокроковий** (сухий прогін показує
+    кількість+обсяг+SHA гілки; підтвердження = `deletePublishedMediaBatch(paths,
+    expectedHeadSha)` — один атомарний Git Data коміт + не-force оновлення гілки).
+    Публікація між кроками → `ConflictError`, нічого не видалено. `completeDeletion`
+    користується тим самим захищеним пакетом. Старий одиничний
+    `deletePublishedMedia` видалено.
+  - **§2** пакет повертає `deleted` / `already-absent`; 409/422/обрив → конфлікт
+    або transient — **ніколи «прибрано N»** без підтвердженого видалення.
+  - **§3** `getPanelData` більше **не читає кожне фото**: один `mediaIndex()`
+    (`git/trees?recursive=1` з одного коміту), порівняння git-blob-id робочого
+    фото проти git-blob-id `_pub`-копії. Обрізане/помилкове дерево → помилка, не
+    «in-sync». **Вимір:** 83→29 звернень до GitHub, 39.7→0.15 МБ на рендер.
+  - **§4** тести: керована гонка очищення↔публікація, transient при помилці
+    пакета, `mediaIndex` помилка ≠ in-sync, фото >1 МБ; `github.test.ts` для
+    `headSha`/`mediaIndex`/`deletePublishedMediaBatch`. 340 pass.
+  - Реальний контент **не змінювався**, міграцій не було. Фікс читання >1 МБ
+    (`f80fab7`) збережено.
 
 - **П39 — доопрацювання пайплайну фото + namespace ключів review (задача 17:38), `115520c`→`f80fab7`:**
   - **§1** `inSyncIgnoringFrozenPhotos` читає й хешує кожне робоче фото → заміна
