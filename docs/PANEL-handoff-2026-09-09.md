@@ -12,16 +12,16 @@
 |---|---|
 | Репозиторій | `DreamCar-vavd/DREAM.CAR.VAVD` |
 | Робоча гілка | `codex/admin-panel-spike` |
-| **Remote HEAD** | **`866b271`** (П44 Е1–Е4 частково) ← `2c4720e` ← `34d0ae0` (3 `zzz-e4` коміти живої перевірки Е4, **чистий діф нульовий**) ← `21d9db4` (П44 Е2+Е3) ← `9246455` (П44 Е1) ← `5a2299a` (док П43) ← `b3d8543` ← `f53f8fa` ← `1e923c6` ← `d95f9db`/`7ac1cc4` (П42). **Останній НЕ-тестовий код — `21d9db4`.** |
+| **Remote HEAD** | **`8dd6cbc`** (нуль-нетто UI-перевірка Е6) ← `cea07bf` (нуль-нетто) ← `ba9d236` (Е5) ← `a87d188` (Е4 §4) ← `fbdda32` (Е3 §3) ← `1438378` (Е3 §2) ← `86fd9be` (докreview) ← `6d0360a` ← `866b271` (П44 Е1–Е4 частк.). **Останній НЕ-тестовий код — `ba9d236`.** |
 | `main` | `ce1977af140b49dce4bb79001c7eeed5e01aa2c2` — **не чіпати, не зрушувався** |
 | PR | **#26**, draft, OPEN, MERGEABLE — **не мержити, не знімати draft** |
-| CI `Verify` на `9246455`/`21d9db4` | success |
-| Vercel Preview на `21d9db4` | success (deployment `21d9db4bf`) |
-| Тести / tsc / eslint | **379 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
+| CI `Verify` на `ba9d236` | success |
+| Vercel Preview на `ba9d236` | success |
+| Тести / tsc / eslint | **400 pass / 0 todo**, tsc 0, eslint 0, `npm run build` OK, `content:guard` OK |
 | Preview-хост (branch alias) | `dreamcarvavd-git-codex-admin-p-648563-6y7h9wdz4r-7375s-projects.vercel.app` |
 | Team Vercel | `6y7h9wdz4r-7375s-projects` = `team_DBxz9jzVQflTswVKf9BRzWHo` (Hobby) |
 
-**Реальний контент на HEAD `866b271`:** `git diff HEAD -- public/ src/content/`
+**Реальний контент на HEAD `8dd6cbc`:** `git diff 21d9db4..HEAD -- public/ src/content/`
 **порожній** (звірено). 49 `_pub`-файлів. Зміни П38–П44 у контенті — лише
 `bornAt` (17 карток), namespaced review-ключі, `_pub`-шляхи фото та `publishedAt`
 у `published.json` (див. записи П38/П39 у журналі; бізнес-тексти й ціни — ні).
@@ -30,57 +30,39 @@
 
 ---
 
-## НАСТУПНИЙ КРОК П44 (для нового чату — почати звідси)
+## П44 + Ревізія П44 — ЗАВЕРШЕНО (2026-09-10 12:50)
 
-**Стан (ревізовано 2026-09-10 12:50):** Е1–Е2 закінчені й задеплоєні;
-**Е3 потребує доопрацювання** (серверний `WriteUncertainError` = звичайний JSON
-`transient:true`, немає окремої машинної ознаки «результат невідомий»;
-«Перевірити результат» робить висновок лише з `stateToken`, не з конкретного
-очікуваного ефекту дії); **Е4 частково**; **Е5 доповнити**. Деталі й етапи 2–7 —
-у `docs/PANEL-progress.md` запис «Ревізія П44 (задача 2026-09-10 12:50)».
-Почати від актуальної `origin/codex/admin-panel-spike` (`git fetch && git
-merge --ff-only`); контрольна точка коду — `21d9db4`, tip — `6d0360a`.
+**Стан:** усі етапи ревізії (2–7) закриті. Tip гілки — `8dd6cbc` (останній
+**код** — `ba9d236`; `cea07bf`/`8dd6cbc` — нуль-нетто жива UI-перевірка).
+CI + Vercel на `ba9d236` — **success**. **400 тестів**, tsc/eslint/build/
+content:guard — зелені. `main` @ `ce1977af` — не зрушений.
+Почати новий чат від актуальної `origin/codex/admin-panel-spike`
+(`git fetch && git merge --ff-only`).
 
-**Що вже є (не переробляти):**
-- Е1 (`9246455`) — `LocalFsStorage({ root })` + `mutablePath()` guard +
-  `src/lib/content/store/localFs.test.ts` (пісочниця в `os.tmpdir()`).
-- Е2 (`21d9db4`) — `useRefresh()` у `src/app/panel/PanelActions.tsx`:
-  завершення = `useTransition().isPending` false; таймер `REFRESH_SLOW_MS=6000`
-  лише для підказки `slow`. Виміряно: 8с рендер → блок 8.8с (не 2.5), швидкий →
-  1.2с.
-- Е3 (`21d9db4`) — **ЧАСТКОВО**: стан `uncertain` у `PanelButton`/
-  `CleanupFrozenMediaButton`; кнопка «Перевірити результат» (лише
-  `router.refresh()`); жодного авто-запису. **Доопрацювати (задача 12:50):**
-  окрема машинна ознака `outcome:"unknown"` на сервері; звірка **конкретного**
-  очікуваного ефекту замість `stateToken`; невдала перевірка не знімає блок.
-- Е4 частково — локальні протоколи A–D (Playwright + `fetch`-стаби) пройдені;
-  Preview: звичайний цикл очищення на синтетичних `_pub` `zzz-e4` через `POST
-  /api/panel` — один атомарний коміт `866b271`.
+**Що зроблено ревізією (деталі — `docs/PANEL-progress.md` запис «Ревізія П44»,
+цільові тести — `docs/PANEL-etap4-protocol.md` розділи E–G):**
+- `1438378` — машинна ознака `outcome:"unknown"` (лише `WriteUncertainError`)
+  наскрізь; блокує повтор незалежно від ділянки обриву.
+- `fbdda32` — `check-result` = окрема лише-читаюча дія, звіряє **конкретний**
+  очікуваний ефект; `applied:null` / помилка читання → блок лишається.
+- `a87d188` — symlink-guard у `LocalFsStorage.mutablePath`; план очищення
+  прив'язано до `headSha` гілки (`getPanelData.headSha`).
+- `ba9d236` — чисті хелпери маршрутизації + 8 сценаріїв задачі + «check = 0
+  writes».
+- `cea07bf`/`8dd6cbc` — жива UI-перевірка очищення на Preview → **1** атомарний
+  коміт. Локальні знімки станів (lock / check→applied / check→null / 375 px).
+- `<Е7 коміт>` — інструкція власнику + журнал + протокол + цей файл + опис PR #26.
 
-**Що лишилося:**
-1. **Е4 залишок:**
-   - Знімки саме **Preview** ключових станів (очікування / «триває довше» /
-     конфлікт / невизначений запис / «Перевірити результат» → результат).
-     Сесія власника у фоновій вкладці Chrome періодично «замерзає» — надійніше
-     через Playwright проти Preview, АБО попросити власника відкрити вкладку.
-   - `docs/PANEL-etap4-protocol.md` — **чорновик готовий** (A–D + Preview-цикл); лишилося: для
-     кожного взірця вказати середовище (local dev / Preview) і SHA (`21d9db4`).
-   - «Звичайний цикл» на Preview через **кнопку в UI** на погодженому
-     `zzz-test-panel` (не лише `POST`) — з повним прибиранням.
-2. **Е5 — інструкція власнику** (`docs/PANEL-owner-guide.md`, оновити **лише
-   змінені частини**): як зрозуміти «збережено» (зелений статус); «ще
-   оновлюється» (кнопка «Оновлюємо…», заблокована); «Оновлення триває довше…»;
-   що натиснути після втраченої відповіді (**«Перевірити результат»**, не
-   повторювати дію); як перевірити результат на Preview; як відновити конкретну
-   версію в окремій копії (`git clone --branch codex/admin-panel-spike … &&
-   git checkout <SHA>`; для приватних налаштувань — окремо).
-3. Після Е4/Е5: оновити журнал за фактом, звірити фінальний SHA з CI +
-   deployment.
+**Що ЩЕ НЕ зроблено (чесно):**
+- Повний Keystatic-цикл `zzz-test-panel` через UI саме на Preview (створення→
+  публікація→видалення) — потребує тривало активної сесії власника; покрито
+  П35 + 400 тестами. Цикл **очищення** через кнопку — виконано.
+- Справжній 375 px саме на Preview `/panel` — знято локально (розмітка
+  ідентична). Блокери власника Б1–Б5 — без змін, поза цією задачею.
 
-**Взірці цієї сесії:** `~/Desktop/DREAM.CAR.VAVD-panel-samples-20260910/`
-(panel-wide-1280, panel-mobile-375, panel-loading-skeleton,
-panel-conflict-message, panel-uncertain-write-message, scenario-recording.md) —
-з П42/П43, показують той самий UI; для П44 Е4 потрібні **свіжі Preview**-знімки.
+**Взірці:** знімки станів — у цій сесії чату (lock / check-applied / check-null /
+375 px) + `docs/PANEL-etap4-protocol.md` розділи E–G. Старіші —
+`~/Desktop/DREAM.CAR.VAVD-panel-samples-20260910/` (П42/П43, той самий UI).
 
 **Патч постерів Dacia** — `docs/patches/dacia-poster-freeze.patch` +
 `README-dacia-poster-freeze.md`, підготовлений, **НЕ застосований**, не чіпати.
