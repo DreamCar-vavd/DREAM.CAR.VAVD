@@ -2,6 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
+import {
+  busyLabelFor,
+  messageForResponse,
+  NETWORK_UNCERTAIN_MSG,
+  type ActionMessage,
+  type ActionResponse,
+} from "./actionMessages";
 
 export interface PanelVersions {
   car: string;
@@ -19,6 +26,26 @@ type ActionPayload =
   | { action: "unpublish"; kind: string; id: string }
   | { action: "complete-deletion" };
 
+/** amber/green/red status line, announced to a screen reader. */
+function StatusLine({ msg, children }: { msg: ActionMessage; children?: React.ReactNode }) {
+  const tone =
+    msg.kind === "ok"
+      ? "text-green-700 dark:text-green-400"
+      : msg.kind === "conflict"
+        ? "text-amber-700 dark:text-amber-400"
+        : "text-red-600";
+  return (
+    <span
+      className={`text-xs ${tone}`}
+      role={msg.kind === "err" ? "alert" : "status"}
+      aria-live={msg.kind === "err" ? "assertive" : "polite"}
+    >
+      {msg.text}
+      {children}
+    </span>
+  );
+}
+
 export function PanelButton({
   payload,
   versions,
@@ -35,16 +62,16 @@ export function PanelButton({
   confirmText?: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [refreshing, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "conflict"; text: string } | null>(null);
-  // Synchronous guard: `busy` state updates on the next render, so two fast
-  // clicks could both pass `disabled` and fire the request twice. This blocks
-  // the second one immediately.
+  const [msg, setMsg] = useState<ActionMessage | null>(null);
+  // Synchronous guard: `busy`/`refreshing` only disable on the next render, so
+  // two fast clicks — or a click during the post-action refresh — could fire a
+  // second request against stale versions. This blocks it immediately.
   const inFlight = useRef(false);
 
   async function run() {
-    if (inFlight.current) return;
+    if (inFlight.current || busy || refreshing) return;
     if (confirmText && !window.confirm(confirmText)) return;
     inFlight.current = true;
     setBusy(true);
@@ -55,29 +82,13 @@ export function PanelButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, versions }),
       });
-      const data = (await res.json()) as {
-        ok: boolean;
-        message: string;
-        conflict?: boolean;
-        transient?: boolean;
-        auth?: boolean;
-        forbidden?: boolean;
-        blockers?: { kind: string }[];
-      };
-      const extra = data.blockers?.length ? ` (${data.blockers.length} пункт(и))` : "";
-      // Conflict or a transient backend failure -> "reload and check before
-      // acting again": amber + a refresh affordance. auth / forbidden -> a plain
-      // error: the message already says what to do and a refresh won't help.
-      setMsg({
-        kind: data.ok ? "ok" : data.conflict || data.transient ? "conflict" : "err",
-        text: data.message + extra,
-      });
+      const data = (await res.json()) as ActionResponse;
+      setMsg(messageForResponse(data, data.ok));
       if (data.ok) startTransition(() => router.refresh());
     } catch {
-      setMsg({
-        kind: "conflict",
-        text: "Помилка мережі — відповідь не отримано. Дію могло бути застосовано або ні; оновіть сторінку й перевірте стан перш ніж повторювати.",
-      });
+      // No response — the write may or may not have landed. Reload and check,
+      // do NOT retry blindly. Deliberately different wording from a confirmed save.
+      setMsg({ kind: "conflict", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
       inFlight.current = false;
@@ -94,27 +105,20 @@ export function PanelButton({
       "border-neutral-800 bg-neutral-800 text-white hover:bg-neutral-700 dark:border-neutral-200 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white",
   }[variant];
 
+  const working = busy || refreshing;
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <button
         type="button"
         onClick={run}
-        disabled={disabled || busy || pending}
+        disabled={disabled || working}
+        aria-busy={working}
         className={`${base} ${styles}`}
       >
-        {busy || pending ? "…" : children}
+        {working ? busyLabelFor(busy ? payload.action : "refresh") : children}
       </button>
       {msg && (
-        <span
-          className={`text-xs ${
-            msg.kind === "ok"
-              ? "text-green-700 dark:text-green-400"
-              : msg.kind === "conflict"
-                ? "text-amber-700 dark:text-amber-400"
-                : "text-red-600"
-          }`}
-        >
-          {msg.text}
+        <StatusLine msg={msg}>
           {msg.kind === "conflict" && (
             <button
               type="button"
@@ -124,7 +128,7 @@ export function PanelButton({
               Оновити
             </button>
           )}
-        </span>
+        </StatusLine>
       )}
     </span>
   );
@@ -135,17 +139,32 @@ export function PanelButton({
  * count + size + the branch head it was computed against); the button then turns
  * into "Підтвердити …" and the second click deletes exactly that set against
  * that head. A publish landing in between makes the confirm a no-op conflict.
+ *
+ * `publishedVersion` — the panel's published.json token: when it changes (any
+ * publish, incl. this session's refresh) a pending dry-run plan is stale, so we
+ * drop it and make the owner re-run the check.
  */
-export function CleanupFrozenMediaButton() {
+export function CleanupFrozenMediaButton({ publishedVersion }: { publishedVersion?: string }) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  const [refreshing, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "conflict"; text: string } | null>(null);
-  const [pending, setPending] = useState<{ count: number; headSha: string } | null>(null);
+  const [msg, setMsg] = useState<ActionMessage | null>(null);
+  const [plan, setPlan] = useState<{ count: number; headSha: string } | null>(null);
   const inFlight = useRef(false);
 
+  // A publish (or the post-cleanup refresh) moved the branch — the shown plan is
+  // stale, so drop it and make the owner re-run the check; a confirm against it
+  // would only conflict. Adjusted during render (the "reset state on prop
+  // change" pattern), not in an effect.
+  const [seenVersion, setSeenVersion] = useState(publishedVersion);
+  if (publishedVersion !== seenVersion) {
+    setSeenVersion(publishedVersion);
+    if (plan) setPlan(null);
+    if (msg) setMsg(null);
+  }
+
   async function call(confirm: boolean, headSha?: string) {
-    if (inFlight.current) return;
+    if (inFlight.current || busy || refreshing) return;
     inFlight.current = true;
     setBusy(true);
     setMsg(null);
@@ -155,30 +174,20 @@ export function CleanupFrozenMediaButton() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "cleanup-frozen-media", confirm, headSha, versions: {} }),
       });
-      const data = (await res.json()) as {
-        ok: boolean;
-        message: string;
-        conflict?: boolean;
-        transient?: boolean;
+      const data = (await res.json()) as ActionResponse & {
         cleanup?: { count: number; totalBytes: number; headSha: string };
       };
       if (data.ok && data.cleanup && !confirm) {
-        setPending({ count: data.cleanup.count, headSha: data.cleanup.headSha });
+        setPlan({ count: data.cleanup.count, headSha: data.cleanup.headSha });
         setMsg({ kind: "ok", text: data.message });
       } else {
-        setPending(null);
-        setMsg({
-          kind: data.ok ? "ok" : data.conflict || data.transient ? "conflict" : "err",
-          text: data.message,
-        });
+        setPlan(null);
+        setMsg(messageForResponse(data, data.ok));
         if (data.ok) startTransition(() => router.refresh());
       }
     } catch {
-      setPending(null);
-      setMsg({
-        kind: "conflict",
-        text: "Помилка мережі — оновіть сторінку й перевірте стан перш ніж повторювати.",
-      });
+      setPlan(null);
+      setMsg({ kind: "conflict", text: NETWORK_UNCERTAIN_MSG });
     } finally {
       setBusy(false);
       inFlight.current = false;
@@ -186,24 +195,26 @@ export function CleanupFrozenMediaButton() {
   }
 
   const cls =
-    "inline-flex min-h-[36px] items-center rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-40";
+    "inline-flex min-h-[36px] items-center rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed";
+  const working = busy || refreshing;
   return (
     <span className="inline-flex flex-col items-start gap-1">
-      {pending ? (
+      {plan ? (
         <span className="inline-flex gap-2">
           <button
             type="button"
-            disabled={busy}
-            onClick={() => call(true, pending.headSha)}
+            disabled={working}
+            aria-busy={working}
+            onClick={() => call(true, plan.headSha)}
             className={`${cls} border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950`}
           >
-            {busy ? "…" : `Підтвердити — прибрати ${pending.count}`}
+            {working ? busyLabelFor("cleanup-confirm") : `Підтвердити — прибрати ${plan.count}`}
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={working}
             onClick={() => {
-              setPending(null);
+              setPlan(null);
               setMsg(null);
             }}
             className={`${cls} border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800`}
@@ -214,26 +225,15 @@ export function CleanupFrozenMediaButton() {
       ) : (
         <button
           type="button"
-          disabled={busy}
+          disabled={working}
+          aria-busy={working}
           onClick={() => call(false)}
           className={`${cls} border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800`}
         >
-          {busy ? "…" : "Прибрати старі копії фото"}
+          {working ? busyLabelFor("cleanup-dry-run") : "Прибрати старі копії фото"}
         </button>
       )}
-      {msg && (
-        <span
-          className={`text-xs ${
-            msg.kind === "ok"
-              ? "text-green-700 dark:text-green-400"
-              : msg.kind === "conflict"
-                ? "text-amber-700 dark:text-amber-400"
-                : "text-red-600"
-          }`}
-        >
-          {msg.text}
-        </span>
-      )}
+      {msg && <StatusLine msg={msg} />}
     </span>
   );
 }
@@ -246,9 +246,10 @@ export function RefreshButton() {
       type="button"
       onClick={() => startTransition(() => router.refresh())}
       disabled={pending}
-      className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40 dark:hover:bg-neutral-800"
+      aria-busy={pending}
+      className="inline-flex min-h-[36px] items-center rounded border border-neutral-400 px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed dark:hover:bg-neutral-800"
     >
-      {pending ? "…" : "Оновити стан"}
+      {pending ? busyLabelFor("refresh") : "Оновити стан"}
     </button>
   );
 }
