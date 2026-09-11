@@ -253,20 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "service:zzz-test": {
-    "instance": "mtwwpirg-9q5h43eh",
-    "uk": {
-      "hash": "9ef33c96738a0ff71aafc474396c33e6d0b76162977564bcaa6f1aa9ba0972c3",
-      "at": "2026-09-11T12:21:51.313Z"
-    },
-    "en": {
-      "hash": "88fcaa9981599172b7ddd5aed685fa8e5bbe35b3f1c291d14f66087e4334d9be",
-      "at": "2026-09-11T12:22:00.585Z"
-    },
-    "ru": {
-      "hash": "1058f2644a102551d136b15c2e03be98c14f129a71fd030075005798fd2201f6",
-      "at": "2026-09-11T12:22:04.808Z"
-    }
   }
 }
