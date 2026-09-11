@@ -1,0 +1,64 @@
+{
+  "id": "detailing",
+  "order": 50,
+  "status": "coming-soon",
+  "iconSrc": "/images/services/premium-3d/05-detailing-polishing-premium-3d.png",
+  "priceAmount": "",
+  "priceCurrency": "£",
+  "photos": [],
+  "uk": {
+    "title": "Детейлінг і полірування",
+    "shortDescription": "Полірування кузова та професійний догляд за автомобілем.",
+    "longDescription": "Повертаємо кузову автомобіля доглянутий вигляд: усуваємо дрібні дефекти лакофарбового покриття та виконуємо професійне полірування із захисним ефектом.",
+    "cardDescription": "Полірування. Хімчистка. Детейлінг. Захисні покриття. Усе в одному пакеті.",
+    "bullets": [
+      "Полірування кузова",
+      "Усунення дрібних подряпин та потертостей",
+      "Догляд за салоном",
+      "Захисне покриття після полірування"
+    ],
+    "modalLead": "Відкриваємося вже зовсім скоро",
+    "modalDescription": "Комплексний догляд за кузовом і салоном: полірування, хімчистка, детейлінг та захисні покриття. Результат — бездоганний вигляд і надійний захист лакофарбового покриття.",
+    "modalSections": [],
+    "priceNote": "",
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "en": {
+    "title": "Detailing & Polishing",
+    "shortDescription": "Bodywork polishing and professional car care.",
+    "longDescription": "We restore a well-kept appearance to the bodywork: removing minor paintwork defects and carrying out professional polishing with a protective finish.",
+    "cardDescription": "Polishing. Interior deep cleaning. Detailing. Protective coatings. Everything in one package.",
+    "bullets": [
+      "Bodywork polishing",
+      "Removal of minor scratches and swirl marks",
+      "Interior care",
+      "Protective coating after polishing"
+    ],
+    "modalLead": "Opening very soon",
+    "modalDescription": "Complete care for your vehicle's exterior and interior: polishing, deep cleaning, detailing and protective coatings. The result — an immaculate appearance and reliable protection for the paintwork.",
+    "modalSections": [],
+    "priceNote": "",
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "ru": {
+    "title": "Детейлинг и полировка",
+    "shortDescription": "Полировка кузова и профессиональный уход за автомобилем.",
+    "longDescription": "Возвращаем кузову автомобиля ухоженный вид: устраняем мелкие дефекты лакокрасочного покрытия и выполняем профессиональную полировку с защитным эффектом.",
+    "cardDescription": "Полировка. Химчистка. Детейлинг. Защитные покрытия. Всё в одном пакете.",
+    "bullets": [
+      "Полировка кузова",
+      "Устранение мелких царапин и потёртостей",
+      "Уход за салоном",
+      "Защитное покрытие после полировки"
+    ],
+    "modalLead": "Открываемся уже совсем скоро",
+    "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+    "modalSections": [],
+    "priceNote": "",
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "bornAt": "legacy-detailing"
+}

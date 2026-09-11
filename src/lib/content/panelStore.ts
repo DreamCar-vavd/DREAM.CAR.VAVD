@@ -1,0 +1,1287 @@
+import { createHash } from "node:crypto";
+import {
+  LOCALES,
+  type ContentLocale,
+  type GateFailure,
+  type LangReviewStatus,
+  type ReviewState,
+} from "./carsGate";
+import { KINDS, KIND_ORDER, type ContentKind, type KindKey } from "./kinds";
+import {
+  ConflictError,
+  MediaMissingError,
+  PUBLISHED_MEDIA_DIR,
+  StorageAuthError,
+  StorageBackendError,
+  StorageForbiddenError,
+  WriteUncertainError,
+  type DeployStatus,
+  type PanelStorage,
+} from "./store/adapter";
+
+export const sha256 = (input: string) => createHash("sha256").update(input).digest("hex");
+
+/** `public/images/cms/<dir>` base per kind; `null` for kinds with no photos. */
+const IMAGE_DIR: Record<KindKey, string | null> = {
+  car: "cars",
+  gallery: "gallery",
+  service: "services",
+  contact: null,
+  promo: "promos",
+};
+
+const PUBLISHED = "src/content/cms/published.json" as const;
+const REVIEW = "src/content/cms/review-state.json" as const;
+
+/** keys inside published.json, one per kind, in a fixed order. */
+const SNAPSHOT_KEYS = ["cars", "gallery", "services", "contact", "promos"] as const;
+type SnapshotKey = (typeof SNAPSHOT_KEYS)[number];
+const KEY_FOR_KIND: Record<KindKey, SnapshotKey> = {
+  car: "cars",
+  gallery: "gallery",
+  service: "services",
+  contact: "contact",
+  promo: "promos",
+};
+
+// deep, key-sorted JSON so "modified" detection sees nested text edits
+function stable(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stable((value as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+// ---------------------------------------------------------------------------
+// snapshot / review parsing
+// ---------------------------------------------------------------------------
+
+export type Snapshot = { publishedAt: string } & Record<SnapshotKey, unknown[]>;
+
+function parseSnapshot(text: string | null): Snapshot {
+  const o = (text ? JSON.parse(text) : {}) as Record<string, unknown>;
+  const out = { publishedAt: String(o.publishedAt ?? "") } as Snapshot;
+  for (const k of SNAPSHOT_KEYS) out[k] = Array.isArray(o[k]) ? (o[k] as unknown[]) : [];
+  return out;
+}
+function parseReview(text: string | null): ReviewState {
+  return text ? (JSON.parse(text) as ReviewState) : {};
+}
+
+/**
+ * The card-instance token stored on a working card JSON as `bornAt`. Keystatic
+ * mints a fresh one on every "create" (schema default), so a delete + re-create
+ * under the same slug yields a different token even with identical text. "" when
+ * the card predates the field (legacy) or the JSON is unreadable — a legacy
+ * card only ever matches a legacy (token-less) review row.
+ */
+function instanceToken(text: string): string {
+  try {
+    return String((JSON.parse(text || "{}") as { bornAt?: unknown }).bornAt ?? "");
+  } catch {
+    return "";
+  }
+}
+/** slug -> instance token, for one kind's raw directory entries. */
+function instanceMap(entries: { name: string; text: string }[]): Map<string, string> {
+  return new Map(entries.map((e) => [e.name.replace(/\.json$/, ""), instanceToken(e.text)]));
+}
+
+/**
+ * review-state.json key for a card. Namespaced by kind so `cars/foo` and
+ * `services/foo` keep SEPARATE confirmations — confirming one never touches the
+ * other. Bare (un-namespaced) keys are legacy: still read as a fallback by the
+ * gates, and migrated by scripts/migrate-review-keys.mjs.
+ */
+export const reviewKeyFor = (kindKey: KindKey, id: string) => `${kindKey}:${id}`;
+
+/**
+ * Keystatic's "Delete entry" is a direct GitHub commit that removes the item
+ * JSON (and its images) but never `review-state.json`, so deleting a card
+ * through the editor leaves its review row behind. Left alone those rows
+ * accumulate.
+ *
+ * A row is stale when NOTHING backs its key: for `kind:slug` — no working card
+ * of that kind; for a bare legacy key — no working card of any kind. `liveKeys`
+ * holds both forms for every working card. Pure — no I/O.
+ */
+function staleReviewSlugs(review: ReviewState, liveKeys: ReadonlySet<string>): string[] {
+  return Object.keys(review).filter((k) => !liveKeys.has(k));
+}
+function pruneReview(review: ReviewState, liveKeys: ReadonlySet<string>): ReviewState {
+  if (staleReviewSlugs(review, liveKeys).length === 0) return review;
+  return Object.fromEntries(
+    Object.entries(review).filter(([k]) => liveKeys.has(k)),
+  ) as ReviewState;
+}
+
+/**
+ * Every working card, as BOTH `kind:slug` and bare `slug` — so a namespaced row
+ * is live iff its own kind still has the card, while a legacy bare row is live
+ * iff any kind does. Best-effort at cleanup call sites (a read failure must not
+ * sink the surrounding action).
+ */
+async function collectWorkingSlugs(
+  storage: PanelStorage,
+  atSha?: string,
+): Promise<Set<string>> {
+  const dirs = await Promise.all(
+    KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir, atSha)),
+  );
+  const keys = new Set<string>();
+  KIND_ORDER.forEach((kindKey, i) => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    for (const w of coerceList(kind, dirs[i].data)) {
+      keys.add(w.id);
+      keys.add(reviewKeyFor(kindKey, w.id));
+    }
+  });
+  return keys;
+}
+
+function coerceList<W extends { id: string; order: number }>(
+  kind: ContentKind<W>,
+  entries: { name: string; text: string }[],
+): W[] {
+  return entries
+    .map((e) => kind.coerce(e.name.replace(/\.json$/, ""), JSON.parse(e.text || "{}")))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+function coerceSnapshotList<W extends { id: string; order: number }>(
+  kind: ContentKind<W>,
+  raw: unknown[],
+): W[] {
+  return raw
+    .map((r) => kind.coerce(String((r as { id?: unknown }).id ?? ""), r as Record<string, unknown>))
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+}
+
+/** Rebuild published.json replacing exactly one kind's list. */
+function rebuildSnapshot(prev: Snapshot, kindKey: KindKey, nextList: unknown[]): Snapshot {
+  const next = { publishedAt: new Date().toISOString() } as Snapshot;
+  for (const k of SNAPSHOT_KEYS) {
+    if (k === KEY_FOR_KIND[kindKey]) {
+      next[k] = nextList;
+    } else {
+      const kind = KINDS[
+        (Object.keys(KEY_FOR_KIND) as KindKey[]).find((kk) => KEY_FOR_KIND[kk] === k)!
+      ];
+      next[k] = coerceSnapshotList(kind, prev[k]) as unknown[];
+    }
+  }
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// published-media freezing
+//
+// Keystatic edits the WORKING photo files (`…/<slug>/photos/<i>/image.<ext>`) —
+// re-ordering renumbers them and a removal deletes one, both as direct commits
+// the panel never sees. If published.json still pointed at a working path, the
+// NEXT deployment (any commit) would 404 that image even though the material was
+// never re-published. So on publish every referenced working image is copied,
+// content-addressed, into `…/<slug>/_pub/<hash>.<ext>` — a folder Keystatic does
+// not know about — and the snapshot points there instead. The copy lives until
+// a later publish of the same slug no longer references it.
+// ---------------------------------------------------------------------------
+
+const IMG_EXT_RE = /\.(jpe?g|png|webp)$/i;
+const PUB_SEG = `/${PUBLISHED_MEDIA_DIR}/`;
+
+/** Public image URLs a snapshot item points at, in a STABLE order: photos[]
+ *  first (or the single `image` for promos), then the car video poster. Used
+ *  both to plan frozen copies and to compare slot-by-slot, so the two lists
+ *  must line up. */
+function itemImageUrls(kindKey: KindKey, item: Record<string, unknown>): string[] {
+  if (kindKey === "promo") return [String(item.image ?? "")].filter(Boolean);
+  const photos = Array.isArray(item.photos) ? (item.photos as Record<string, unknown>[]) : [];
+  const urls = photos.map((p) => String(p?.image ?? ""));
+  if (kindKey === "car") {
+    const video = item.video as { posterSrc?: unknown } | undefined;
+    urls.push(String(video?.posterSrc ?? "")); // kept even when "" -> dropped by filter
+  }
+  return urls.filter(Boolean);
+}
+/** A copy of `item` with each image URL swapped per `rewrite` (old -> new). */
+function withRewrittenImages(
+  kindKey: KindKey,
+  item: Record<string, unknown>,
+  rewrite: Map<string, string>,
+): Record<string, unknown> {
+  if (rewrite.size === 0) return item;
+  if (kindKey === "promo") {
+    const next = rewrite.get(String(item.image ?? ""));
+    return next ? { ...item, image: next } : item;
+  }
+  const photos = Array.isArray(item.photos) ? (item.photos as Record<string, unknown>[]) : [];
+  const out: Record<string, unknown> = {
+    ...item,
+    photos: photos.map((p) => {
+      const next = rewrite.get(String(p?.image ?? ""));
+      return next ? { ...p, image: next } : p;
+    }),
+  };
+  if (kindKey === "car" && item.video && typeof item.video === "object") {
+    const video = { ...(item.video as Record<string, unknown>) };
+    const next = rewrite.get(String(video.posterSrc ?? ""));
+    if (next) {
+      video.posterSrc = next;
+      out.video = video;
+    }
+  }
+  return out;
+}
+
+const mediaHash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex").slice(0, 24);
+const frozenRel = (dir: string, slug: string, hash: string, ext: string) =>
+  `images/cms/${dir}/${slug}/${PUBLISHED_MEDIA_DIR}/${hash}.${ext}`;
+
+/**
+ * Plan the frozen copy of every image this item references — the `photos[]` and,
+ * for a car, the video `posterSrc` when it is a local CMS image — by reading
+ * each working file, hashing it, and returning the `_pub/` copies to write plus
+ * the item with its URLs rewritten. NOTHING is written here.
+ *
+ * A card that names an image whose file is genuinely missing → `MediaMissingError`
+ * (publish must abort; the previous published images stay live). A network /
+ * auth / rate-limit failure propagates its own typed error. An OPTIONAL image
+ * that was never filled in never reaches this (empty `image`/`posterSrc` is
+ * dropped by `itemImageUrls`). A URL already under `_pub/`, an external link, or
+ * a path outside `/images/cms/` is passed through untouched.
+ */
+async function planFrozenMedia(
+  storage: PanelStorage,
+  kindKey: KindKey,
+  item: Record<string, unknown>,
+): Promise<{ item: Record<string, unknown>; puts: { path: string; bytes: Uint8Array }[] }> {
+  const dir = IMAGE_DIR[kindKey];
+  if (!dir) return { item, puts: [] };
+  const slug = String(item.id ?? "");
+  const rewrite = new Map<string, string>();
+  const puts: { path: string; bytes: Uint8Array }[] = [];
+  for (const url of itemImageUrls(kindKey, item)) {
+    if (url.includes(PUB_SEG)) continue; // already frozen
+    if (rewrite.has(url)) continue; // same file named twice (e.g. poster == photo 0)
+    if (!url.startsWith("/images/cms/") || !IMG_EXT_RE.test(url)) continue; // not our media
+    const bytes = await storage.readMedia(`public${url}`); // throws on network/auth/etc.
+    if (bytes === null) throw new MediaMissingError(`public${url}`); // named file is gone
+    const ext = url.match(IMG_EXT_RE)![1].toLowerCase();
+    const rel = frozenRel(dir, slug, mediaHash(bytes), ext);
+    puts.push({ path: `public/${rel}`, bytes });
+    rewrite.set(url, `/${rel}`);
+  }
+  return { item: withRewrittenImages(kindKey, item, rewrite), puts };
+}
+
+/** Write the planned `_pub/` copies (idempotent — a byte-identical file is skipped). */
+async function writeFrozenMedia(
+  storage: PanelStorage,
+  puts: { path: string; bytes: Uint8Array }[],
+): Promise<void> {
+  for (const p of puts) await storage.putPublishedMedia(p.path, p.bytes);
+}
+
+type MediaIndex = Map<string, { id: string; size: number }>;
+
+/**
+ * Is the published snapshot entry `pub` still in sync with working card `item`,
+ * accounting for frozen photos?
+ *
+ * Non-photo fields, and photo COUNT / ORDER / CAPTIONS, are compared exactly.
+ * For each photo slot the WORKING file's content id (git blob id, from one
+ * consistent branch tree) is compared to the published `_pub/` copy's id — NOT
+ * to the sha-256 in the file name (a different identifier). Equal ids ⇒ same
+ * bytes ⇒ in sync. A byte change at the same path, or a re-order (Keystatic
+ * renumbers the files), gives a different id → "modified". A working file
+ * missing from the tree, or a published `_pub/` file that has vanished, also
+ * reads as "modified".
+ *
+ * `index` is fetched once per `getPanelData` (one request in github mode). If
+ * it could not be fetched, `getPanelData` rejects — an incomplete tree is never
+ * read as "all in sync".
+ */
+/** A card's content with photo URLs blanked — so a token computed from it
+ *  survives freezing (working `photos/*` path → published `_pub/<hash>` path). */
+function stripPhotoUrls(kindKey: KindKey, o: Record<string, unknown>): Record<string, unknown> {
+  if (kindKey === "promo") return { ...o, image: "" };
+  const photos = Array.isArray(o.photos) ? (o.photos as Record<string, unknown>[]) : [];
+  const out: Record<string, unknown> = { ...o, photos: photos.map((p) => ({ ...p, image: "" })) };
+  if (kindKey === "car" && o.video && typeof o.video === "object") {
+    out.video = { ...(o.video as Record<string, unknown>), posterSrc: "" };
+  }
+  return out;
+}
+
+/**
+ * A stable identity for "the content this card would publish", ignoring which
+ * frozen `_pub/` copy the photos resolve to. Captured by the client at the
+ * moment a publish is attempted and compared, in `checkActionResult`, against
+ * whatever is actually in the published snapshot later — so "another editor
+ * published a different version of the same item" can never read as "our
+ * publish succeeded". NOT sensitive; a hash of already-public card text.
+ */
+export function publishContentToken(kindKey: KindKey, item: Record<string, unknown>): string {
+  return sha256(stable(stripPhotoUrls(kindKey, item)));
+}
+
+function inSyncIgnoringFrozenPhotos(
+  index: MediaIndex,
+  kindKey: KindKey,
+  pub: Record<string, unknown>,
+  item: Record<string, unknown>,
+): boolean {
+  if (stable(stripPhotoUrls(kindKey, pub)) !== stable(stripPhotoUrls(kindKey, item))) return false;
+
+  const pu = itemImageUrls(kindKey, pub);
+  const iu = itemImageUrls(kindKey, item);
+  if (pu.length !== iu.length) return false;
+
+  return pu.every((pubUrl, i) => {
+    const workUrl = iu[i];
+    if (!pubUrl.includes(PUB_SEG)) return pubUrl === workUrl; // legacy plain path
+    const pubId = index.get(`public${pubUrl}`)?.id;
+    const workId = index.get(`public${workUrl}`)?.id;
+    return pubId !== undefined && workId !== undefined && pubId === workId;
+  });
+}
+
+const FROZEN_PATH_RE = /\/_pub\/[a-f0-9]+\.\w+$/;
+
+/** Every `_pub/` repo path referenced anywhere in `snapshot` (as `public/…`). */
+function referencedFrozenPaths(snapshot: Snapshot): Set<string> {
+  const refs = new Set<string>();
+  JSON.stringify(snapshot, (_k, v) => {
+    if (typeof v === "string" && v.includes(PUB_SEG) && FROZEN_PATH_RE.test(v)) {
+      refs.add(v.startsWith("/") ? `public${v}` : v);
+    }
+    return v;
+  });
+  return refs;
+}
+
+// ---------------------------------------------------------------------------
+// dashboard model
+// ---------------------------------------------------------------------------
+
+export type ItemPublishState = "not-published" | "in-sync" | "modified" | "orphan-published";
+
+export interface PanelRow {
+  id: string;
+  title: string;
+  subtitle: string;
+  /** `null` when the working card is gone (orphan-published row). */
+  editHref: string | null;
+  langStatus: Record<ContentLocale, LangReviewStatus>;
+  blockers: GateFailure[];
+  publishState: ItemPublishState;
+  publiclyVisible: boolean;
+  publishedExists: boolean;
+  /**
+   * Whether a working (Keystatic) card backs this row. `false` means the card
+   * was deleted but a published copy still lives in the snapshot — the row is
+   * shown read-only with only "прибрати з сайті".
+   */
+  workingExists: boolean;
+  /**
+   * Identity of the content a publish of this row WOULD write, ignoring frozen
+   * photo paths. The client captures this the moment a publish is attempted and
+   * hands it back to `checkActionResult` if the response is lost — so the check
+   * verifies THIS exact version, not whatever the row looks like after a refresh.
+   */
+  publishTargetToken: string;
+  /**
+   * Per-locale hash of the confirmed text — identical to what `confirmLocale`
+   * writes into review-state. Captured on a "Позначити перевіреним" click so a
+   * lost-response check can tell "our confirm of THIS text landed" apart from
+   * "someone confirmed different text since".
+   */
+  localeTextToken: Record<ContentLocale, string>;
+}
+export interface PanelGroup {
+  kind: KindKey;
+  label: string;
+  singleEntry: boolean;
+  createHref: string | null;
+  rows: PanelRow[];
+}
+export type Versions = Record<KindKey, string> & { review: string; published: string };
+export interface PanelData {
+  groups: PanelGroup[];
+  publishedAt: string;
+  deploy: DeployStatus;
+  mode: "local" | "github";
+  /** Working branch in github mode; `null` for local files. */
+  branch: string | null;
+  versions: Versions;
+  /**
+   * The branch head every read on this render was pinned to (`null` in local
+   * mode). A cleanup dry-run plan is computed against this exact commit, so the
+   * client drops a pending plan the moment it moves — `versions.published` is
+   * ONE file's token and cannot stand in for the branch head.
+   */
+  headSha: string | null;
+  /**
+   * review-state.json rows whose slug no longer backs any working card (a card
+   * deleted straight from Keystatic — its delete never touches review-state).
+   * They do not colour the dashboard; the next panel write drops them.
+   */
+  staleReviewSlugs: string[];
+}
+
+const COLLECTION_SLUG: Record<KindKey, string> = {
+  car: "cars",
+  gallery: "galleryProjects",
+  service: "services",
+  contact: "siteContact",
+  promo: "promos",
+};
+function subtitleFor(kind: KindKey, item: { id: string; order: number } & Record<string, unknown>) {
+  if (kind === "car") return `${item.id} · ${item.price ?? ""} · порядок ${item.order}`;
+  if (kind === "contact") return "телефон, email, соцмережі, графік — трьома мовами";
+  if (kind === "promo") {
+    return `${item.id} · ${item.visible === false ? "прихований" : "видимий"} · порядок ${item.order}`;
+  }
+  return `${item.id} · порядок ${item.order}`;
+}
+/**
+ * Keystatic URL base. In github mode the panel and the editor MUST agree on the
+ * branch, so every link is branch-scoped; otherwise Keystatic would open its own
+ * last/default branch (main) and show different content than /panel.
+ */
+const keystaticBase = (branch: string | null) =>
+  branch ? `/keystatic/branch/${encodeURIComponent(branch)}` : "/keystatic";
+
+const editHrefFor = (kind: KindKey, id: string, branch: string | null) =>
+  kind === "contact"
+    ? `${keystaticBase(branch)}/singleton/siteContact` // singleton — one edit page, no "Add"
+    : `${keystaticBase(branch)}/collection/${COLLECTION_SLUG[kind]}/item/${id}`;
+
+const createHrefFor = (kind: KindKey, branch: string | null) =>
+  `${keystaticBase(branch)}/collection/${COLLECTION_SLUG[kind]}/create`;
+
+export async function getPanelData(storage: PanelStorage): Promise<PanelData> {
+  // Content reads (readDir / readFile) are NOT wrapped: a failure there must
+  // reject so the page shows a retry state — it is never turned into an empty
+  // dashboard. ONLY the deploy-status probe is caught here: it is
+  // non-essential, so if the backend gives no usable answer the content still
+  // renders and the banner shows "unknown" (which the banner never styles as a
+  // successful build).
+  // Pin every content read to ONE commit S: working cards, published.json,
+  // review-state and the media tree must all describe the same version, or a
+  // card's status could be built from working files at one commit and a media
+  // tree at another. In local mode `atSha` is null and ignored.
+  const atShaOrNull = await storage.headSha();
+  const atSha = atShaOrNull ?? undefined;
+  const dirs = await Promise.all(
+    KIND_ORDER.map((k) => storage.readDir(KINDS[k].dir, atSha)),
+  );
+  const [publishedF, reviewF, mediaIndex, deploy] = await Promise.all([
+    storage.readFile(PUBLISHED, atSha),
+    storage.readFile(REVIEW, atSha),
+    // ONE consistent snapshot of every CMS image (git blob ids), pinned to S.
+    // NOT caught — an incomplete tree must never let a stale card read as "in
+    // sync".
+    storage.mediaIndex(atSha),
+    storage.deployStatus().catch((err): DeployStatus => {
+      if (err instanceof StorageBackendError) {
+        return { state: "unknown", reason: "не вдалося перевірити стан збірки" };
+      }
+      throw err;
+    }),
+  ]);
+  const snapshot = parseSnapshot(publishedF.data);
+  const review = parseReview(reviewF.data);
+
+  const workingLists = KIND_ORDER.map((kindKey, i) =>
+    coerceList(KINDS[kindKey] as ContentKind<{ id: string; order: number }>, dirs[i].data),
+  );
+  const liveKeys = new Set<string>();
+  KIND_ORDER.forEach((kindKey, i) => {
+    for (const w of workingLists[i]) {
+      liveKeys.add(w.id);
+      liveKeys.add(reviewKeyFor(kindKey, w.id));
+    }
+  });
+  // A review row whose key nothing backs is stale (Keystatic delete). Don't let
+  // it gate or badge anything; report it so it can be tidied.
+  const stale = staleReviewSlugs(review, liveKeys);
+  const ctx = { review: pruneReview(review, liveKeys), sha256 };
+  const instances = KIND_ORDER.map((_, i) => instanceMap(dirs[i].data));
+
+  const groups: PanelGroup[] = KIND_ORDER.map((kindKey, i): PanelGroup => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    const working = workingLists[i];
+    const instanceOf = (id: string) => instances[i].get(id) ?? "";
+    const publishedList = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    const publishedById = new Map(publishedList.map((p) => [p.id, p]));
+    const workingIds = new Set(working.map((w) => w.id));
+
+    const emptyLangStatus = () =>
+      Object.fromEntries(LOCALES.map((l) => [l, "empty" as LangReviewStatus])) as Record<
+        ContentLocale,
+        LangReviewStatus
+      >;
+
+    const rows = working.map((item): PanelRow => {
+      const pub = publishedById.get(item.id);
+      const itemCtx = {
+        ...ctx,
+        instance: instanceOf(item.id),
+        reviewKey: reviewKeyFor(kindKey, item.id),
+      };
+      const langStatus = Object.fromEntries(
+        LOCALES.map((l) => [l, kind.langStatus(item, l, itemCtx)]),
+      ) as Record<ContentLocale, LangReviewStatus>;
+      let publishState: ItemPublishState = "not-published";
+      if (pub) {
+        publishState = inSyncIgnoringFrozenPhotos(
+          mediaIndex,
+          kindKey,
+          pub as unknown as Record<string, unknown>,
+          item as unknown as Record<string, unknown>,
+        )
+          ? "in-sync"
+          : "modified";
+      }
+      return {
+        id: item.id,
+        title: kind.displayTitle(item),
+        subtitle: subtitleFor(kindKey, item as never),
+        editHref: editHrefFor(kindKey, item.id, storage.branch),
+        langStatus,
+        blockers: kind.publishBlockers(item, itemCtx),
+        publishState,
+        publiclyVisible: Boolean(pub) && kind.isRenderable(pub!),
+        publishedExists: Boolean(pub),
+        workingExists: true,
+        publishTargetToken: publishContentToken(kindKey, item as unknown as Record<string, unknown>),
+        localeTextToken: Object.fromEntries(
+          LOCALES.map((l) => [l, sha256(kind.confirmedText(item, l))]),
+        ) as Record<ContentLocale, string>,
+      };
+    });
+
+    // Entries still in the published snapshot whose working card was deleted.
+    // They keep rendering on the public site, so the panel MUST keep a way to
+    // take them down. Read-only: no edit link (nothing to edit), no publish /
+    // confirm actions, and getPanelData never recreates the working file.
+    const orphanRows = publishedList
+      .filter((pub) => !workingIds.has(pub.id))
+      .map((pub): PanelRow => ({
+        id: pub.id,
+        title: kind.displayTitle(pub),
+        subtitle: subtitleFor(kindKey, pub as never),
+        editHref: null,
+        langStatus: emptyLangStatus(),
+        blockers: [],
+        publishState: "orphan-published",
+        publiclyVisible: kind.isRenderable(pub),
+        publishedExists: true,
+        workingExists: false,
+        publishTargetToken: publishContentToken(kindKey, pub as unknown as Record<string, unknown>),
+        localeTextToken: Object.fromEntries(LOCALES.map((l) => [l, ""])) as Record<
+          ContentLocale,
+          string
+        >,
+      }));
+
+    return {
+      kind: kindKey,
+      label: kind.label,
+      singleEntry: Boolean(kind.singleEntry),
+      createHref: kind.singleEntry ? null : createHrefFor(kindKey, storage.branch),
+      rows: [...rows, ...orphanRows],
+    };
+  });
+
+  const versions = { review: reviewF.version, published: publishedF.version } as Versions;
+  KIND_ORDER.forEach((k, i) => {
+    versions[k] = dirs[i].version;
+  });
+
+  return {
+    groups,
+    publishedAt: snapshot.publishedAt,
+    deploy,
+    mode: storage.mode,
+    branch: storage.branch,
+    versions,
+    headSha: atShaOrNull,
+    staleReviewSlugs: stale,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// actions — server re-reads + re-gates every time; the browser supplies only
+// { kind, id, locale } and the version tokens it last saw.
+// ---------------------------------------------------------------------------
+
+export type ActionResult =
+  | {
+      ok: true;
+      message: string;
+      /** Dry-run summary from `cleanupFrozenMedia` — the client re-submits with
+       *  `confirm` + this `headSha` to actually delete, and keeps `paths` so a
+       *  lost-response check can verify exactly this set was removed. */
+      cleanup?: { count: number; totalBytes: number; headSha: string; paths: string[] };
+    }
+  | {
+      ok: false;
+      message: string;
+      blockers?: GateFailure[];
+      conflict?: boolean;
+      /** GitHub unreachable or rate-limited BEFORE / instead of the write — a
+       *  transient backend problem, not bad input. The write provably did NOT
+       *  land, so trying again later is safe. NOT the same as `outcome:"unknown"`. */
+      transient?: boolean;
+      /**
+       * The one machine-readable "how did the write end" flag. Set ONLY when a
+       * write was in flight and its result is genuinely unknown (a dropped
+       * connection AFTER the request left — `WriteUncertainError`). Absence means
+       * the write provably did not land (validation / conflict / auth / a
+       * pre-flight backend failure) — safe to retry. The client MUST NOT decide
+       * this from the message text: `outcome:"unknown"` → lock the action and
+       * force a read-only "Перевірити результат" before any retry.
+       */
+      outcome?: "unknown";
+      /** 401 — the GitHub session ended; the user must sign in again. */
+      auth?: boolean;
+      /** 403 — access was refused (permissions narrowed / repo access lost);
+       *  signing in again will not fix it. */
+      forbidden?: boolean;
+    };
+
+const asConflict = (err: unknown): ActionResult | null =>
+  err instanceof ConflictError ? { ok: false, message: err.message, conflict: true } : null;
+
+/**
+ * Turn any storage error into a user-facing ActionResult. Never leaks a token,
+ * a raw GitHub body or a stack trace — only the error's own message text.
+ *  - ConflictError         -> {conflict:true}, offer refresh
+ *  - StorageAuthError (401) -> {auth:true}; message says sign in again
+ *  - StorageForbiddenError (403) -> {forbidden:true}; access changed, re-login won't help
+ *  - WriteUncertainError  -> {outcome:"unknown"}; a write was in flight, result
+ *      genuinely unknown — the client locks and forces a read-only check first
+ *  - StorageRateLimitedError / StorageUnavailableError -> {transient:true}; the
+ *      write provably did not land (pre-flight / definite refusal) — safe to retry
+ *  - anything else         -> generic failure with the message prefixed
+ */
+function toActionError(err: unknown, prefix: string): ActionResult {
+  const conflict = asConflict(err);
+  if (conflict) return conflict;
+  if (err instanceof MediaMissingError) return { ok: false, message: err.message };
+  if (err instanceof StorageAuthError) return { ok: false, message: err.message, auth: true };
+  if (err instanceof StorageForbiddenError) {
+    return { ok: false, message: err.message, forbidden: true };
+  }
+  if (err instanceof WriteUncertainError) {
+    // The ONLY path that sets outcome:"unknown". A dropped connection AFTER the
+    // write request left GitHub — the commit may or may not have landed.
+    return { ok: false, message: err.message, outcome: "unknown" };
+  }
+  if (err instanceof StorageBackendError) {
+    // StorageUnavailableError / StorageRateLimitedError — the request never left
+    // or was definitively refused; nothing was written. Retriable after a wait.
+    return { ok: false, message: err.message, transient: true };
+  }
+  return { ok: false, message: `${prefix}: ${(err as Error).message}` };
+}
+
+/** Run an action body; map storage failures (incl. the load phase) to a result. */
+async function runAction(prefix: string, body: () => Promise<ActionResult>): Promise<ActionResult> {
+  try {
+    return await body();
+  } catch (err) {
+    return toActionError(err, prefix);
+  }
+}
+
+async function loadKind(storage: PanelStorage, kindKey: KindKey) {
+  const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+  const [dir, reviewF] = await Promise.all([storage.readDir(kind.dir), storage.readFile(REVIEW)]);
+  return {
+    kind,
+    working: coerceList(kind, dir.data),
+    workingVersion: dir.version,
+    instances: instanceMap(dir.data),
+    review: parseReview(reviewF.data),
+    reviewVersion: reviewF.version,
+  };
+}
+
+export async function confirmLocale(
+  storage: PanelStorage,
+  kindKey: KindKey,
+  id: string,
+  locale: ContentLocale,
+  expected: { working: string; review: string },
+): Promise<ActionResult> {
+  return runAction("Не збережено", async () => {
+    const { kind, working, workingVersion, instances, review, reviewVersion } = await loadKind(
+      storage,
+      kindKey,
+    );
+    if (workingVersion !== expected.working || reviewVersion !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("робочі картки").message };
+    }
+    const item = working.find((w) => w.id === id);
+    if (!item) return { ok: false, message: `«${id}» не знайдено.` };
+    const cardInstance = instances.get(id) ?? "";
+    const rkey = reviewKeyFor(kindKey, id);
+    if (
+      kind.langStatus(item, locale, { review, sha256, instance: cardInstance, reviewKey: rkey }) ===
+      "empty"
+    ) {
+      return { ok: false, message: `${locale.toUpperCase()}: спершу заповніть обов'язкові поля.` };
+    }
+    // This is the only action that writes review-state, so it is also the only
+    // place that can garbage-collect rows left behind by a Keystatic "Delete
+    // entry" (which never touches this file). Best-effort: if the extra reads
+    // fail we still write the confirmation, just without the tidy-up.
+    let base = review;
+    const liveKeys = await collectWorkingSlugs(storage).catch(() => null);
+    if (liveKeys) {
+      liveKeys.add(id).add(rkey); // the card we just re-read is live by definition
+      base = pruneReview(review, liveKeys);
+    }
+    // This row is keyed by kind — start it from the namespaced row, falling back
+    // to a legacy bare row once (and dropping that bare row, so `cars/foo` and
+    // `services/foo` stop sharing it). If the row was last confirmed against a
+    // DIFFERENT card instance (deleted + re-created), drop the sibling locales
+    // so confirming one language never silently revives the others.
+    const legacyRow = base[id];
+    const priorRow = base[rkey] ?? legacyRow;
+    const prevRow = (priorRow?.instance ?? "") === cardInstance ? priorRow : undefined;
+    const next: ReviewState = { ...base };
+    delete next[id]; // consolidate any legacy bare key into the namespaced one
+    next[rkey] = {
+      ...prevRow,
+      instance: cardInstance,
+      [locale]: { hash: sha256(kind.confirmedText(item, locale)), at: new Date().toISOString() },
+    };
+    await storage.writeFile(REVIEW, `${JSON.stringify(next, null, 2)}\n`, expected.review);
+    return { ok: true, message: `${locale.toUpperCase()}: позначено перевіреним.` };
+  });
+}
+
+export async function publishItem(
+  storage: PanelStorage,
+  kindKey: KindKey,
+  id: string,
+  expected: { working: string; review: string; published: string },
+): Promise<ActionResult> {
+  return runAction("Публікація не вдалася", async () => {
+    const { kind, working, workingVersion, instances, review, reviewVersion } = await loadKind(
+      storage,
+      kindKey,
+    );
+    const publishedF = await storage.readFile(PUBLISHED);
+    if (workingVersion !== expected.working || reviewVersion !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("контент").message };
+    }
+    const item = working.find((w) => w.id === id);
+    if (!item) return { ok: false, message: `«${id}» не знайдено.` };
+
+    const blockers = kind.publishBlockers(item, {
+      review,
+      sha256,
+      instance: instances.get(id) ?? "",
+      reviewKey: reviewKeyFor(kindKey, id),
+    });
+    if (blockers.length > 0) {
+      return { ok: false, message: "Не можна опублікувати — є невирішені пункти.", blockers };
+    }
+
+    const snapshot = parseSnapshot(publishedF.data);
+    const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    const existing = current.find((p) => p.id === id);
+    if (existing && stable(existing) === stable(item)) {
+      return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
+    }
+
+    // Plan the frozen copy of every referenced photo (reads + hashes only — no
+    // write). A named photo whose file is missing, or a network / auth failure,
+    // throws here → the publish aborts and the previous published.json (and its
+    // photos) stay exactly as they were.
+    const { item: frozenRaw, puts } = await planFrozenMedia(
+      storage,
+      kindKey,
+      item as unknown as Record<string, unknown>,
+    );
+    const frozen = frozenRaw as typeof item;
+    // Re-freezing an unchanged photo set produces the exact same `_pub/` URLs,
+    // so re-publishing an item that only DIFFERED by working-vs-frozen photo
+    // paths (e.g. straight after the freeze migration) is a clean no-op.
+    if (existing && stable(existing) === stable(frozen)) {
+      return { ok: true, message: `«${id}» вже опубліковано в цій версії.` };
+    }
+
+    const nextList = [...current.filter((p) => p.id !== id), frozen].sort(
+      (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+    );
+    const nextSnapshot = rebuildSnapshot(snapshot, kindKey, nextList as unknown[]);
+
+    // Close the read→verify→write TOCTOU window: re-read working + review right
+    // before committing; abort on any drift (parallel Keystatic save / confirm).
+    const recheck = await loadKind(storage, kindKey);
+    if (recheck.workingVersion !== expected.working || recheck.reviewVersion !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("контент").message };
+    }
+
+    // Write the frozen copies, then the snapshot (version-guarded), then write
+    // the copies ONCE MORE: if a manual "прибрати старі копії фото" ran in the
+    // gap and deleted one, this restores it, and after the snapshot write no
+    // cleanup will touch a file the current published.json points at.
+    await writeFrozenMedia(storage, puts);
+    await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
+    await writeFrozenMedia(storage, puts).catch(() => {});
+    const tail =
+      storage.mode === "github"
+        ? " Очікуйте завершення збірки (1–3 хв), стан — угорі сторінки."
+        : " Зміни на сайті.";
+    return {
+      ok: true,
+      message: kind.isRenderable(item)
+        ? `Опубліковано.${tail}`
+        : `Опубліковано. «${id}» приховане публічно.`,
+    };
+  });
+}
+
+export async function unpublishItem(
+  storage: PanelStorage,
+  kindKey: KindKey,
+  id: string,
+  expected: { published: string },
+): Promise<ActionResult> {
+  return runAction("Не вдалося прибрати з сайту", async () => {
+    const kind = KINDS[kindKey] as ContentKind<{ id: string; order: number }>;
+    const publishedF = await storage.readFile(PUBLISHED);
+    if (publishedF.version !== expected.published) {
+      return { ok: false, conflict: true, message: new ConflictError("знімок").message };
+    }
+    const snapshot = parseSnapshot(publishedF.data);
+    const current = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[kindKey]]);
+    if (!current.some((p) => p.id === id)) {
+      return { ok: false, message: `«${id}» і так не опубліковане.` };
+    }
+    const nextSnapshot = rebuildSnapshot(
+      snapshot,
+      kindKey,
+      current.filter((p) => p.id !== id) as unknown[],
+    );
+    await storage.writeFile(PUBLISHED, `${JSON.stringify(nextSnapshot, null, 2)}\n`, expected.published);
+    // The slug's `_pub/` copies are now unreferenced, but deleting them here
+    // could race a parallel re-publish — the owner sweeps them with
+    // "прибрати старі копії фото" (cleanupFrozenMedia).
+    const tail = storage.mode === "github" ? " Опубліковану версію буде знято після наступної збірки." : "";
+    return {
+      ok: true,
+      message: `«${id}» прибрано з опублікованого знімка.${tail}`,
+    };
+  });
+}
+
+/**
+ * Finish a Keystatic "Delete entry": drop every review-state.json row whose slug
+ * no longer backs a working card in ANY kind. Keystatic's delete is a direct
+ * commit that never touches review-state, and until now those rows were only
+ * swept as a side-effect of the next `confirmLocale` on some other item — this
+ * is the on-demand button for it (task 2026-09-09 §4). An orphan still in the
+ * published snapshot is removed separately with "Прибрати з сайту".
+ *
+ * Safety:
+ *  - GET never calls this; nothing is removed by opening the page.
+ *  - The working set is re-read fresh from every kind here — a read failure
+ *    rejects (transient), so "GitHub unreachable" is never mistaken for
+ *    "the card is gone". A slug that has re-appeared as a working card (owner
+ *    re-created it) is kept, and even if it weren't the row's `instance` no
+ *    longer matches the new card so its languages still need review.
+ *  - One version-guarded write; idempotent — a second click finds nothing
+ *    stale and writes nothing.
+ */
+export async function completeDeletion(
+  storage: PanelStorage,
+  expected: { review: string },
+): Promise<ActionResult> {
+  return runAction("Не вдалося завершити видалення", async () => {
+    // Phase 1 — one consistent snapshot S1: working cards and review-state are
+    // read pinned to it so a Keystatic commit landing mid-read cannot make a
+    // still-present card look deleted.
+    const s1 = await storage.headSha();
+    const [workingSlugs, reviewF] = await Promise.all([
+      collectWorkingSlugs(storage, s1 ?? undefined),
+      storage.readFile(REVIEW, s1 ?? undefined),
+    ]);
+    if (reviewF.version !== expected.review) {
+      return { ok: false, conflict: true, message: new ConflictError("перевірки перекладів").message };
+    }
+    const review = parseReview(reviewF.data);
+    const stale = staleReviewSlugs(review, workingSlugs);
+    if (stale.length === 0) {
+      return { ok: true, message: "Незавершених видалень немає — рядки підтверджень уже прибрані." };
+    }
+    await storage.writeFile(
+      REVIEW,
+      `${JSON.stringify(pruneReview(review, workingSlugs), null, 2)}\n`,
+      expected.review,
+    );
+    // Phase 2 — the review write moved the branch, so take a FRESH consistent
+    // snapshot S2. A slug gone from working cards AND the published snapshot
+    // (both read at S2) has dead `_pub/` copies; sweep them with the same
+    // branch-guarded batch the manual cleanup uses (guarded by S2). Best-effort
+    // — the review rows are already pruned; a ConflictError here just defers the
+    // media sweep to "Прибрати старі копії фото".
+    let mediaNote = "";
+    try {
+      const s2 = await storage.headSha();
+      const [index, publishedF, workingAtS2] = await Promise.all([
+        storage.mediaIndex(s2 ?? undefined),
+        storage.readFile(PUBLISHED, s2 ?? undefined),
+        collectWorkingSlugs(storage, s2 ?? undefined),
+      ]);
+      const referenced = referencedFrozenPaths(parseSnapshot(publishedF.data));
+      // Only slugs still unbacked at S2 (owner may have re-created one in the gap).
+      const stillStale = stale.filter((k) => !workingAtS2.has(k));
+      const staleSlugs = new Set(
+        stillStale.map((k) => (k.includes(":") ? k.slice(k.indexOf(":") + 1) : k)),
+      );
+      const dead = [...index.keys()].filter((p) => {
+        const m = p.match(/^public\/images\/cms\/[^/]+\/([^/]+)\/_pub\//);
+        return m && staleSlugs.has(m[1]) && FROZEN_PATH_RE.test(p) && !referenced.has(p);
+      });
+      if (dead.length > 0) {
+        const done = (await storage.deletePublishedMediaBatch(dead, s2)).filter(
+          (o) => o.outcome === "deleted",
+        ).length;
+        if (done > 0) mediaNote = ` Прибрано ${done} копі(ю/ї/й) фото.`;
+      }
+    } catch {
+      mediaNote = " (копії фото прибрати не вдалося — скористайтеся «Прибрати старі копії фото»).";
+    }
+    return {
+      ok: true,
+      message: `Готово — прибрано рядки підтверджень: ${stale.join(", ")}.${mediaNote}`,
+    };
+  });
+}
+
+/**
+ * Freeze EVERY item already in published.json: copy each still-working image it
+ * references into the slug's `_pub/` folder and repoint the snapshot there.
+ * Idempotent — an item already fully frozen produces byte-identical paths and is
+ * skipped. Used by scripts/migrate-freeze-published-photos.mjs to close the gap
+ * for items published before this pipeline existed; a no-op afterwards.
+ * Returns the number of items whose paths changed.
+ */
+export async function freezePublishedMedia(storage: PanelStorage): Promise<{ changed: number }> {
+  const publishedF = await storage.readFile(PUBLISHED);
+  const snapshot = parseSnapshot(publishedF.data);
+  const allPuts: { path: string; bytes: Uint8Array }[] = [];
+  let changed = 0;
+  for (const kindKey of KIND_ORDER) {
+    const list = snapshot[KEY_FOR_KIND[kindKey]];
+    for (let i = 0; i < list.length; i += 1) {
+      const before = stable(list[i]);
+      const { item, puts } = await planFrozenMedia(
+        storage,
+        kindKey,
+        list[i] as Record<string, unknown>,
+      );
+      list[i] = item;
+      allPuts.push(...puts);
+      if (stable(list[i]) !== before) changed += 1;
+    }
+  }
+  if (changed === 0) return { changed: 0 };
+  await writeFrozenMedia(storage, allPuts);
+  await storage.writeFile(PUBLISHED, `${JSON.stringify(snapshot, null, 2)}\n`, publishedF.version);
+  return { changed };
+}
+
+/** Human "1.2 МБ" / "640 КБ". */
+function humanBytes(n: number): string {
+  return n >= 1024 * 1024 ? `${(n / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(n / 1024))} КБ`;
+}
+
+/**
+ * The `_pub/` files no current published entry points at — computed from ONE
+ * consistent commit: `headSha` is read first, then `published.json` and the
+ * media tree are BOTH read pinned to it. Without the pin a publish landing
+ * between the three reads could leave the plan referencing one version of
+ * published.json and a different version of the tree.
+ */
+async function frozenMediaCandidates(
+  storage: PanelStorage,
+): Promise<{ paths: string[]; totalBytes: number; headSha: string | null }> {
+  const headSha = await storage.headSha();
+  const [publishedF, index] = await Promise.all([
+    storage.readFile(PUBLISHED, headSha ?? undefined),
+    storage.mediaIndex(headSha ?? undefined),
+  ]);
+  const referenced = referencedFrozenPaths(parseSnapshot(publishedF.data));
+  const paths: string[] = [];
+  let totalBytes = 0;
+  for (const [path, { size }] of index) {
+    if (FROZEN_PATH_RE.test(path) && !referenced.has(path)) {
+      paths.push(path);
+      totalBytes += size;
+    }
+  }
+  return { paths: paths.sort(), totalBytes, headSha };
+}
+
+/**
+ * Explicit, guarded sweep of `_pub/` copies no current published entry points
+ * at. The deferred replacement for the old auto-GC, which could race a parallel
+ * re-publish and delete a photo it needed.
+ *
+ *  - Without `confirm`: a DRY RUN — reports how many files (and how many bytes)
+ *    would go, and the branch head they were computed against. Nothing deleted.
+ *  - With `confirm` + that `headSha`: ONE atomic commit removes exactly those
+ *    files, and only while the branch is still at `headSha` (`deletePublishedMediaBatch`
+ *    pushes non-force; a `ConflictError` means a publish landed in between —
+ *    re-run the dry run). The result reports what was actually removed vs what
+ *    was already gone — never "прибрано N" for an unconfirmed delete.
+ *
+ * In github mode a confirm MUST carry the dry-run's `headSha` and it must still
+ * match — a confirm with no `headSha` cannot bypass the version check.
+ */
+export async function cleanupFrozenMedia(
+  storage: PanelStorage,
+  opts: { confirm?: boolean; headSha?: string | null } = {},
+): Promise<ActionResult> {
+  return runAction("Не вдалося прибрати старі копії", async () => {
+    // ONE consistent snapshot: `headSha` (S) is read first inside
+    // `frozenMediaCandidates`, and `published.json` + the media tree are read
+    // pinned to S. The delete batch is guarded with the same S.
+    const { paths, totalBytes, headSha } = await frozenMediaCandidates(storage);
+
+    if (paths.length === 0) {
+      return { ok: true, message: "Зайвих копій фото немає — усе прибрано." };
+    }
+    if (!opts.confirm) {
+      return {
+        ok: true,
+        message: `Можна прибрати ${paths.length} стар(у/і/их) копі(ю/ї/й) фото — ${humanBytes(
+          totalBytes,
+        )}. Натисніть ще раз, щоб підтвердити.`,
+        cleanup: { count: paths.length, totalBytes, headSha: headSha ?? "", paths },
+      };
+    }
+    // github mode: a confirm is only valid against the exact head the user was
+    // shown. No `headSha` on the request → treat as stale, never as "skip the
+    // check". local mode has no branch, so `headSha` is null on both sides.
+    const staleConfirm =
+      storage.mode === "github"
+        ? !opts.headSha || opts.headSha !== (headSha ?? "")
+        : opts.headSha !== undefined && (opts.headSha ?? "") !== (headSha ?? "");
+    if (staleConfirm) {
+      return {
+        ok: false,
+        conflict: true,
+        message: new ConflictError("гілка").message,
+      };
+    }
+
+    const outcomes = await storage.deletePublishedMediaBatch(paths, headSha);
+    const deleted = outcomes.filter((o) => o.outcome === "deleted").length;
+    const absent = outcomes.filter((o) => o.outcome === "already-absent").length;
+    if (deleted === 0) {
+      return { ok: true, message: "Прибирати нічого — усі кандидати вже відсутні." };
+    }
+    const tail =
+      storage.mode === "github" ? " Зміни в гілці після наступної збірки." : "";
+    return {
+      ok: true,
+      message:
+        `Прибрано ${deleted} стар(у/і/их) копі(ю/ї/й) фото` +
+        (absent ? ` (ще ${absent} вже були відсутні)` : "") +
+        `.${tail}`,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// read-only result check — the ONLY thing "Перевірити результат" runs after a
+// write whose outcome is unknown. It NEVER writes and NEVER retries the action;
+// it re-reads fresh state and answers one question: did THIS action's specific
+// expected effect happen?  true / false / null ("Результат поки невідомий").
+// A null answer must NOT unlock the button (the caller keeps it locked); a
+// page refresh settling is not, by itself, an answer.
+// ---------------------------------------------------------------------------
+
+export interface CheckTarget {
+  action: "publish" | "unpublish" | "confirm-locale" | "complete-deletion" | "cleanup-frozen-media";
+  kind?: KindKey;
+  id?: string;
+  locale?: ContentLocale;
+  /**
+   * The initial target captured at click time, BEFORE the write:
+   *  - publish       — `row.publishTargetToken` (content identity, frozen-photo-safe)
+   *  - confirm-locale — `row.localeTextToken[locale]` (hash of that locale's text)
+   * The check compares THIS against fresh state; the row's post-refresh props
+   * must never stand in for it.
+   */
+  expectToken?: string;
+  /** cleanup: the exact `_pub/` repo paths from the confirmed dry-run plan. */
+  planPaths?: string[];
+  /** complete-deletion: the stale review slugs the owner was shown. */
+  slugs?: string[];
+}
+
+export type CheckResult = { ok: true; applied: boolean | null; message: string };
+
+export async function checkActionResult(
+  storage: PanelStorage,
+  target: CheckTarget,
+  seen: Record<string, string | undefined>,
+): Promise<CheckResult> {
+  const unknown = (message: string): CheckResult => ({ ok: true, applied: null, message });
+  try {
+    // cleanup is checked against the media tree alone — no need for full panel data.
+    if (target.action === "cleanup-frozen-media") {
+      const plan = target.planPaths ?? [];
+      if (plan.length === 0) {
+        return unknown("Немає збереженого плану для звірки — запустіть перевірку зайвих копій ще раз.");
+      }
+      const index = await storage.mediaIndex();
+      const still = plan.filter((p) => index.has(p));
+      if (still.length === 0) {
+        return { ok: true, applied: true, message: "Схоже, копії прибрано — жодного файла з плану вже немає." };
+      }
+      if (still.length === plan.length) {
+        return {
+          ok: true,
+          applied: false,
+          message: "Схоже, нічого не прибрано — усі файли з плану на місці. Можна повторити очищення.",
+        };
+      }
+      return unknown(
+        `Прибрано частину (${plan.length - still.length} з ${plan.length}) — результат невизначений, перевірте ще раз.`,
+      );
+    }
+
+    if (target.action === "complete-deletion") {
+      const data = await getPanelData(storage);
+      const asked = target.slugs?.length ? target.slugs : data.staleReviewSlugs;
+      const remaining = asked.filter((s) => data.staleReviewSlugs.includes(s));
+      return remaining.length === 0
+        ? { ok: true, applied: true, message: "Схоже, рядки підтверджень видалених карток прибрано." }
+        : {
+            ok: true,
+            applied: false,
+            message: `Ще лишилися незавершені видалення: ${remaining.join(", ")}. Можна повторити.`,
+          };
+    }
+
+    if (!target.kind || !target.id) return unknown("Не вказано матеріал для перевірки.");
+    const kind = KINDS[target.kind] as ContentKind<{ id: string; order: number }>;
+    const LOC = target.locale ? target.locale.toUpperCase() : "";
+
+    if (target.action === "publish" || target.action === "unpublish") {
+      const publishedF = await storage.readFile(PUBLISHED);
+      const snapshot = parseSnapshot(publishedF.data);
+      const list = coerceSnapshotList(kind, snapshot[KEY_FOR_KIND[target.kind]]);
+      const publishedItem = list.find((p) => p.id === target.id);
+      const publishedMoved = publishedF.version !== (seen.published ?? "");
+
+      if (target.action === "unpublish") {
+        return publishedItem
+          ? {
+              ok: true,
+              applied: false,
+              message: `«${target.id}» ще опубліковано — схоже, НЕ прибрано. Можна повторити.`,
+            }
+          : { ok: true, applied: true, message: `«${target.id}» більше не опубліковано — схоже, прибрано з сайту.` };
+      }
+
+      // publish — verify the EXACT version we tried to publish (captured token),
+      // not "is the row in-sync now".
+      if (!publishedItem) {
+        return {
+          ok: true,
+          applied: false,
+          message: `«${target.id}» не опубліковано — на сайті попередня версія. Можна повторити.`,
+        };
+      }
+      if (!target.expectToken) {
+        return unknown(
+          `«${target.id}» опубліковано, але звірити саме вашу версію не вдалося (застаріла вкладка). Перегляньте матеріал у панелі.`,
+        );
+      }
+      const publishedToken = publishContentToken(
+        target.kind,
+        publishedItem as unknown as Record<string, unknown>,
+      );
+      if (publishedToken === target.expectToken) {
+        return {
+          ok: true,
+          applied: true,
+          message: `Схоже, опубліковано саме цю версію «${target.id}» — повторювати не треба.`,
+        };
+      }
+      // «A» is published, but with content different from what we tried — another
+      // editor published a different version. NOT our success.
+      return unknown(
+        `Опубліковано іншу версію «${target.id}»${publishedMoved ? " (інший редактор)" : ""}. ` +
+          `Стару дію не повторюйте — перегляньте поточний матеріал у панелі та вирішіть заново.`,
+      );
+    }
+
+    if (target.action === "confirm-locale") {
+      if (!target.locale) return unknown("Не вказано мову для перевірки.");
+      const [reviewF, loaded] = await Promise.all([
+        storage.readFile(REVIEW),
+        loadKind(storage, target.kind),
+      ]);
+      const review = parseReview(reviewF.data);
+      const rkey = reviewKeyFor(target.kind, target.id);
+      const conf = (review[rkey] ?? review[target.id])?.[target.locale];
+      const workingItem = loaded.working.find((w) => w.id === target.id);
+      const currentText = workingItem
+        ? sha256(loaded.kind.confirmedText(workingItem, target.locale))
+        : undefined;
+
+      if (conf && target.expectToken && conf.hash === target.expectToken) {
+        // OUR confirm of THIS exact text landed.
+        const drifted = currentText !== undefined && currentText !== target.expectToken;
+        return {
+          ok: true,
+          applied: true,
+          message:
+            `${LOC}: підтвердження застосовано.` +
+            (drifted
+              ? " Відтоді текст змінили — перегляньте картку в Keystatic, перш ніж підтверджувати знову."
+              : " Повторювати не треба."),
+        };
+      }
+      if (conf && target.expectToken && conf.hash !== target.expectToken) {
+        // A DIFFERENT text was confirmed since — can't say ours landed, and the
+        // owner must read the current text before confirming anything.
+        return unknown(
+          `${LOC}: мову підтверджено іншим текстом (можливо, інший редактор). ` +
+            `Не підтверджуйте наосліп — відкрийте картку в Keystatic, прочитайте поточний текст.`,
+        );
+      }
+      if (!conf) {
+        return {
+          ok: true,
+          applied: false,
+          message: `${LOC}: схоже, НЕ підтверджено. Прочитайте текст і підтвердіть знову.`,
+        };
+      }
+      return unknown(`${LOC}: стан підтвердження незвичний — перевірте картку в Keystatic.`);
+    }
+
+    return unknown("Невідома дія для перевірки.");
+  } catch (err) {
+    // A read failure is NOT an answer — stay "unknown", keep the button locked.
+    const msg = err instanceof Error ? err.message : String(err);
+    return unknown(`Стан прочитати не вдалося (${msg}). Спробуйте «Перевірити результат» ще раз.`);
+  }
+}

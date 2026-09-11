@@ -1,0 +1,64 @@
+{
+  "id": "car-selection",
+  "order": 10,
+  "status": "available",
+  "iconSrc": "/images/services/premium-3d/01-car-selection-premium-3d.png",
+  "priceAmount": "",
+  "priceCurrency": "£",
+  "photos": [],
+  "uk": {
+    "title": "Автопідбір",
+    "shortDescription": "Підбір автомобіля під ключ з перевіркою технічного стану та історії.",
+    "longDescription": "Ми допомагаємо підібрати автомобіль, який відповідає вашим потребам і бюджету. Кожен варіант перевіряється технічно та юридично, щоб ви ухвалювали рішення на основі перевірених фактів, а не лише оголошення.",
+    "cardDescription": "",
+    "bullets": [
+      "Пошук варіантів за вашими критеріями",
+      "Технічний огляд та перевірка історії авто",
+      "Супровід на переговорах та оформленні",
+      "Прозорий звіт про стан автомобіля"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "priceNote": "",
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "en": {
+    "title": "Car Sourcing",
+    "shortDescription": "Turnkey car sourcing with a full technical and history check.",
+    "longDescription": "We help you find a car that matches your needs and budget. Every option is checked technically and legally, so your decision is based on verified facts rather than the listing alone.",
+    "cardDescription": "",
+    "bullets": [
+      "Search for options matching your criteria",
+      "Technical inspection and history check",
+      "Support during negotiation and paperwork",
+      "A transparent report on the car's condition"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "priceNote": "",
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "ru": {
+    "title": "Автоподбор",
+    "shortDescription": "Подбор автомобиля под ключ с проверкой технического состояния и истории.",
+    "longDescription": "Мы помогаем подобрать автомобиль, который соответствует вашим потребностям и бюджету. Каждый вариант проверяется технически и юридически, чтобы решение основывалось на проверенных фактах, а не только на объявлении.",
+    "cardDescription": "",
+    "bullets": [
+      "Поиск вариантов по вашим критериям",
+      "Технический осмотр и проверка истории автомобиля",
+      "Сопровождение на переговорах и оформлении",
+      "Прозрачный отчёт о состоянии автомобиля"
+    ],
+    "modalLead": "",
+    "modalDescription": "",
+    "modalSections": [],
+    "priceNote": "",
+    "seoTitle": "",
+    "seoDescription": ""
+  },
+  "bornAt": "legacy-car-selection"
+}

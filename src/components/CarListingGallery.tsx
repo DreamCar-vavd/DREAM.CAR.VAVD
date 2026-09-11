@@ -4,8 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Images, Play, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
-import type { CarListing } from "@/content/carListings";
 import type { CarListingCopy } from "@/content/types";
+
+export interface CarListingMedia {
+  id: string;
+  photos: { src: string }[];
+  video: { src: string; posterSrc: string } | null;
+}
 import { setRequestedVehicle } from "@/lib/vehicleContactIntent";
 import { isModifiedClick } from "@/lib/isModifiedClick";
 
@@ -29,18 +34,16 @@ export function CarListingGallery({
   labels,
   contactHref,
 }: {
-  listing: CarListing;
+  listing: CarListingMedia;
   copy: CarListingCopy;
   labels: GalleryLabels;
   contactHref: string;
 }) {
   const media: MediaItem[] = [
     ...listing.photos.map((photo) => ({ type: "photo" as const, src: photo.src })),
-    ...(listing.videos ?? []).map((video) => ({
-      type: "video" as const,
-      src: video.src,
-      posterSrc: video.posterSrc,
-    })),
+    ...(listing.video
+      ? [{ type: "video" as const, src: listing.video.src, posterSrc: listing.video.posterSrc }]
+      : []),
   ];
 
   const [isOpen, setIsOpen] = useState(false);

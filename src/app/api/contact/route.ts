@@ -8,6 +8,8 @@ import {
   resolveAllowedEndpoint,
   validateContactPayload,
 } from "@/lib/contact";
+import { getWritableLeadsStore, deriveIdempotencyKeys, type LeadInput } from "@/lib/leads/store";
+import { resolveLeadResponse, type EmailOutcome } from "@/lib/leads/deliver";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const UPSTREAM_TIMEOUT_MS = 10_000;
@@ -66,14 +68,35 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: false, code: "INVALID_PAYLOAD" }, 400);
   }
 
+  // Durable record (panel database) — an INDEPENDENT sink, tried BEFORE email
+  // so a captured lead survives an email outage or a missing email endpoint.
+  // `null` when no database is configured -> no-op, the email path is exactly
+  // as before. Never throws out of here, never logs personal data.
+  const leadsStore = await getWritableLeadsStore();
+  let savedToDb = false;
+  if (leadsStore) {
+    try {
+      const keys = await deriveIdempotencyKeys(validation.payload as LeadInput);
+      await leadsStore.create(validation.payload as LeadInput, keys);
+      savedToDb = true;
+    } catch {
+      console.warn("[contact] lead DB write failed; continuing with email only");
+    }
+  }
+
   const endpoint = resolveAllowedEndpoint(process.env.CONTACT_FORM_ENDPOINT);
   if (!endpoint) {
-    return jsonResponse({ ok: false, code: "NOT_CONFIGURED" }, 503);
+    // Email not set up. If the lead was still saved, report success with a
+    // code; otherwise keep the original 503.
+    return savedToDb
+      ? jsonResponse({ ok: true, code: "SAVED_EMAIL_FAILED" }, 200)
+      : jsonResponse({ ok: false, code: "NOT_CONFIGURED" }, 503);
   }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
+  let email: EmailOutcome;
   try {
     const upstreamResponse = await fetch(endpoint, {
       method: "POST",
@@ -91,18 +114,13 @@ export async function POST(request: Request) {
       // contact details to an unverified URL. Fail loud instead.
       redirect: "error",
     });
-
-    if (!upstreamResponse.ok) {
-      return jsonResponse({ ok: false, code: "DELIVERY_FAILED" }, 502);
-    }
-
-    return jsonResponse({ ok: true }, 200);
+    email = upstreamResponse.ok ? "ok" : "failed";
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return jsonResponse({ ok: false, code: "UPSTREAM_TIMEOUT" }, 504);
-    }
-    return jsonResponse({ ok: false, code: "DELIVERY_FAILED" }, 502);
+    email = error instanceof Error && error.name === "AbortError" ? "timeout" : "failed";
   } finally {
     clearTimeout(timeoutId);
   }
+
+  const { status, body } = resolveLeadResponse({ hasStore: Boolean(leadsStore), savedToDb, email });
+  return jsonResponse(body, status);
 }

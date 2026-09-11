@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import { draftMode } from "next/headers";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Manrope } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
@@ -7,10 +8,12 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { locales, isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { siteUrl } from "@/lib/site";
-import { phoneDisplay, emailDisplay } from "@/lib/social";
+
 import { getSocialLinks } from "@/lib/social";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { DraftPreviewBanner } from "@/components/DraftPreviewBanner";
+import { readSiteContent } from "@/lib/content/siteContent";
 import "../globals.css";
 
 const heading = Playfair_Display({
@@ -82,7 +85,9 @@ export default async function LocaleLayout({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
-  const social = getSocialLinks();
+  const social = getSocialLinks(dict.contact);
+  const inDraftMode = (await draftMode()).isEnabled;
+  const site = inDraftMode ? await readSiteContent() : null;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -90,12 +95,10 @@ export default async function LocaleLayout({
     name: dict.meta.siteName,
     url: `${siteUrl}/${locale}`,
     image: `${siteUrl}/images/dream-car-logo.png`,
-    telephone: phoneDisplay,
-    email: emailDisplay,
+    telephone: dict.contact.phone,
+    email: dict.contact.email,
     areaServed: "GB",
-    ...(process.env.NEXT_PUBLIC_BUSINESS_ADDRESS
-      ? { address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS }
-      : {}),
+    ...(dict.contact.addressText ? { address: dict.contact.addressText } : {}),
     ...(social.length > 0 ? { sameAs: social.map((s) => s.url) } : {}),
   };
 
@@ -110,6 +113,13 @@ export default async function LocaleLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {inDraftMode && (
+          <DraftPreviewBanner
+            active={site?.isDraftPreview ?? false}
+            version={site?.draftVersion}
+            error={site?.draftError}
+          />
+        )}
         <SiteHeader dict={dict} locale={locale} />
         <main className="flex-1">{children}</main>
         <SiteFooter dict={dict} locale={locale} />

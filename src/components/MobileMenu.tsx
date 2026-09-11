@@ -4,18 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Menu, X, Phone } from "lucide-react";
 import type { NavItem } from "@/lib/nav";
-import { phoneDisplay, phoneHref } from "@/lib/social";
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
 
 export function MobileMenu({
   items,
   phoneLabel,
+  phoneHref,
+  phoneDisplay,
   navLabel,
   openMenuLabel,
   closeMenuLabel,
 }: {
   items: NavItem[];
   phoneLabel: string;
+  phoneHref: string;
+  phoneDisplay: string;
   navLabel: string;
   openMenuLabel: string;
   closeMenuLabel: string;

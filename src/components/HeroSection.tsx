@@ -4,7 +4,7 @@ import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
 import { DreamLogo } from "./DreamLogo";
 import { GoldLink } from "./GoldButton";
-import { whatsappUrl } from "@/lib/social";
+
 
 function CornerOrnament({ className }: { className: string }) {
   return (
@@ -95,7 +95,7 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
                     {dict.hero.ctaPrimary}
                   </GoldLink>
                   <GoldLink
-                    href={whatsappUrl}
+                    href={dict.contact.whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     variant="outline"

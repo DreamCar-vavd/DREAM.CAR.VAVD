@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Dictionary } from "@/content/types";
-import { services } from "@/content/services";
+
 import { classifyContactErrorKind, type ContactErrorKind } from "@/lib/contactErrorKind";
 import { CONTACT_MAX_LENGTHS } from "@/lib/contactLimits";
 import { consumeRequestedService, onServiceRequested } from "@/lib/serviceContactIntent";
@@ -78,7 +78,7 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
       focusContactsHeading();
       if (!select) return;
       if (select.value && !autoFilled) return;
-      if (services.some((service) => service.slug === slug)) {
+      if (slug in dict.services) {
         select.value = slug;
         autoFilled = true;
       }
@@ -90,7 +90,7 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
       unsubscribe();
       select?.removeEventListener("input", markUserEdited);
     };
-  }, []);
+  }, [dict]);
 
   // Same mechanism as above (including the `autoFilled`/`input`-event
   // distinction — see the comment above), for a car listing's requested
@@ -341,9 +341,9 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
             <option value="" disabled>
               {dict.contact.form.selectService}
             </option>
-            {services.map(({ slug }) => (
+            {Object.keys(dict.services).map((slug) => (
               <option key={slug} value={slug}>
-                {dict.services[slug].title}
+                {dict.services[slug]?.title ?? slug}
               </option>
             ))}
           </select>

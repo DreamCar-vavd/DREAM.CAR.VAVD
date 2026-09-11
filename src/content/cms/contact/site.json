@@ -1,0 +1,34 @@
+{
+  "id": "site",
+  "order": 1,
+  "phoneDisplay": "+44 7706 054203",
+  "phoneE164": "+447706054203",
+  "email": "dream.car.vavd@gmail.com",
+  "whatsappNumber": "447706054203",
+  "telegramUrl": "",
+  "instagramUrl": "",
+  "facebookUrl": "",
+  "youtubeUrl": "",
+  "addressText": "",
+  "mapsUrl": "",
+  "hours": "",
+  "uk": {
+    "heading": "Контакти",
+    "subheading": "Залишились питання? Зв'яжіться з нами будь-яким зручним способом",
+    "hoursLabel": "",
+    "addressLabel": ""
+  },
+  "en": {
+    "heading": "Contact",
+    "subheading": "Any questions? Get in touch in whichever way suits you",
+    "hoursLabel": "",
+    "addressLabel": ""
+  },
+  "ru": {
+    "heading": "Контакты",
+    "subheading": "Остались вопросы? Свяжитесь с нами любым удобным способом",
+    "hoursLabel": "",
+    "addressLabel": ""
+  },
+  "bornAt": "legacy-site"
+}
