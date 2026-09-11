@@ -20,17 +20,23 @@
   Keystatic-комітів циклу заміни фото A→B (`8b26ae1`…`92c73d3`, **нуль-нетто**
   крім `publishedAt`). **416 тестів pass**, tsc 0, eslint 0, build OK,
   content:guard OK. CI + Vercel на `3c25963` — **success**.
-- **Задача 20:24 (Б3-preview + залишки):**
-  - **Б3-preview БД заявок — НЕ підключено.** Дозвіл власника є, але:
-    реєстрація/вхід у Neon = дія власника (асистент не створює акаунти / не
-    вводить паролі; `console.neon.tech` → екран входу, акаунта нема);
-    `LEADS_DATABASE_URL` у Vercel = секрет, вводить лише власник (Vercel
-    MCP-доступ до проєкту — 403). Асистент звірив умови Neon Free
-    (2026-09-10, без змін), прийняв рішення про `statement_timeout`
-    (`ALTER ROLE leads_app SET statement_timeout='4000ms'` — без зміни коду,
-    Neon-сумісно), переписав runbook (`PANEL-leads-db.md` розділ 5, 12 кроків)
-    і перевірку (розділ 6 — синтетично через адаптер, **без надсилання форми/
-    email**). Preview `/keystatic` login відкрито в браузері власника.
+- **Задача 20:24→21:20 (Б3-preview + залишки):**
+  - **Б3-preview БД заявок — ПІДКЛЮЧЕНО й перевірено наживо (2026-09-11).**
+    Власник створив Neon-проєкт `dream-car-leads-test` (Frankfurt, 0.25↔2 CU),
+    передав owner-рядок через локальний `.env.migrate` (не в чат). Асистент:
+    `npm run leads:migrate` (таблиця готова); роль `leads_app` — лише
+    `SELECT, INSERT`, `statement_timeout='4000ms'` — **звірено підключенням як
+    `leads_app`**: UPDATE/DELETE/CREATE TABLE/`pg_shadow` усі `denied (42501)`;
+    ідемпотентність через реальний `createPgLeadsStore` (той самий ключ →
+    `inserted:false`, той самий id). `LEADS_DATABASE_URL` додано у Vercel —
+    **Preview only, branch `codex/admin-panel-spike`** (Production НЕ
+    зачеплено — типовий перемикач «Choose Environment» спершу підставляв
+    Production, це скасовано, redeploy зроблено через
+    `Deployments → гілка → Redeploy` з підтвердженим Preview). **Жива звірка:**
+    `/panel/leads` на Preview → зник банер «не налаштоване» → показало 2
+    синтетичні рядки з БД → після soft-delete → «Заявок поки немає.» (порожньо,
+    коректно). Форма/email жодного разу не викликались. `.env.migrate`
+    видалено, буфер обміну очищено. Деталі — `PANEL-leads-db.md`.
   - **Блок 6 — Production-план.** Звірено `origin/main`: **немає жодного файлу
     панелі/Keystatic/leads** (0 збігів на 164 файлах). `main` `/api/contact`
     не має кроку БД. `LEADS_DATABASE_URL` на Production **не мав би ефекту** —
@@ -62,9 +68,9 @@
 |---|---|
 | **Перевірено автоматично** (416 тестів, tsc/eslint/build/content:guard) | модель помилок `outcome:"unknown"`; `checkActionResult` (звірка `expectToken` для publish/confirm; `applied:null` для «іншого редактора»/помилки читання; 0 записів); `routeWriteResponse`/`routeCheckResponse`/`shouldFireAction`; `fetchCheckResult` (timeout/мережа → null); `LocalFsStorage` symlink-guard + пісочниця; `ConcurrencyGate`; гейти мов, content-guard, leads-адаптер контракт (+ hosted→not-configured, db-throw, порожній список, помилка читання), `leadsListErrorView` (без витоку хост/порт/роль), blob-адаптер контракт |
 | **Перевірено локально** (Browser pane, справжній CSS-в'юпорт / стаби `fetch` / `PANEL_CONTENT_ROOT`-копія / ізольований `git clone`) | H1/H2 «Перевірити результат» через відрендерений UI; лічильник запитів (1 запис / 1 check на N кліків); фокус на «Перевірити результат» після блокування; timeout check → «не вдалося, спробуйте ще раз»; 375 px і 320 px `/panel` — без h-скролу; `role=alert`/`aria-live`; `:focus-visible` золоте кільце; повний цикл A–D (П44 Е4); **процедура відновлення контенту** — відкат знімка з ВИДАЛЕНИМИ замороженими фото потребує 3 об'єкти з одного SHA (`published.json` + `review-state.json` + тека медіа); guard ✓ + build OK, фото байт-точні (задача 20:24 блок 5, `PANEL-etap4-protocol.md` §N) |
-| **Перевірено на Preview** (авторизована сесія власника, github-режим) | вхід/чернетка/вихід (П31–П32); **повний Keystatic-цикл `zzz-test-panel`** create→3× confirm→publish (сайт 200)→перегляд→unpublish (сайт 404)→delete→«Завершити видалення» на фінальному коді `500d692` (§I); **повний цикл заміни фото A→B `zzz-photo-ab`** create(A)→confirm→publish(сайт=A)→swap→**знімок=A/чернетка=B**→publish(сайт=B, 3 мови)→unpublish→delete→cleanup, net-zero (задача 16:08 §I2); life-cycle карток + namespace review-ключів (П38–П39); атомарне очищення `_pub` + конфлікт застарілого SHA (П40–П41); цикл очищення через кнопку UI (`8dd6cbc`); заморозка фото між збірками (П39 §5.5) |
+| **Перевірено на Preview** (авторизована сесія власника, github-режим) | вхід/чернетка/вихід (П31–П32); **повний Keystatic-цикл `zzz-test-panel`** create→3× confirm→publish (сайт 200)→перегляд→unpublish (сайт 404)→delete→«Завершити видалення» на фінальному коді `500d692` (§I); **повний цикл заміни фото A→B `zzz-photo-ab`** create(A)→confirm→publish(сайт=A)→swap→**знімок=A/чернетка=B**→publish(сайт=B, 3 мови)→unpublish→delete→cleanup, net-zero (задача 16:08 §I2); life-cycle карток + namespace review-ключів (П38–П39); атомарне очищення `_pub` + конфлікт застарілого SHA (П40–П41); цикл очищення через кнопку UI (`8dd6cbc`); заморозка фото між збірками (П39 §5.5); **Б3-preview БД заявок жива** — `leads_app` (лише SELECT/INSERT, statement_timeout звірено), `/panel/leads` показує реальні рядки з Neon → soft-delete → «Заявок поки немає» (задача 21:20) |
 | **Прийнято особисто власником** | q75 hero (П15); текст автосервісу/детейлінгу (П11/П12); загальний UX панелі — власник користувався dev :3000 |
-| **Ще не перевірено** | справжній CSS-в'юпорт **375/320 px на авторизованому Preview `/panel`** (блокер — авторизація в Playwright; не-авторизований 375/320 на Preview без h-overflow — §J; локальний авторизований 375 px є); Б2/Б3/Б4/Б5 — жива перевірка (адаптери готові, `LEADS_DATABASE_URL`/`BLOB_READ_WRITE_TOKEN` не задані); захищена копія секретів Preview (дія власника — інструкція в `PANEL-backup-restore.md`) |
+| **Ще не перевірено** | справжній CSS-в'юпорт **375/320 px на авторизованому Preview `/panel`** (блокер — авторизація в Playwright; не-авторизований 375/320 на Preview без h-overflow — §J; локальний авторизований 375 px є); **Б2/Б4/Б5** — жива перевірка (Б3 вже жива, `BLOB_READ_WRITE_TOKEN` не задано); **Б3-prod** (реальні заявки сайту — потребує коду в `main`); захищена копія секретів Preview (дія власника — інструкція в `PANEL-backup-restore.md`) |
 - **Remote HEAD (до ревізії):** `866b271` — П44 Е1–Е4 (частково), задача 2026-09-10 11:49.
   Останній не-тестовий **код** — `21d9db4`. Ланцюг: `866b271` ← `2c4720e` ←
   `34d0ae0` (3 `zzz-e4` коміти живої перевірки Е4, **чистий діф нульовий**) ←
