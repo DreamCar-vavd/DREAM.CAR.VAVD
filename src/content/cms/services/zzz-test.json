@@ -1,0 +1,22 @@
+{
+  "id": "zzz-test",
+  "order": 999,
+  "status": "available",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ Тест приймання",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Acceptance test",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Тест приёмки",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mtwwpirg-9q5h43eh"
+}
