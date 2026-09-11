@@ -228,7 +228,7 @@ export function PanelButton({
   const base =
     "inline-flex min-h-[36px] items-center gap-1 rounded border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed";
   const styles = {
-    default: "border-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800",
+    default: "border-neutral-400 text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800",
     primary: "border-amber-600 bg-amber-600 text-white hover:bg-amber-700",
     danger: "border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950",
     solid:
