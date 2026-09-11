@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-11T12:24:52.328Z",
+  "publishedAt": "2026-09-11T12:51:18.901Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1088,54 +1088,6 @@
         ],
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
-        "modalSections": [],
-        "priceNote": "",
-        "seoTitle": "",
-        "seoDescription": ""
-      }
-    },
-    {
-      "id": "zzz-test",
-      "order": 999,
-      "status": "available",
-      "iconSrc": "",
-      "priceAmount": "",
-      "priceCurrency": "£",
-      "photos": [],
-      "uk": {
-        "title": "ZZZ Тест приймання",
-        "shortDescription": "Тестовий запис для приймання панелі.",
-        "longDescription": "Створено для перевірки циклу створення/публікації/видалення. DELETE ME.",
-        "cardDescription": "",
-        "bullets": [],
-        "modalLead": "",
-        "modalDescription": "",
-        "modalSections": [],
-        "priceNote": "",
-        "seoTitle": "",
-        "seoDescription": ""
-      },
-      "en": {
-        "title": "ZZZ Acceptance test",
-        "shortDescription": "Test entry for panel acceptance.",
-        "longDescription": "Created to verify the create/publish/delete cycle. DELETE ME.",
-        "cardDescription": "",
-        "bullets": [],
-        "modalLead": "",
-        "modalDescription": "",
-        "modalSections": [],
-        "priceNote": "",
-        "seoTitle": "",
-        "seoDescription": ""
-      },
-      "ru": {
-        "title": "ZZZ Тест приёмки",
-        "shortDescription": "Тестовая запись для приёмки панели.",
-        "longDescription": "Создано для проверки цикла создания/публикации/удаления. DELETE ME.",
-        "cardDescription": "",
-        "bullets": [],
-        "modalLead": "",
-        "modalDescription": "",
         "modalSections": [],
         "priceNote": "",
         "seoTitle": "",
