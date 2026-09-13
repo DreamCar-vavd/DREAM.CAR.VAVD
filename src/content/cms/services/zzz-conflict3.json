@@ -1,0 +1,28 @@
+{
+  "id": "zzz-conflict3",
+  "order": 100,
+  "status": "available",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ Тест 3",
+    "shortDescription": "Тест.",
+    "longDescription": "Тест. DELETE ME.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Test 3",
+    "shortDescription": "Test.",
+    "longDescription": "Test. DELETE ME.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Тест 3",
+    "shortDescription": "Тест.",
+    "longDescription": "Тест. DELETE ME.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mu0azrt0-swvded9d"
+}
