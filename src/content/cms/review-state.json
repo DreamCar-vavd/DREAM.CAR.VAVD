@@ -268,5 +268,12 @@
       "hash": "98a5d799585de5d8e18726a9e9c2132741e67f375dc546ae5015cb4fcae3e6fa",
       "at": "2026-09-13T20:56:22.921Z"
     }
+  },
+  "service:zzz-publish-hard-conflict": {
+    "instance": "mu0at3n7-xw10ui93",
+    "uk": {
+      "hash": "49900cdecf449fbaaf8277c51c1e2b5709ca18156c8b967d7b1e0811b87d47db",
+      "at": "2026-09-13T21:02:38.510Z"
+    }
   }
 }
