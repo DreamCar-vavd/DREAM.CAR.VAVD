@@ -253,12 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "service:zzz-conflict-test": {
-    "instance": "mu09mbap-kmui1w4h",
-    "uk": {
-      "hash": "d802c39937f775bb53b9639f708c3fdde2bddaac029d7f528e0d016573927f84",
-      "at": "2026-09-13T20:31:07.403Z"
-    }
   }
 }
