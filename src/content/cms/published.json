@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-11T12:51:18.901Z",
+  "publishedAt": "2026-09-13T20:57:33.241Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1088,6 +1088,54 @@
         ],
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "zzz-publish-conflict",
+      "order": 100,
+      "status": "available",
+      "iconSrc": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
+      "photos": [],
+      "uk": {
+        "title": "ZZZ Тест конфлікту публікації",
+        "shortDescription": "Тестовий запис для перевірки конфлікту публікації.",
+        "longDescription": "Створено для перевірки циклу публікації. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "ZZZ Publish conflict test",
+        "shortDescription": "Test entry for publish-conflict verification.",
+        "longDescription": "Created to verify the publish cycle. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "ZZZ Тест конфликта публикации",
+        "shortDescription": "Тестовая запись для проверки конфликта публикации.",
+        "longDescription": "Создано для проверки цикла публикации. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
         "modalSections": [],
         "priceNote": "",
         "seoTitle": "",
