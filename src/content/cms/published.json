@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-13T20:57:33.241Z",
+  "publishedAt": "2026-09-13T21:03:34.837Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1132,6 +1132,54 @@
         "title": "ZZZ Тест конфликта публикации",
         "shortDescription": "Тестовая запись для проверки конфликта публикации.",
         "longDescription": "Создано для проверки цикла публикации. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "zzz-publish-hard-conflict",
+      "order": 100,
+      "status": "available",
+      "iconSrc": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
+      "photos": [],
+      "uk": {
+        "title": "ZZZ Жорсткий конфлікт публікації",
+        "shortDescription": "Тестовий запис для жорсткого конфлікту публікації.",
+        "longDescription": "Створено для жорсткого конфлікту публікації. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "ZZZ Hard publish conflict",
+        "shortDescription": "Test entry for hard publish conflict.",
+        "longDescription": "Created for hard publish conflict test. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "ZZZ Жесткий конфликт публикации",
+        "shortDescription": "Тестовая запись для жесткого конфликта публикации.",
+        "longDescription": "Создано для жесткого конфликта публикации. DELETE ME.",
         "cardDescription": "",
         "bullets": [],
         "modalLead": "",
