@@ -12,6 +12,20 @@
  * upstream still cannot read or write arbitrary files.
  */
 
+/**
+ * No live storage session for this request — not signed in (github mode) or
+ * a required env var is missing. Distinct from every `StorageBackendError`
+ * below: those mean a session EXISTS but GitHub refused/couldn't answer.
+ * Lives here (not store/index.ts, which has `import "server-only"`) so a
+ * plain `node:test` file can import it without pulling that guard in.
+ */
+export class NotConnectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotConnectedError";
+  }
+}
+
 /** The only paths/dirs the panel is ever allowed to touch. */
 export const ALLOWED_DIRS = [
   "src/content/cms/cars",

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
-import { getStorage, NotConnectedError } from "@/lib/content/store";
 import {
+  NotConnectedError,
   StorageAuthError,
   StorageBackendError,
   StorageForbiddenError,
 } from "@/lib/content/store/adapter";
-import { getLeadsStore, type Lead } from "@/lib/leads/store";
+import { loadLeadsAccess } from "@/lib/leads/accessGate";
+import type { Lead } from "@/lib/leads/store";
 import { leadsListErrorView } from "@/lib/leads/loadError";
 import { RefreshButton } from "../PanelActions";
 
@@ -83,11 +84,12 @@ export default async function LeadsPage({
   // Collaborators, and on a PUBLIC repo GitHub itself will happily read repo
   // content for any signed-in token regardless of collaborator status — so a
   // valid session alone is not evidence the signed-in user is still an
-  // editor. `assertWriteAccess()` re-checks that live, every request.
-  try {
-    const contentStore = await getStorage();
-    await contentStore.assertWriteAccess();
-  } catch (err) {
+  // editor. `loadLeadsAccess` re-checks that live, every request, and — this
+  // is the point of the extraction — never constructs/reads the leads store
+  // until the check has already succeeded (see accessGate.test.ts).
+  const gate = await loadLeadsAccess();
+  if (!gate.ok) {
+    const err = gate.error;
     if (err instanceof NotConnectedError || err instanceof StorageAuthError) {
       return (
         <main className="mx-auto max-w-2xl px-4 py-10">
@@ -132,7 +134,7 @@ export default async function LeadsPage({
   }
 
   const { cursor } = await searchParams;
-  const store = await getLeadsStore();
+  const store = gate.leadsStore;
 
   let page;
   let loadError: string | null = null;

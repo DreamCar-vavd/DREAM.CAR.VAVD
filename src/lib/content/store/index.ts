@@ -6,13 +6,7 @@ import { resolveContentBranch } from "./branch";
 import type { PanelStorage } from "./adapter";
 
 export * from "./adapter";
-
-export class NotConnectedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotConnectedError";
-  }
-}
+import { NotConnectedError } from "./adapter";
 
 /**
  * Picks the storage adapter for the current request.
