@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-13T21:03:34.837Z",
+  "publishedAt": "2026-09-13T21:46:36.234Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1088,6 +1088,54 @@
         ],
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "zzz-conflict3",
+      "order": 100,
+      "status": "available",
+      "iconSrc": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
+      "photos": [],
+      "uk": {
+        "title": "ZZZ Тест 3",
+        "shortDescription": "Тест.",
+        "longDescription": "Тест. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "ZZZ Test 3",
+        "shortDescription": "Test.",
+        "longDescription": "Test. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "ZZZ Тест 3",
+        "shortDescription": "Тест.",
+        "longDescription": "Тест. DELETE ME.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
         "modalSections": [],
         "priceNote": "",
         "seoTitle": "",
