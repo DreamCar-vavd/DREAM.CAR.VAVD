@@ -2471,3 +2471,34 @@ redeploy + прогін `docs/PANEL-hosted-verification.md`. Тоді Б2/Б3 п
 - **Блок 4 — мобільний Preview.** Обидва браузерні інструменти без сесії
   Preview. Компаунд-блокер (сесія XOR в'юпорт) — 4-та перевірка. Pending;
   інструкція власнику §J. Не-авторизовані 375/320 — h-overflow немає.
+
+## Задача 19:16 (2026-09-13) — `/panel/leads`: перевірка доступу лише за наявністю cookie
+
+**Знахідка з коду:** `getStorage()` перевіряв лише *наявність* cookie
+`keystatic-gh-access-token`, ніколи — її чинність чи право користувача на цей
+репозиторій. Для контенту (`/panel`) це маскувалось: `GitHubStorage` все одно
+падає на 401/403 при реальному читанні/записі. Але `/panel/leads` читає Neon
+напряму — Neon нічого не знає про GitHub Collaborators, а `DREAM.CAR.VAVD`
+публічний, тож GitHub і так віддає читання репо будь-якому підписаному
+токену незалежно від статусу колаборатора (підтверджено наживо цього ж дня:
+`VOLODYMYR-LUCKY` бачив дашборд `/panel` ще 20+ хв після видалення з
+Collaborators — очікувано для контенту, але той самий механізм дірявив
+`/panel/leads`).
+
+**Фікс (`b2d1327`):** новий метод `PanelStorage.assertWriteAccess()` —
+`GitHubStorage` робить `GET /repos/{owner}/{repo}` з токеном сесії й вимагає
+`permissions.push === true` (той самий рівень, що й Collaborator з правом
+Write); `LocalFsStorage` — no-op (єдиний довірений оператор у dev).
+`/panel/leads` викликає це перед читанням Neon, з тим самим UI для
+`StorageAuthError`/`StorageForbiddenError`/retriable, що й `/panel`.
+
+Тести: +7 (`github.test.ts` ×6, `localFs.test.ts` ×1) — 423/423 pass.
+tsc/eslint/build/content:guard — чисто. CI + Vercel Preview — success.
+
+Перевірено **наживо** на Preview (без чужих облікових даних):
+без cookie → «не увійшли через GitHub»; з фейковим токеном → «Сесію GitHub
+завершено або відкликано». Сценарії «чинний користувач без прав» і
+«власник/чинний редактор» — покриті лише автотестами (`assertWriteAccess`
+unit-тести з мокованим `permissions.push` true/false); живий тест обома
+наявними тестовими акаунтами (`DreamCar-vavd`, `VOLODYMYR-LUCKY`) власник ще
+не проганяв — права акаунтів після відкликання цього сеансу не змінювались.
