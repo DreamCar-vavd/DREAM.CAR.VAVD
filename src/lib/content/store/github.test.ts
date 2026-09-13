@@ -322,6 +322,18 @@ test("a request that never responds is aborted and reported as StorageUnavailabl
   assert.ok(Date.now() - started < 200, "bailed near the request timeout, not later");
 });
 
+test("assertWriteAccess: a GitHub timeout is StorageUnavailableError, not a silent pass", async () => {
+  const impl: typeof fetch = (_input, init) => abortOnSignal(init);
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageUnavailableError);
+});
+
+test("assertWriteAccess: a dropped connection (ECONNRESET) is StorageUnavailableError", async () => {
+  const impl: typeof fetch = () => Promise.reject(econnreset());
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl, ...FAST });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageUnavailableError);
+});
+
 test("a response whose body never finishes is also aborted (StorageUnavailableError)", async () => {
   const impl: typeof fetch = async (_input, init) =>
     ({ status: 200, text: () => abortOnSignal(init) }) as unknown as Response;
