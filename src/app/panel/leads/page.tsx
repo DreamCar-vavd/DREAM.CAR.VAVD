@@ -2,8 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
+import {
+  StorageAuthError,
+  StorageBackendError,
+  StorageForbiddenError,
+} from "@/lib/content/store/adapter";
 import { getLeadsStore, type Lead } from "@/lib/leads/store";
 import { leadsListErrorView } from "@/lib/leads/loadError";
+import { RefreshButton } from "../PanelActions";
 
 export const dynamic = "force-dynamic";
 
@@ -72,22 +78,53 @@ export default async function LeadsPage({
 }) {
   if (!keystaticEnabled) notFound();
 
-  // Same server-side gate as the publish dashboard: a live storage session is
-  // required (local FS in dev, a signed-in GitHub token in hosted mode).
+  // Same server-side gate as the publish dashboard (a live storage session is
+  // required), PLUS a live editor-access check: Neon has no notion of GitHub
+  // Collaborators, and on a PUBLIC repo GitHub itself will happily read repo
+  // content for any signed-in token regardless of collaborator status — so a
+  // valid session alone is not evidence the signed-in user is still an
+  // editor. `assertWriteAccess()` re-checks that live, every request.
   try {
-    await getStorage();
+    const contentStore = await getStorage();
+    await contentStore.assertWriteAccess();
   } catch (err) {
-    if (err instanceof NotConnectedError) {
+    if (err instanceof NotConnectedError || err instanceof StorageAuthError) {
       return (
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-xl font-bold">Заявки</h1>
-          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
             {err.message}
           </p>
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- separate app tree */}
           <a className="mt-3 inline-block underline" href="/keystatic">
             Відкрити Keystatic і увійти →
           </a>
+        </main>
+      );
+    }
+    if (err instanceof StorageForbiddenError) {
+      // Access was refused or revoked — a fresh sign-in will not restore a
+      // permission the token never had.
+      return (
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-xl font-bold">Заявки</h1>
+          <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+            {err.message}
+          </p>
+        </main>
+      );
+    }
+    if (err instanceof StorageBackendError && err.retriable) {
+      // Unreachable or rate-limited — never show an empty list for this.
+      return (
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-xl font-bold">Заявки</h1>
+          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+            {err.message}
+          </p>
+          <p className="mt-3">
+            <RefreshButton />
+          </p>
         </main>
       );
     }

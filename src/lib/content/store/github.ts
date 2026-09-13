@@ -92,6 +92,26 @@ export class GitHubStorage implements PanelStorage {
   }
 
   /**
+   * `GET /repos/{owner}/{repo}` with this token returns a `permissions`
+   * object describing THIS token's own access level — the only reliable,
+   * per-user signal GitHub's API gives us, and unaffected by the repo being
+   * public. A missing/false `push` means the caller has at most read access
+   * (or none), which is not editor access even though a repo read already
+   * succeeded elsewhere. See `PanelStorage.assertWriteAccess`.
+   */
+  async assertWriteAccess(): Promise<void> {
+    const { status, body, headers } = await this.gh(this.repoUrl(""));
+    GitHubStorage.rejectIfUnauthorized(status, headers, body);
+    if (status !== 200) {
+      throw new StorageUnavailableError(`перевірка прав доступу не вдалася (${status})`);
+    }
+    const push = (body as { permissions?: { push?: boolean } }).permissions?.push;
+    if (!push) {
+      throw new StorageForbiddenError("недостатньо прав доступу для перегляду заявок");
+    }
+  }
+
+  /**
    * One GitHub call, bounded twice: by `requestTimeoutMs` and by the remaining
    * whole-instance budget, whichever is smaller. The abort signal covers both
    * waiting for the response and reading its body, so a stalled body stream

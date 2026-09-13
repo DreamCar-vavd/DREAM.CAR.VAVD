@@ -84,6 +84,8 @@ const gitBlobId = (bytes: Uint8Array) =>
 class FakeStorage implements PanelStorage {
   readonly mode = "github" as const;
   branch: string | null = null;
+  /** These tests exercise content read/write, not the leads access gate. */
+  async assertWriteAccess(): Promise<void> {}
   files = new Map<string, string>();
   dirs = new Map<string, DirEntry[]>();
   media = new Map<string, Uint8Array>();

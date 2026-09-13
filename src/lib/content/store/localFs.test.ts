@@ -210,3 +210,7 @@ test("sandbox: the cleanup dry-run plan is bound to the branch head it was compu
     await sbx.cleanup();
   }
 });
+
+test("assertWriteAccess is a no-op in local mode (single trusted operator)", async () => {
+  await new LocalFsStorage().assertWriteAccess();
+});

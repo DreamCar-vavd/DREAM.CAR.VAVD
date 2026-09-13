@@ -127,6 +127,62 @@ test("readDir lists the fixed dir, fetches each file, version = tree of blob sha
   assert.equal(calls.filter((c) => c.url.includes("/cars/") && c.url.includes(".json")).length, 2);
 });
 
+test("assertWriteAccess resolves when the token's own permissions include push", async () => {
+  const { impl, calls } = fakeGitHub({
+    "DreamCar-vavd/DREAM.CAR.VAVD": () => ({
+      status: 200,
+      body: { permissions: { admin: false, push: true, pull: true } },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await gh.assertWriteAccess();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, "GET");
+});
+
+test("assertWriteAccess rejects with StorageForbiddenError when push is false", async () => {
+  const { impl } = fakeGitHub({
+    "DreamCar-vavd/DREAM.CAR.VAVD": () => ({
+      status: 200,
+      body: { permissions: { admin: false, push: false, pull: true } },
+    }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageForbiddenError);
+});
+
+test("assertWriteAccess rejects with StorageForbiddenError when permissions are absent (e.g. an unauthenticated-shaped response)", async () => {
+  const { impl } = fakeGitHub({
+    "DreamCar-vavd/DREAM.CAR.VAVD": () => ({ status: 200, body: { name: "DREAM.CAR.VAVD" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageForbiddenError);
+});
+
+test("assertWriteAccess rejects with StorageAuthError on a 401 (session ended/revoked)", async () => {
+  const { impl } = fakeGitHub({
+    "DreamCar-vavd/DREAM.CAR.VAVD": () => ({ status: 401, body: { message: "Bad credentials" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageAuthError);
+});
+
+test("assertWriteAccess rejects with StorageForbiddenError on a 403", async () => {
+  const { impl } = fakeGitHub({
+    "DreamCar-vavd/DREAM.CAR.VAVD": () => ({ status: 403, body: { message: "Forbidden" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageForbiddenError);
+});
+
+test("assertWriteAccess rejects with StorageUnavailableError on an unexpected status", async () => {
+  const { impl } = fakeGitHub({
+    "DreamCar-vavd/DREAM.CAR.VAVD": () => ({ status: 500, body: { message: "boom" } }),
+  });
+  const gh = new GitHubStorage({ ...CFG, fetchImpl: impl });
+  await assert.rejects(() => gh.assertWriteAccess(), StorageUnavailableError);
+});
+
 test("readDir reads its JSON files with bounded parallelism, preserving order + version", async () => {
   const N = 20;
   const list = Array.from({ length: N }, (_, i) => ({ name: `f${String(i).padStart(2, "0")}.json`, sha: `s${i}`, type: "file" }));

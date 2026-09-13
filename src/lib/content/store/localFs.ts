@@ -44,6 +44,9 @@ export class LocalFsStorage implements PanelStorage {
     this.root = path.resolve(opts.root ?? process.cwd());
   }
 
+  /** Local dev: single trusted operator on the filesystem — nothing to check. */
+  async assertWriteAccess(): Promise<void> {}
+
   /** Repo-relative -> absolute, under this instance's root. */
   private abs(rel: string): string {
     return path.join(this.root, rel);

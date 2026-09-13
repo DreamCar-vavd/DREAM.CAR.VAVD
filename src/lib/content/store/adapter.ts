@@ -228,6 +228,22 @@ export interface PanelStorage {
   readonly branch: string | null;
 
   /**
+   * Confirms this session may access editor-only data that lives OUTSIDE the
+   * git content tree (e.g. leads/заявки in Postgres), where GitHub's own
+   * per-file 401/403 on a content read can never gate the request. A signed
+   * `keystatic-gh-access-token` cookie only proves someone once completed
+   * OAuth — on a PUBLIC repo, GitHub grants that same token read access to
+   * repo content regardless of Collaborator status, so a cookie's mere
+   * presence is not evidence of current editor access. Github mode makes a
+   * live call and requires at least push (write) access — the same level a
+   * Collaborator needs to edit content; local mode is a no-op (single
+   * trusted operator, matching every other local-mode shortcut in this
+   * file). Rejects with `StorageAuthError`/`StorageForbiddenError`/
+   * `StorageBackendError` exactly like every other method here.
+   */
+  assertWriteAccess(): Promise<void>;
+
+  /**
    * `*.json` files (dotfiles excluded), sorted by name, + a combined version.
    * `atSha` pins the read to ONE commit (github mode) so several reads that must
    * agree on a version don't drift as the branch moves; ignored in local mode
