@@ -1,0 +1,28 @@
+{
+  "id": "zzz-conflict-test",
+  "order": 999,
+  "status": "available",
+  "photos": [],
+  "uk": {
+    "title": "ZZZ Conflict Test A1",
+    "shortDescription": "Синтетичний тестовий запис для перевірки конфлікту публікації (PR #26). Буде видалений.",
+    "longDescription": "Докладний опис тестового запису для перевірки конфлікту публікації.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "en": {
+    "title": "ZZZ Conflict Test A1",
+    "shortDescription": "Synthetic test entry for publish-conflict verification (PR #26). Will be removed.",
+    "longDescription": "Detailed description of the synthetic test entry used to verify the publish conflict.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "ru": {
+    "title": "ZZZ Тест Конфлікта A1",
+    "shortDescription": "Синтетическая тестовая запись для проверки конфликта публикации (PR #26). Будет удалена.",
+    "longDescription": "Подробное описание тестовой записи для проверки конфликта публикации.",
+    "bullets": [],
+    "modalSections": []
+  },
+  "bornAt": "mu11f83z-twizls0l"
+}
