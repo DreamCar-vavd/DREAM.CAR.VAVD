@@ -21,6 +21,13 @@ import type { SiteContent } from "./siteContent";
  * exactly the "stale draft-mode session outlives revoked access" bug the
  * fix targets, so every denial case must resolve to the SAME fail-closed
  * shape a fresh render would produce.
+ *
+ * Ordering (does `readSiteContent` actually skip reading content after a
+ * failed check, not just this pure function in isolation) is covered in
+ * `siteContent.test.ts`, which calls the real `readSiteContent` with
+ * `next/headers`/`./store` mocked — a hand-simulated "sequence" test here
+ * could assert the right answer without ever exercising the production
+ * call site, so it can't catch a regression in that call site.
  */
 
 const published: SiteContent = {
@@ -138,31 +145,6 @@ test("GitHub rate limit during the check (StorageRateLimitedError): fails closed
     assert.equal(result.content.isDraftPreview, false);
     assert.doesNotMatch(result.content.draftError ?? "", /Немає прав|відкликано/);
   }
-});
-
-test("sequence: a failed retriable check must short-circuit BEFORE any content read is attempted", async () => {
-  // Proves the ordering `readSiteContent` depends on, not just resolveDraftAccess's
-  // return value in isolation: the storage stub below has no `readDir` at
-  // all, so if the caller pressed on to read content after a failed check
-  // (the exact shape of the bug — the check's own error skipping past the
-  // access decision entirely) this test fails with a TypeError instead of a
-  // false green from asserting resolveDraftAccess's output alone.
-  const storage = storageWith(async () => {
-    throw new StorageUnavailableError("перевірка прав доступу не вдалася (504)");
-  });
-  const access = await resolveDraftAccess({ getStorage: async () => storage }, published);
-  assert.equal(access.ok, false);
-  if (!access.ok) {
-    // The same short-circuit `readSiteContent` performs: `if (!access.ok) return access.content`.
-    const result = access.content;
-    assert.equal(result.isDraftPreview, false);
-    assert.ok(result.draftError, "banner text must be present so the page can render it");
-  }
-  assert.equal(
-    "readDir" in storage,
-    false,
-    "storage stub intentionally has no readDir — reaching for it would prove the check was bypassed",
-  );
 });
 
 test("allowed session (push:true): resolves ok with the live storage handle, not the published fallback", async () => {

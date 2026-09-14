@@ -9,7 +9,7 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
+    "test": "node --experimental-test-module-mocks --import tsx --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
     "content:check": "node scripts/content-check.mjs",
     "content:guard": "node --import tsx scripts/content-guard.ts",
     "content:migrate": "node scripts/migrate-content.mjs",
