@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadLeadsAccess } from "./accessGate";
-import { NotConnectedError, StorageForbiddenError, StorageUnavailableError } from "../content/store/adapter";
+import {
+  NotConnectedError,
+  StorageAuthError,
+  StorageForbiddenError,
+  StorageUnavailableError,
+} from "../content/store/adapter";
 import type { PanelStorage } from "../content/store/adapter";
 import type { Lead, LeadsStore } from "./store";
 
@@ -73,7 +78,33 @@ test("no session (getStorage itself throws): leads store is never constructed", 
   assert.equal(leads.getListCalls(), 0);
 });
 
-test("invalid/revoked token: assertWriteAccess rejects -> leads store never constructed", async () => {
+test("invalid/expired/revoked token (GitHub 401): StorageAuthError, leads store never constructed", async () => {
+  // A 401 from GitHub — the token itself is no longer valid (expired, or the
+  // authorization was revoked) — is StorageAuthError, NOT StorageForbiddenError.
+  // GitHubStorage.rejectIfUnauthorized maps 401 -> StorageAuthError and 403 ->
+  // StorageForbiddenError; those are different real-world causes ("sign in
+  // again" vs "this account was never granted enough access") and the page
+  // shows different copy for each, so the test must not blur them.
+  const leads = countingLeadsStore();
+  const { storage, getCalls } = countingStorage(async () => {
+    throw new StorageAuthError();
+  });
+  const result = await loadLeadsAccess({
+    getStorage: async () => storage,
+    getLeadsStore: leads.getLeadsStore,
+  });
+  assert.equal(result.ok, false);
+  assert.ok(!result.ok && result.error instanceof StorageAuthError);
+  assert.equal(getCalls(), 1, "the access check itself must run exactly once");
+  assert.equal(leads.getStoreCalls(), 0, "getLeadsStore must not run when the session is invalid");
+  assert.equal(leads.getListCalls(), 0);
+});
+
+test("signed-in with a valid token but no push access (GitHub 403): StorageForbiddenError, no leads read", async () => {
+  // A 403 — the token is valid and the user is who they say they are, but
+  // this specific account (e.g. a removed Collaborator) lacks push access.
+  // Distinct cause from the 401 case above; kept as a separate test on
+  // purpose, not a duplicate of it.
   const leads = countingLeadsStore();
   const { storage, getCalls } = countingStorage(async () => {
     throw new StorageForbiddenError("недостатньо прав доступу для перегляду заявок");
@@ -84,22 +115,8 @@ test("invalid/revoked token: assertWriteAccess rejects -> leads store never cons
   });
   assert.equal(result.ok, false);
   assert.ok(!result.ok && result.error instanceof StorageForbiddenError);
-  assert.equal(getCalls(), 1, "the access check itself must run exactly once");
-  assert.equal(leads.getStoreCalls(), 0, "getLeadsStore must not run when access is forbidden");
-  assert.equal(leads.getListCalls(), 0);
-});
-
-test("signed-in user without write access (push:false, surfaced as StorageForbiddenError): no leads read", async () => {
-  const leads = countingLeadsStore();
-  const { storage } = countingStorage(async () => {
-    throw new StorageForbiddenError("недостатньо прав доступу для перегляду заявок");
-  });
-  const result = await loadLeadsAccess({
-    getStorage: async () => storage,
-    getLeadsStore: leads.getLeadsStore,
-  });
-  assert.equal(result.ok, false);
-  assert.equal(leads.getStoreCalls(), 0);
+  assert.equal(getCalls(), 1);
+  assert.equal(leads.getStoreCalls(), 0, "getLeadsStore must not run when push access is missing");
   assert.equal(leads.getListCalls(), 0);
 });
 
