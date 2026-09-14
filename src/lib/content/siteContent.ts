@@ -9,6 +9,7 @@ import type { CmsContact } from "./contactGate";
 import type { CmsPromo } from "./promoGate";
 import { coerceCar, coerceContact, coerceGalleryProject, coercePromo, coerceService } from "./coerce";
 import { readPublishedSnapshot } from "./snapshot";
+import { resolveDraftAccess } from "./draftAccess";
 
 export interface SiteContent {
   cars: CmsCar[];
@@ -55,16 +56,18 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
   };
   if (!isDraftPreview) return published;
 
-  const { getStorage, NotConnectedError } = await import("./store");
-  let storage;
-  try {
-    storage = await getStorage();
-  } catch (err) {
-    if (err instanceof NotConnectedError) {
-      return { ...published, draftError: "Сесію завершено або відкликано — перегляд чернетки недоступний." };
-    }
-    throw err;
-  }
+  const { getStorage } = await import("./store");
+  // Re-checked on EVERY render, not only when Draft Mode was switched on: the
+  // `__prerender_bypass` cookie set by /api/panel/preview has no expiry tied
+  // to repo access, so a session that enabled preview while still an editor
+  // would otherwise keep seeing draft content indefinitely after being
+  // removed as a Collaborator — this repo is public, so a plain content read
+  // alone would still succeed for that stale session. `resolveDraftAccess` is
+  // the pure, testable half of this check (see draftAccess.test.ts); it fails
+  // CLOSED on any error — the published snapshot, never the draft, on doubt.
+  const access = await resolveDraftAccess({ getStorage }, published);
+  if (!access.ok) return access.content;
+  const storage = access.storage;
 
   try {
     const [carsDir, galleryDir, servicesDir, contactDir, promosDir] = await Promise.all([

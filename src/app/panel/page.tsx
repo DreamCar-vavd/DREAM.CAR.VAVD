@@ -394,7 +394,14 @@ export default async function PanelPage() {
 
   let data: PanelData;
   try {
-    data = await getPanelData(await getStorage());
+    const storage = await getStorage();
+    // Same live re-check as /panel/leads and the draft-preview renderer: a
+    // signed cookie only proves someone once completed OAuth, and this repo
+    // is public, so GitHub will happily serve a content read to a removed
+    // Collaborator's still-valid token. Confirm current push access before
+    // showing the dashboard at all, not only before a write action.
+    await storage.assertWriteAccess();
+    data = await getPanelData(storage);
   } catch (err) {
     if (err instanceof NotConnectedError || err instanceof StorageAuthError) {
       // Not signed in, or the 401 session ended — both recover by signing in.
