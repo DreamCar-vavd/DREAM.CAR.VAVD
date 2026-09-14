@@ -4,7 +4,7 @@
   "status": "available",
   "photos": [],
   "uk": {
-    "title": "ZZZ Conflict Test A1",
+    "title": "ZZZ Conflict Test A2 (updated by A)",
     "shortDescription": "Синтетичний тестовий запис для перевірки конфлікту публікації (PR #26). Буде видалений.",
     "longDescription": "Докладний опис тестового запису для перевірки конфлікту публікації.",
     "bullets": [],
