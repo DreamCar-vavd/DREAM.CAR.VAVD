@@ -9,7 +9,7 @@ import type { CmsContact } from "./contactGate";
 import type { CmsPromo } from "./promoGate";
 import { coerceCar, coerceContact, coerceGalleryProject, coercePromo, coerceService } from "./coerce";
 import { readPublishedSnapshot } from "./snapshot";
-import { resolveDraftAccess } from "./draftAccess";
+import { resolveDraftAccess, type DraftAccessResult } from "./draftAccess";
 
 export interface SiteContent {
   cars: CmsCar[];
@@ -65,7 +65,22 @@ export const readSiteContent = cache(async (): Promise<SiteContent> => {
   // alone would still succeed for that stale session. `resolveDraftAccess` is
   // the pure, testable half of this check (see draftAccess.test.ts); it fails
   // CLOSED on any error — the published snapshot, never the draft, on doubt.
-  const access = await resolveDraftAccess({ getStorage }, published);
+  let access: DraftAccessResult;
+  try {
+    access = await resolveDraftAccess({ getStorage }, published);
+  } catch {
+    // Defense in depth: `resolveDraftAccess` already classifies every known
+    // storage failure (see draftAccess.ts) and returns `ok: false` instead of
+    // throwing, but this call sits BEFORE the try/catch below — an
+    // unclassified error here must still fail closed to the published
+    // snapshot, not crash the whole page render. Deliberately generic (no
+    // err.message): an error type this function doesn't recognise is not
+    // guaranteed to be secret-free.
+    return {
+      ...published,
+      draftError: "Тимчасово не вдалося перевірити доступ до чернетки. Оновіть сторінку за хвилину.",
+    };
+  }
   if (!access.ok) return access.content;
   const storage = access.storage;
 

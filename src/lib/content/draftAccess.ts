@@ -1,5 +1,5 @@
 import type { PanelStorage } from "./store/adapter";
-import { NotConnectedError, StorageAuthError, StorageForbiddenError } from "./store/adapter";
+import { NotConnectedError, StorageAuthError, StorageBackendError, StorageForbiddenError } from "./store/adapter";
 import type { SiteContent } from "./siteContent";
 
 export interface DraftAccessDeps {
@@ -39,6 +39,15 @@ export async function resolveDraftAccess(
     }
     if (err instanceof StorageForbiddenError) {
       return { ok: false, content: { ...published, draftError: "Немає прав доступу для перегляду чернетки." } };
+    }
+    if (err instanceof StorageBackendError && err.retriable) {
+      // Unreachable GitHub or a rate limit is a transient network condition,
+      // not a permission decision — must never be worded like the two cases
+      // above (same class of mistake `/panel/leads` already guards against,
+      // see StorageBackendError && retriable in leads/page.tsx). The message
+      // itself is one of the adapter's own short, secret-free Ukrainian
+      // strings (see store/adapter.ts), safe to show as-is.
+      return { ok: false, content: { ...published, draftError: err.message } };
     }
     throw err;
   }

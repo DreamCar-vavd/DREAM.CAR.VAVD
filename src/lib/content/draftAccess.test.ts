@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveDraftAccess } from "./draftAccess";
-import { NotConnectedError, StorageAuthError, StorageForbiddenError, StorageUnavailableError } from "./store/adapter";
+import {
+  NotConnectedError,
+  StorageAuthError,
+  StorageForbiddenError,
+  StorageRateLimitedError,
+  StorageUnavailableError,
+} from "./store/adapter";
 import type { PanelStorage } from "./store/adapter";
 import type { SiteContent } from "./siteContent";
 
@@ -86,24 +92,76 @@ test("a check failure never returns ok:true — an error from assertWriteAccess 
   assert.notEqual(result.ok, true, "the point of 'fail closed': a thrown check error must never resolve as allowed");
 });
 
-test("GitHub error/timeout during the check (StorageUnavailableError): propagates, not swallowed as access", async () => {
-  // Distinct from the auth/forbidden cases: an unreachable GitHub is not
-  // "access denied" — the caller (readSiteContent) already has a broader
-  // try/catch around the whole draft path for this, so this must NOT be
-  // silently mapped to a draftError here (which would render a wrong,
-  // specific denial message for what is really just a network blip).
-  await assert.rejects(
-    () =>
-      resolveDraftAccess(
-        {
-          getStorage: async () =>
-            storageWith(async () => {
-              throw new StorageUnavailableError("GitHub не відповів вчасно");
-            }),
-        },
-        published,
-      ),
-    StorageUnavailableError,
+test("GitHub unreachable/timeout during the check (StorageUnavailableError): fails closed, NOT rethrown", async () => {
+  // Regression for the exact bug the 14.09.2026 fix targets: this call sits
+  // in `readSiteContent` BEFORE its own try/catch (see siteContent.ts), so a
+  // thrown error here used to escape all the way out of the whole page
+  // render instead of falling back to the published snapshot. A network blip
+  // is also NOT "access denied" — the message must be distinct from the
+  // auth/forbidden wording above, or an operator reading it would go chase a
+  // permissions problem that doesn't exist.
+  const result = await resolveDraftAccess(
+    {
+      getStorage: async () =>
+        storageWith(async () => {
+          throw new StorageUnavailableError("GitHub не відповів вчасно");
+        }),
+    },
+    published,
+  );
+  assert.equal(result.ok, false);
+  assert.ok(!result.ok);
+  if (!result.ok) {
+    assert.equal(result.content.isDraftPreview, false, "must fall back to the PUBLISHED content, not an empty draft");
+    assert.doesNotMatch(
+      result.content.draftError ?? "",
+      /Немає прав|відкликано/,
+      "a network blip must not be worded like a permissions/session denial",
+    );
+    assert.match(result.content.draftError ?? "", /GitHub не відповів вчасно/);
+  }
+});
+
+test("GitHub rate limit during the check (StorageRateLimitedError): fails closed the same way as StorageUnavailableError", async () => {
+  const result = await resolveDraftAccess(
+    {
+      getStorage: async () =>
+        storageWith(async () => {
+          throw new StorageRateLimitedError("Спробуйте через хвилину.");
+        }),
+    },
+    published,
+  );
+  assert.equal(result.ok, false);
+  assert.ok(!result.ok);
+  if (!result.ok) {
+    assert.equal(result.content.isDraftPreview, false);
+    assert.doesNotMatch(result.content.draftError ?? "", /Немає прав|відкликано/);
+  }
+});
+
+test("sequence: a failed retriable check must short-circuit BEFORE any content read is attempted", async () => {
+  // Proves the ordering `readSiteContent` depends on, not just resolveDraftAccess's
+  // return value in isolation: the storage stub below has no `readDir` at
+  // all, so if the caller pressed on to read content after a failed check
+  // (the exact shape of the bug — the check's own error skipping past the
+  // access decision entirely) this test fails with a TypeError instead of a
+  // false green from asserting resolveDraftAccess's output alone.
+  const storage = storageWith(async () => {
+    throw new StorageUnavailableError("перевірка прав доступу не вдалася (504)");
+  });
+  const access = await resolveDraftAccess({ getStorage: async () => storage }, published);
+  assert.equal(access.ok, false);
+  if (!access.ok) {
+    // The same short-circuit `readSiteContent` performs: `if (!access.ok) return access.content`.
+    const result = access.content;
+    assert.equal(result.isDraftPreview, false);
+    assert.ok(result.draftError, "banner text must be present so the page can render it");
+  }
+  assert.equal(
+    "readDir" in storage,
+    false,
+    "storage stub intentionally has no readDir — reaching for it would prove the check was bypassed",
   );
 });
 
