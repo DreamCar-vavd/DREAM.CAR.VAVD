@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-13T21:46:36.234Z",
+  "publishedAt": "2026-09-14T09:29:40.639Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1088,6 +1088,54 @@
         ],
         "modalLead": "Открываемся уже совсем скоро",
         "modalDescription": "Комплексный уход за кузовом и салоном: полировка, химчистка, детейлинг и защитные покрытия. Результат — безупречный внешний вид и надёжная защита лакокрасочного покрытия.",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      }
+    },
+    {
+      "id": "zzz-conflict-test",
+      "order": 999,
+      "status": "available",
+      "iconSrc": "",
+      "priceAmount": "",
+      "priceCurrency": "£",
+      "photos": [],
+      "uk": {
+        "title": "ZZZ Conflict Test A2 (updated by A)",
+        "shortDescription": "Синтетичний тестовий запис для перевірки конфлікту публікації (PR #26). Буде видалений.",
+        "longDescription": "Докладний опис тестового запису для перевірки конфлікту публікації.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "en": {
+        "title": "ZZZ Conflict Test A1",
+        "shortDescription": "Synthetic test entry for publish-conflict verification (PR #26). Will be removed.",
+        "longDescription": "Detailed description of the synthetic test entry used to verify the publish conflict.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
+        "modalSections": [],
+        "priceNote": "",
+        "seoTitle": "",
+        "seoDescription": ""
+      },
+      "ru": {
+        "title": "ZZZ Тест Конфлікта A1",
+        "shortDescription": "Синтетическая тестовая запись для проверки конфликта публикации (PR #26). Будет удалена.",
+        "longDescription": "Подробное описание тестовой записи для проверки конфликта публикации.",
+        "cardDescription": "",
+        "bullets": [],
+        "modalLead": "",
+        "modalDescription": "",
         "modalSections": [],
         "priceNote": "",
         "seoTitle": "",
