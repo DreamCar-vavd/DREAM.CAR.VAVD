@@ -52,6 +52,12 @@ export interface ProcessStep {
   description: string;
 }
 
+/**
+ * Legacy known car ids. Since the management panel, the catalogue is
+ * data-driven (src/content/cms/cars/*) and a car id is just a string; this
+ * union is kept only for the pre-panel fixtures/tests that still reference
+ * these three by name.
+ */
 export type CarListingId =
   | "suzuki-sx4-s-cross"
   | "dacia-sandero-2022"
@@ -128,7 +134,7 @@ export interface Dictionary {
     heading: string;
     subheading: string;
   };
-  services: Record<ServiceSlug, ServiceCopy>;
+  services: Record<string, ServiceCopy>;
   specialOrderService: {
     title: string;
     description: string;
@@ -145,7 +151,13 @@ export interface Dictionary {
     contactCta: string;
     photoAlt: string;
     videoAlt: string;
-    listings: Record<CarListingId, CarListingCopy>;
+    /**
+     * Per-car copy for the current locale. Populated at build time by
+     * getDictionary() from the management panel content
+     * (src/content/cms/cars/*), not from the static dictionary files.
+     * Key = car id. Only cars that pass the publish gate appear here.
+     */
+    listings: Record<string, CarListingCopy>;
   };
   process: {
     heading: string;
@@ -178,7 +190,7 @@ export interface Dictionary {
       checkedLabel: string;
       resultLabel: string;
     };
-    projects: Record<GalleryProjectId, GalleryProjectCopy>;
+    projects: Record<string, GalleryProjectCopy>;
   };
   about: {
     heading: string;
@@ -193,6 +205,24 @@ export interface Dictionary {
     subheading: string;
     phone: string;
     email: string;
+    /**
+     * Effective contact details for the current locale. Populated at build
+     * time by getDictionary() from the panel snapshot (src/content/cms/contact),
+     * falling back to src/lib/social.ts defaults + NEXT_PUBLIC_* env when no
+     * contact record is published. Never carries CONTACT_FORM_ENDPOINT.
+     */
+    phoneHref: string;
+    emailHref: string;
+    whatsappUrl: string;
+    telegramUrl: string;
+    instagramUrl: string;
+    facebookUrl: string;
+    youtubeUrl: string;
+    addressText: string;
+    mapsUrl: string;
+    hours: string;
+    hoursLabel: string;
+    addressLabel: string;
     form: {
       name: string;
       phone: string;

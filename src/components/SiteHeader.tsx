@@ -3,7 +3,6 @@ import { Phone } from "lucide-react";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
 import { getNavItems } from "@/lib/nav";
-import { phoneDisplay, phoneHref } from "@/lib/social";
 import { DreamLogo } from "./DreamLogo";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { MobileMenu } from "./MobileMenu";
@@ -36,19 +35,19 @@ export function SiteHeader({ dict, locale }: { dict: Dictionary; locale: Locale 
 
         <div className="hidden items-center gap-6 xl:flex">
           <a
-            href={phoneHref}
+            href={dict.contact.phoneHref}
             className="flex items-center gap-2 text-sm font-semibold text-gold"
             aria-label={dict.common.phoneLabel}
           >
             <Phone size={16} aria-hidden="true" />
-            {phoneDisplay}
+            {dict.contact.phone}
           </a>
           <LanguageSwitcher currentLocale={locale} label={dict.common.languageLabel} />
         </div>
 
         <div className="flex items-center gap-3 xl:hidden">
           <a
-            href={phoneHref}
+            href={dict.contact.phoneHref}
             aria-label={dict.common.phoneLabel}
             className="flex h-11 w-11 items-center justify-center text-gold"
           >
@@ -62,6 +61,8 @@ export function SiteHeader({ dict, locale }: { dict: Dictionary; locale: Locale 
           <MobileMenu
             items={items}
             phoneLabel={dict.common.phoneLabel}
+            phoneHref={dict.contact.phoneHref}
+            phoneDisplay={dict.contact.phone}
             navLabel={dict.nav.mobileLabel}
             openMenuLabel={dict.nav.openMenu}
             closeMenuLabel={dict.nav.closeMenu}

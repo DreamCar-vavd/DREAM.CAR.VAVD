@@ -2,14 +2,24 @@
 
 import { useRef, useState } from "react";
 import type { Dictionary } from "@/content/types";
-import { services } from "@/content/services";
+import type { ServiceMetaEntry } from "@/lib/content/publishedServices";
 import { ServiceCard } from "./ServiceCard";
 import { SpecialOrderServiceCard } from "./SpecialOrderServiceCard";
 import { ServiceModal, type ServiceModalContent } from "./ServiceModal";
 
 const SPECIAL_ORDER_ID = "special-order";
+const COMING_SOON: Record<string, string> = { uk: "Незабаром", en: "Coming soon", ru: "Скоро" };
 
-export function ServicesGrid({ dict, locale }: { dict: Dictionary; locale: string }) {
+export function ServicesGrid({
+  dict,
+  locale,
+  serviceMeta,
+}: {
+  dict: Dictionary;
+  locale: string;
+  /** Published services (icon / status / order) from the panel snapshot. */
+  serviceMeta: ServiceMetaEntry[];
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const contactHref = `/${locale}#contacts`;
@@ -70,8 +80,9 @@ export function ServicesGrid({ dict, locale }: { dict: Dictionary; locale: strin
         </div>
 
         <div className="mx-auto mt-8 grid max-w-[1760px] gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {services.map(({ slug, iconSrc }) => {
+          {serviceMeta.map(({ slug, iconSrc, status }) => {
             const copy = dict.services[slug];
+            if (!copy) return null;
             return (
               <ServiceCard
                 key={slug}
@@ -79,6 +90,7 @@ export function ServicesGrid({ dict, locale }: { dict: Dictionary; locale: strin
                 title={copy.title}
                 description={copy.cardDescription ?? copy.shortDescription}
                 readMoreLabel={dict.common.readMore}
+                statusBadge={status === "coming-soon" ? COMING_SOON[locale] : undefined}
                 onOpen={(trigger) => open(slug, trigger)}
               />
             );

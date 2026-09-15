@@ -1,0 +1,255 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  busyLabelFor,
+  checkResultMessage,
+  fetchCheckResult,
+  messageForResponse,
+  NETWORK_UNCERTAIN_MSG,
+  PANEL_REFRESHED_MSG,
+  REFRESH_SLOW_MSG,
+  routeCheckResponse,
+  routeWriteResponse,
+  shouldFireAction,
+} from "./actionMessages";
+
+test("messageForResponse: a confirmed write is green; while the panel refreshes it says so", () => {
+  const settled = messageForResponse({ ok: true, message: "Опубліковано." });
+  assert.equal(settled.kind, "ok");
+  assert.equal(settled.text, "Опубліковано.");
+
+  const refreshing = messageForResponse({ ok: true, message: "Опубліковано." }, true);
+  assert.equal(refreshing.kind, "ok");
+  assert.match(refreshing.text, /Оновлюємо панель/);
+});
+
+test("messageForResponse: a conflict is amber (reload-and-check), not a plain error", () => {
+  const m = messageForResponse({ ok: false, conflict: true, message: "Дані змінилися." });
+  assert.equal(m.kind, "conflict");
+  assert.equal(m.text, "Дані змінилися.");
+});
+
+test("messageForResponse: a transient backend failure is amber conflict — nothing was written, retry ok", () => {
+  const m = messageForResponse({ ok: false, transient: true, message: "GitHub недоступний." });
+  assert.equal(m.kind, "conflict"); // -> "Оновити" affordance, NOT a hard lock
+});
+
+test("messageForResponse: outcome:'unknown' is its own kind — the caller LOCKS the action", () => {
+  const m = messageForResponse({
+    ok: false,
+    outcome: "unknown",
+    message: "Відповідь від GitHub не надійшла…",
+  });
+  assert.equal(m.kind, "uncertain");
+  assert.equal(m.text, "Відповідь від GitHub не надійшла…");
+});
+
+test("messageForResponse: outcome:'unknown' wins even if transient is also set", () => {
+  const m = messageForResponse({ ok: false, outcome: "unknown", transient: true, message: "x" });
+  assert.equal(m.kind, "uncertain");
+});
+
+test("messageForResponse: bad input / auth / access is a red error (refresh won't help)", () => {
+  assert.equal(messageForResponse({ ok: false, message: "Не вказано мову." }).kind, "err");
+  assert.equal(messageForResponse({ ok: false, auth: true, message: "Увійдіть знову." }).kind, "err");
+  assert.equal(messageForResponse({ ok: false, forbidden: true, message: "Немає прав." }).kind, "err");
+});
+
+test("messageForResponse: blockers count is appended for a gated publish", () => {
+  const m = messageForResponse({
+    ok: false,
+    message: "Не можна опублікувати.",
+    blockers: [{ kind: "a" }, { kind: "b" }],
+  });
+  assert.equal(m.kind, "err");
+  assert.match(m.text, /\(2 пункт\(и\)\)/);
+});
+
+test("the network-uncertain message points at the read-only check, not a blind retry", () => {
+  assert.match(NETWORK_UNCERTAIN_MSG, /не отримано/);
+  assert.match(NETWORK_UNCERTAIN_MSG, /Перевірити результат/);
+  assert.match(NETWORK_UNCERTAIN_MSG, /лише читає стан/);
+  assert.match(NETWORK_UNCERTAIN_MSG, /перед тим, як повторювати/);
+  assert.doesNotMatch(NETWORK_UNCERTAIN_MSG, /^Опубліковано|^Збережено/);
+});
+
+test("checkResultMessage: says applied / not applied / undetermined — always hedged", () => {
+  const yes = checkResultMessage(true);
+  assert.equal(yes.kind, "ok");
+  assert.match(yes.text, /вже застосовано|застосовано/);
+  assert.match(yes.text, /[Пп]овторювати не треба|не треба/);
+
+  const no = checkResultMessage(false);
+  assert.equal(no.kind, "conflict");
+  assert.match(no.text, /НЕ застосовано/);
+  assert.match(no.text, /повторити/);
+
+  const dunno = checkResultMessage(null);
+  assert.equal(dunno.kind, "conflict");
+  assert.match(dunno.text, /невизначений|не вдалося/);
+});
+
+test("REFRESH_SLOW_MSG is a hint, not a failure; PANEL_REFRESHED_MSG confirms done", () => {
+  assert.match(REFRESH_SLOW_MSG, /довше/);
+  assert.doesNotMatch(REFRESH_SLOW_MSG, /помилк|не вдалося|збій/i);
+  assert.match(PANEL_REFRESHED_MSG, /оновлено/);
+});
+
+test("busyLabelFor: every action has a spoken verb phrase, never a bare ellipsis", () => {
+  for (const a of [
+    "publish",
+    "unpublish",
+    "confirm-locale",
+    "complete-deletion",
+    "cleanup-dry-run",
+    "cleanup-confirm",
+    "check-result",
+    "refresh",
+    "something-new",
+  ]) {
+    const label = busyLabelFor(a);
+    assert.ok(label.length > 1, `"${a}" -> "${label}"`);
+    assert.notEqual(label, "…");
+    assert.match(label, /…$/); // trailing ellipsis = "in progress", but with words
+  }
+  assert.equal(busyLabelFor("publish"), "Публікується…");
+  assert.equal(busyLabelFor("cleanup-confirm"), "Прибираємо копії…");
+});
+
+// ---------------------------------------------------------------------------
+// П44 Е5 — the button's decision routing, one exclusive route per outcome.
+// (behaviour, not wording: lock / refresh / retry-allowed)
+// ---------------------------------------------------------------------------
+
+test("route write: a confirmed write -> refresh, never a lock", () => {
+  const r = routeWriteResponse({ ok: true, message: "Опубліковано." });
+  assert.equal(r.lock, false);
+  assert.equal(r.refresh, true);
+  assert.equal(r.msg.kind, "ok");
+});
+
+test("route write: scenario 1 — write done, browser response lost -> LOCK, no refresh", () => {
+  const r = routeWriteResponse(null); // fetch threw / body unparseable
+  assert.equal(r.lock, true);
+  assert.equal(r.refresh, false);
+  assert.equal(r.msg.kind, "uncertain");
+  assert.doesNotMatch(r.msg.text, /Опубліковано|Збережено|Готово/); // never reads as success
+});
+
+test("route write: scenario 2 — GitHub did not confirm but a JSON error came back", () => {
+  // definite refusal (clean 409 conflict) -> NOT locked, retry allowed
+  const conflict = routeWriteResponse({ ok: false, conflict: true, message: "Дані змінилися." });
+  assert.equal(conflict.lock, false);
+  assert.equal(conflict.refresh, false);
+  assert.equal(conflict.msg.kind, "conflict");
+  // but an explicit outcome:"unknown" JSON error -> LOCK
+  const unknown = routeWriteResponse({ ok: false, outcome: "unknown", message: "Відповідь не надійшла." });
+  assert.equal(unknown.lock, true);
+  assert.equal(unknown.msg.kind, "uncertain");
+});
+
+test("route write: scenario 3 — failure BEFORE the write (transient) -> retry allowed, no lock", () => {
+  const r = routeWriteResponse({ ok: false, transient: true, message: "GitHub недоступний." });
+  assert.equal(r.lock, false);
+  assert.equal(r.refresh, false);
+  assert.equal(r.msg.kind, "conflict");
+});
+
+test("route write: bad input -> red error, no lock, no refresh", () => {
+  const r = routeWriteResponse({ ok: false, message: "Не вказано мову." });
+  assert.equal(r.lock, false);
+  assert.equal(r.refresh, false);
+  assert.equal(r.msg.kind, "err");
+});
+
+test("route check: definite yes/no unlocks; null keeps the lock; a failed check is not success", () => {
+  const yes = routeCheckResponse({ applied: true, message: "Схоже, опубліковано." });
+  assert.equal(yes.unlock, true);
+  assert.equal(yes.refresh, true);
+  assert.equal(yes.msg.kind, "ok");
+
+  const no = routeCheckResponse({ applied: false, message: "Схоже, НЕ опубліковано." });
+  assert.equal(no.unlock, true);
+  assert.equal(no.msg.kind, "conflict");
+
+  // scenario 4/5 — the check itself could not decide (read failed / another
+  // editor changed data): stay LOCKED, never a success.
+  const dunno = routeCheckResponse({ applied: null, message: "Результат поки невідомий." });
+  assert.equal(dunno.unlock, false);
+  assert.equal(dunno.refresh, false);
+  assert.equal(dunno.msg.kind, "uncertain");
+
+  const noReply = routeCheckResponse(null); // check request itself failed
+  assert.equal(noReply.unlock, false);
+  assert.equal(noReply.msg.kind, "uncertain");
+  assert.doesNotMatch(noReply.msg.text, /застосовано|опубліковано|збережено/i);
+});
+
+test("route check: a missing `applied` field is treated as undecided, not as false", () => {
+  const r = routeCheckResponse({ message: "щось" } as { message: string });
+  assert.equal(r.unlock, false);
+});
+
+test("scenario 7 — no request may fire while one is in flight, refreshing, or locked", () => {
+  assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: false, locked: false }), true);
+  assert.equal(shouldFireAction({ inFlight: true, busy: false, refreshing: false, locked: false }), false);
+  assert.equal(shouldFireAction({ inFlight: false, busy: true, refreshing: false, locked: false }), false);
+  // during the post-write refresh a second click must NOT fire another write
+  assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: true, locked: false }), false);
+  // and never while locked pending "Перевірити результат"
+  assert.equal(shouldFireAction({ inFlight: false, busy: false, refreshing: false, locked: true }), false);
+});
+
+// ---------------------------------------------------------------------------
+// task 15:26 §4 — the read-only result check must not hang or multiply
+// ---------------------------------------------------------------------------
+
+test("fetchCheckResult: a hung request is aborted after the timeout and returns null (button stays locked)", async () => {
+  const realFetch = globalThis.fetch;
+  let aborted = false;
+  globalThis.fetch = ((_url: string, opts?: { signal?: AbortSignal }) =>
+    new Promise((_resolve, reject) => {
+      opts?.signal?.addEventListener("abort", () => {
+        aborted = true;
+        reject(new DOMException("aborted", "AbortError"));
+      });
+    })) as typeof fetch;
+  try {
+    const started = Date.now();
+    const out = await fetchCheckResult({ action: "check-result" }, 40);
+    assert.equal(out, null); // -> routeCheckResponse(null) -> stays locked, offer retry
+    assert.equal(aborted, true);
+    assert.ok(Date.now() - started >= 35 && Date.now() - started < 400);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  // null routes to "keep locked, offer another check"
+  const r = routeCheckResponse(null);
+  assert.equal(r.unlock, false);
+});
+
+test("fetchCheckResult: a network error also returns null, not a thrown error", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
+  try {
+    assert.equal(await fetchCheckResult({ action: "check-result" }, 1000), null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("fetchCheckResult: a normal reply is passed straight through", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve({
+      json: () => Promise.resolve({ applied: true, message: "ok" }),
+    })) as unknown as typeof fetch;
+  try {
+    assert.deepEqual(await fetchCheckResult({ action: "check-result" }, 1000), {
+      applied: true,
+      message: "ok",
+    });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
