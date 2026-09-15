@@ -107,7 +107,7 @@ export class GitHubStorage implements PanelStorage {
     }
     const push = (body as { permissions?: { push?: boolean } }).permissions?.push;
     if (!push) {
-      throw new StorageForbiddenError("недостатньо прав доступу для перегляду заявок");
+      throw new StorageForbiddenError("недостатньо прав доступу для цієї дії");
     }
   }
 
