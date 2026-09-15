@@ -42,14 +42,33 @@ GitHub рахує їх окремо: PR може мати всі зелені ch
 **без того, щоб власник щоразу відкривав GitHub і робив Approve** — але й **без
 можливості протягнути цим шляхом довільний код**.
 
+**⚠️ Виправлено 15.09.2026 — попередня версія цієї таблиці містила неточне
+твердження** («Гілка контенту свою копію workflow не запускає») **про те, де
+GitHub бере визначення workflow для `push`-тригера.** Перевірено проти
+офіційної документації GitHub: для `push` GitHub виконує САМЕ ТУ версію
+workflow-файлу, що лежить у запушеному коміті, а не в `main`
+([Events that trigger workflows](https://docs.github.com/en/actions/reference/events-that-trigger-workflows) —
+`push`: `GITHUB_SHA` = «Tip commit pushed to the ref»). Крок `checkout main`
+усередині job визначає лише який КОД виконується всередині вже запущеної
+job — він не впливає на те, яке визначення (`permissions:`, кроки) GitHub
+використав, щоб цю job узагалі запустити. Отже на `push` будь-хто з правом
+Write на репозиторій (не лише те, що дозволяє UI/API панелі) міг би
+запушити в гілку контенту ЗМІНЕНУ копію самого `content-guard.yml` — і саме
+вона, з довільними `permissions:` і кроками, виконалася б як довірений
+actor. Нижче — виправлена схема (`workflow_dispatch` замість `push`); чинний
+`docs/PANEL-hosting-and-approvals.md` і `.github/workflows-proposed/content-guard.yml`
+тепер узгоджені.
+
 | Питання | Відповідь |
 |---|---|
 | Хто створює контент-PR / push | Панель: `/panel` → адаптер пише файли на **гілку контенту** (`PANEL_CONTENT_BRANCH`, напр. `panel/content`) через GitHub API під токеном **того, хто ввійшов** (власник або помічник). |
-| Який check перевіряє дані | Workflow `content-guard.yml` (з `main`): на `push` у гілку контенту робить `git merge-base`, `git diff base..push` і **валить**, якщо diff торкається будь-чого, крім `src/content/cms/published.json`, `src/content/cms/review-state.json`, `public/images/cms/**`; далі запускає `npm run content:guard` (**checkout `main`**, дані з гілки читаються лише через `git show <sha>:file`, скрипти гілки не виконуються) — структура знімка, обов'язкові мови, review-хеші, тип і розмір медіа (magic bytes). |
-| Хто/що виконує «злиття» в `main` | Той самий workflow: якщо обидві перевірки пройшли — `git checkout <sha> -- <рівно файли з маніфесту>` і `git push` у `main`. Це **fast-forward контенту**, не GitHub-merge PR. |
-| Які права потрібні автоматизації | Actor цього workflow (GitHub App **або** вбудований `github-actions[bot]`) має бути **у Bypass list цього ruleset** — тоді його push у `main` не блокується правилами PR/approvals/checks. `permissions:` у workflow — лише `contents: write`. Доступу до Actions/Secrets/Admin/rulesets він не має. |
-| Чому цим шляхом не проходить довільний код | Bypass дозволено **тільки** для гілки контенту і **тільки** після кроку «diff = дозволений allowlist». Будь-який `.ts`/`.js`/`.yml`/`package.json` у diff → workflow падає, push у `main` не робиться. Сам `content-guard.yml` живе в `main`; змінити його = звичайний code-PR (п.1.2). Гілка контенту свою копію workflow **не запускає** (спрацьовує копія з `main` на подію `push`). |
-| Самопогодження / небезпечний bypass | Тут немає approving review взагалі — тому немає й «сам собі Approve». Захист — не review, а **машинний allowlist + checkout з `main`**. Bypass list містить **лише** actor автоматизації, не людей. |
+| Що запускає перевірку/злиття | Workflow `content-guard.yml` (лише з `main`), тригер — **`workflow_dispatch`** (не `push`) із обов'язковим входом `content_sha`. `workflow_dispatch` — один із небагатьох тригерів, чиє визначення GitHub гарантовано бере з дефолтної гілки; він навіть не диспетчеризується, якщо файл ще не лежить у `main` ([GitHub docs](https://docs.github.com/en/actions/reference/events-that-trigger-workflows): «This event will only trigger a workflow run if the workflow file exists on the default branch»). Гілка контенту НЕ може підмінити цю логіку, навіть маючи власну копію файлу. |
+| Який check перевіряє дані | Той самий job (з `main`): `scripts/publish-content.ts` (регресійні тести — `scripts/publish-content.test.ts`, реальні тимчасові git-репозиторії, не мок) рахує `git diff` від merge-base до `content_sha` і **валить**, якщо diff торкається будь-чого, крім `src/content/cms/published.json`, `src/content/cms/review-state.json`, `public/images/cms/**`; далі запускає `npm run content:guard` (дані з гілки читаються лише через `git show <sha>:file`/`git archive`, скрипти гілки не виконуються) — структура знімка, обов'язкові мови, review-хеші, тип і розмір медіа (magic bytes). Відсутній/непрочитний `published.json` — це відмова, а не публікація порожніх даних. |
+| Хто/що виконує «злиття» в `main` | Той самий `publish-content.ts`: стейджить РІВНО файли зі схваленого маніфесту (додавання, заміна байтів, і видалення медіа, що більше не референсоване — ніколи не `git add -A`, щоб випадковий сторонній файл не потрапив у коміт) і пушить у `main` — **fast-forward контенту**, не GitHub-merge PR. Ідемпотентно (повторна обробка вже застосованого коміту — без нового коміту) і ніколи не `--force`: якщо `main` змістився з початку обробки — відмова, не перезапис. |
+| Хто/що ЗАПУСКАЄ dispatch | Поки — **лише вручну**: власник/помічник із правом Write, `gh workflow run content-guard.yml -f content_sha=<sha>` або кнопка «Run workflow» — жодних нових прав не потребує (Write вже включає `actions: write`). Автоматичний запуск одразу після публікації в панелі — окреме, свідоме рішення власника пізніше (потребує або розширення дозволів GitHub App до `actions: write`, або окремого секрету-токена лише для цього виклику — жодне з двох не створено цією сесією). |
+| Що запускається після пушу в `main` | **Нічого автоматично в GitHub Actions.** Push цього job'а зроблено стандартним `GITHUB_TOKEN` — а події, викликані `GITHUB_TOKEN`, НЕ стартують інші workflow (виняток лише `workflow_dispatch`/`repository_dispatch`, `push` серед них немає — [GitHub docs](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)). Тобто CI `Verify` на `main` після цього пушу сам по собі НЕ перезапуститься — прийнятно за замовчуванням, бо `content:guard` у цьому самому job'і вже є довіреною перевіркою саме для контент-змін; якщо власник хоче ще й повторний `Verify` — це окремий PAT/App-токен, не типовий `GITHUB_TOKEN`. Vercel — інша система: її GitHub App підписаний на `push`-вебхуки репозиторію напряму, поза механікою токенів Actions, тож деплой мав би спрацювати як завжди (**найімовірніше, живо цією сесією не перевірено** — жодного реального пушу в `main` не робили). |
+| Чому цим шляхом не проходить довільний код | `workflow_dispatch`-визначення завжди з `main` (див. вище) — гілка контенту фізично не може підмінити ні кроки, ні `permissions:` job'а. Додатково: будь-який `.ts`/`.js`/`.yml`/`package.json` у diff → `publish-content.ts` падає з кодом 2, push у `main` не робиться. Сам workflow-файл і `publish-content.ts` живуть у `main`; змінити їх = звичайний code-PR (п.1.2). |
+| Самопогодження / небезпечний bypass | Тут немає approving review взагалі — тому немає й «сам собі Approve». Захист — **не review**, а: (1) `workflow_dispatch` гарантує довірене визначення job'а, (2) машинний allowlist + content-guard, (3) push під `GITHUB_TOKEN` цього job'а, обмеженим `permissions: contents: write` (без Actions/Secrets/Admin/rulesets). |
 
 ### 1.4. Bootstrap: код guard ще не в `main`
 
@@ -75,9 +94,13 @@ GitHub рахує їх окремо: PR може мати всі зелені ch
    - **Bypass list**: додати actor автоматизації (App або `github-actions`) —
      **тільки його**.
 3. Перевірити: у `/panel` опублікувати дрібну зміну → у гілці `panel/content`
-   з'явився коміт → `content-guard` зелений → у `main` фаст-форвардом лише
+   з'явився коміт → **вручну** `gh workflow run content-guard.yml -f
+   content_sha=<sha цього коміту>` (публікація в панелі сама по собі більше
+   НЕ запускає нічого — `workflow_dispatch` явно триґериться, це очікувано,
+   не регресія) → `content-guard` зелений → у `main` фаст-форвардом лише
    2 JSON (+ медіа) → Vercel зібрав. Спробувати вручну додати у гілку контенту
-   зміну `.ts` → `content-guard` **падає**, `main` не змінюється.
+   зміну `.ts`, продиспетчерити той самий workflow на її SHA →
+   `content-guard` **падає**, `main` не змінюється.
 
 ---
 

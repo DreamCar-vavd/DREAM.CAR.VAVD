@@ -1,25 +1,103 @@
 # PROPOSED — owner applies this by moving it to .github/workflows/content-guard.yml
 # (kept here because this session's token has no `workflow` scope).
 #
-# What it does (report/37 §2–4):
-#   On a push to the content branch, it
-#     1. checks the branch changed NOTHING outside the content allowlist
-#        { src/content/cms/published.json, src/content/cms/review-state.json,
-#          public/images/cms/** };
-#     2. runs `npm run content:guard` (validates the snapshot structure,
-#        language readiness, review-hash correspondence, media paths/types,
-#        rejects traversal/symlink/executables);
-#     3. if both pass, fast-forwards ONLY those files into `main`.
-#   Code changes on the content branch -> step 1 fails -> no merge.
-#   The content branch's code is NEVER executed with the merge token: only
-#   this workflow file (from `main`) runs, and it only runs `npm ci` + the
-#   guard script from `main`'s checkout.
+# ── Why `workflow_dispatch`, not `on: push` (2026-09-15 fix) ──────────────
+# The original version of this file triggered on `push` to the content
+# branch and its own comment claimed "the content branch's own copy of this
+# workflow never runs (the copy on `main` fires on the push event)". That
+# claim is FALSE for a `push` trigger: GitHub Actions resolves which version
+# of the workflow YAML to run from THE PUSHED REF ITSELF, not from `main` —
+# confirmed against GitHub's own docs ("push: ... GITHUB_SHA: Tip commit
+# pushed to the ref", https://docs.github.com/en/actions/reference/events-that-trigger-workflows).
+# The job's own `actions/checkout ref: main` step only decides what CODE
+# runs inside the job once it has already started — it has no effect on
+# which YAML (steps, `permissions:`, triggers) GitHub used to schedule the
+# job in the first place. So on `push`, anyone who can push a commit to the
+# content branch (which, at the git level, is anyone with repo Write access —
+# not limited to what the panel's own UI/API lets an editor do) could also
+# push a modified copy of THIS FILE on that same branch, and that modified
+# definition — with whatever `permissions:` and steps the attacker wrote —
+# is what would actually execute, as the trusted automation actor.
+#
+# `workflow_dispatch` (like `workflow_run`, `repository_dispatch`, and
+# `schedule`) does not have this problem: GitHub always resolves the
+# workflow file from the repository's DEFAULT BRANCH for these events, and
+# a `workflow_dispatch`-triggered workflow must already exist there to be
+# dispatchable at all ("This event will only trigger a workflow run if the
+# workflow file exists on the default branch", same docs page). A `ref`
+# input can still tell a dispatched run which commit to check out — it just
+# can no longer change which YAML/permissions run. That is the actual
+# missing guarantee this file needed; nothing else about the design changes.
+#
+# ── Who/what can trigger this, once activated in .github/workflows/ ───────
+# `workflow_dispatch` needs a caller with at least `actions: write` on the
+# repo (a classic PAT needs the `repo` scope; a fine-grained token or GitHub
+# App installation token needs `actions: write` specifically — GitHub REST
+# docs, "Create a workflow dispatch event"). Two ways to trigger it, in order
+# of how much this proposal actually builds:
+#   1. MANUAL (what this proposal assumes): the owner, or a Collaborator with
+#      repo Write access, runs `gh workflow run content-guard.yml -f
+#      content_sha=<sha>` or clicks "Run workflow" in the Actions tab. This
+#      needs NO new grant — Write access already includes `actions: write`.
+#   2. AUTOMATIC (a later, separate owner decision — NOT built here): the
+#      panel's own publish path calls the REST dispatch endpoint right after
+#      a successful content write. The panel currently authenticates each
+#      write with the SIGNED-IN EDITOR's own GitHub App installation token,
+#      scoped to `contents: write, metadata: read, pull_requests: read`
+#      (see PR #26's description) — that scope does NOT include Actions, so
+#      automatic dispatch needs either widening the GitHub App's permission
+#      manifest to add `actions: write`, or a separate dedicated token
+#      stored as a repository secret used only for this call. Either is a
+#      real permission/secret decision for the owner to make deliberately —
+#      not something to add silently as a side effect of this file.
+#
+# ── What happens after this workflow's own push to `main` ─────────────────
+# This job pushes using the default `GITHUB_TOKEN`. GitHub does NOT start a
+# new workflow run from an event caused by `GITHUB_TOKEN` — the two named
+# exceptions are `workflow_dispatch` and `repository_dispatch` themselves,
+# a plain `push` is not one of them ("Triggering a workflow from a workflow",
+# https://docs.github.com/en/actions/using-workflows/triggering-a-workflow).
+# So the "Verify (TypeScript, ESLint, tests, build)" CI workflow's own
+# `on: push: branches: [main]` will NOT automatically re-run against this
+# guarded commit. That is an accepted, correct default for a content-only
+# change: `content:guard` (run inside THIS job, from `main`'s own trusted
+# copy, before anything is merged) is the actual safety gate for this class
+# of change — a redundant full Verify run afterwards would be defense in
+# depth, not a requirement. If the owner wants it anyway, that also needs a
+# PAT/App token (same dependency as automatic dispatch above), not the
+# default GITHUB_TOKEN — a separate decision, not built here.
+# Vercel is unaffected by any of this: its GitHub App has its own webhook
+# subscription to repository `push` events, entirely outside GitHub Actions'
+# token-triggering rules, so a deployment is still expected to fire
+# normally from this push — noted as "most likely, not live-verified this
+# session" (no push to `main` was made to confirm it).
+#
+# What this file still does, unchanged from the original design:
+#   1. `scripts/publish-content.ts` (regression-tested in
+#      publish-content.test.ts against real temporary git repos) computes
+#      the diff between `main` and the content commit, refuses anything
+#      outside { published.json, review-state.json, public/images/cms/** },
+#      and refuses (rather than substituting empty data for) a missing or
+#      unreadable published.json;
+#   2. it runs `npm run content:guard` (the validator, from `main`'s own
+#      checkout — the content commit's own copy is never executed);
+#   3. on success, it stages exactly the guard-approved files (additions,
+#      byte replacements, AND removals of no-longer-referenced media — never
+#      a blanket `git add -A`, so nothing else already sitting in the
+#      runner's checkout can leak into the commit) and fast-forwards `main`;
+#   4. it is idempotent (re-processing an already-applied content commit
+#      makes no new commit) and never force-pushes — if `main` moved since
+#      this run started, it aborts instead of overwriting.
 
 name: content-guard
 
 on:
-  push:
-    branches: ["panel/content"] # the PANEL_CONTENT_BRANCH
+  workflow_dispatch:
+    inputs:
+      content_sha:
+        description: "Commit SHA on the content branch to validate and merge into main"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -33,8 +111,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # Check out MAIN (trusted) — the guard code and workflow come from here,
-      # never from the pushed content branch.
+      # Check out MAIN (trusted) — the guard/publish code, and this
+      # workflow's own steps/permissions, all come from here. Explicit `ref:
+      # main` regardless of what ref the dispatch call itself specified.
       - name: Checkout main (trusted)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,37 +130,11 @@ jobs:
       - name: Install (from main)
         run: npm ci
 
-      - name: Fetch the pushed content commit
-        run: git fetch origin "${{ github.sha }}"
+      - name: Fetch the content commit
+        run: git fetch origin "${{ inputs.content_sha }}"
 
-      - name: Reject any change outside the content allowlist
+      - name: Guard and publish (scripts/publish-content.ts)
         run: |
-          base="$(git merge-base main "${{ github.sha }}")"
-          changed="$(git diff --name-only "$base" "${{ github.sha }}")"
-          echo "Changed files:"; echo "$changed"
-          bad="$(echo "$changed" | grep -vE '^(src/content/cms/(published|review-state)\.json|public/images/cms/.*)$' || true)"
-          if [ -n "$bad" ]; then
-            echo "::error::Content branch touched non-content files:"; echo "$bad"; exit 1
-          fi
-
-      - name: Validate the snapshot + media (content:guard, from main)
-        run: |
-          git show "${{ github.sha }}:src/content/cms/published.json" > /tmp/published.json
-          git show "${{ github.sha }}:src/content/cms/review-state.json" > /tmp/review.json || echo '{}' > /tmp/review.json
-          rm -rf /tmp/media && mkdir -p /tmp/media
-          git archive "${{ github.sha }}" -- public/images/cms | tar -x -C /tmp/media || true
-          npm run content:guard -- \
-            --published /tmp/published.json --review /tmp/review.json \
-            --media-root /tmp/media --manifest-out /tmp/manifest.txt
-
-      - name: Merge ONLY the manifest files into main
-        run: |
-          git config user.name "content-guard"
-          git config user.email "content-guard@users.noreply.github.com"
-          git checkout main
-          # check out exactly the files the guard approved — never a directory
-          xargs -a /tmp/manifest.txt git checkout "${{ github.sha }}" --
-          git add -A
-          git diff --cached --quiet && { echo "nothing to publish"; exit 0; }
-          git commit -m "content: publish $(date -u +%FT%TZ) (guarded ${{ github.sha }})"
-          git push origin main
+          node --import tsx scripts/publish-content.ts \
+            --content "${{ inputs.content_sha }}" \
+            --remote origin
