@@ -96,8 +96,31 @@ function arg(name: string, fallback?: string): string | undefined {
 const REPO = path.resolve(arg("repo", ".")!);
 const CONTENT_SHA = arg("content");
 const REMOTE = arg("remote");
-const BASE_ALLOWLIST =
-  /^(src\/content\/cms\/(published|review-state)\.json|public\/images\/cms\/.+)$/;
+// Two DIFFERENT boundaries, deliberately kept separate (Б4 Block A,
+// 2026-09-15 — the panel's real write path interleaves commits this
+// script must tolerate seeing without ever transferring them):
+//
+//   EDITING_SOURCE_ALLOWLIST — what's safe for the content branch's history
+//   to contain at all, without refusing the whole publish. A real panel
+//   session commits to THIS branch on every Keystatic save (one commit per
+//   working-copy file, e.g. `src/content/cms/cars/<slug>.json`) and on
+//   every "Позначити перевіреним" (review-state.json) — entirely separate
+//   commits from `publishItem`'s own published.json/media writes (verified
+//   directly against panelStore.ts: confirmLocale/publishItem never share
+//   a commit). Treating any of that as "the content branch touched a
+//   disallowed file" would make a real, correctly-used branch unpublishable
+//   the moment more than one edit had ever happened on it.
+//
+//   The actual TRANSFER stays exactly as narrow as before — see toUpsert/
+//   toRemove below, which only ever consider PUBLISHED_PATH, REVIEW_PATH,
+//   and content-guard's own approved media manifest. A working-copy file
+//   under `src/content/cms/<other-collection>/*.json` is now ALLOWED to
+//   exist in the diff (so it doesn't block the publish) but is still NEVER
+//   eligible to be committed to base — it simply isn't in that filter.
+//   Anything outside src/content/cms/** or public/images/cms/** entirely
+//   (any `.ts`/`.js`/`.yml`/`package.json`/etc.) is unaffected: still
+//   rejected outright, exactly as before.
+const EDITING_SOURCE_ALLOWLIST = /^(src\/content\/cms\/.+|public\/images\/cms\/.+)$/;
 const PUBLISHED_PATH = "src/content/cms/published.json";
 const REVIEW_PATH = "src/content/cms/review-state.json";
 const FULL_SHA_RE = /^[0-9a-f]{40}$/;
@@ -170,7 +193,7 @@ function changedFiles(base: string, content: string): ChangedFiles {
 }
 
 function assertAllowlisted(changed: ChangedFiles): void {
-  const bad = [...changed.upserted, ...changed.removed].filter((f) => !BASE_ALLOWLIST.test(f));
+  const bad = [...changed.upserted, ...changed.removed].filter((f) => !EDITING_SOURCE_ALLOWLIST.test(f));
   if (bad.length > 0) {
     throw new PublishError(
       2,
