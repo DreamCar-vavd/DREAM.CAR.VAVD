@@ -82,6 +82,9 @@
  *   9  a managed path (published.json/review-state.json/a media file this
  *      run touches) has independently diverged on base since the last
  *      guarded publish — refusing to silently overwrite that change
+ *  10  `--remote` was given but the remote could not be read at all —
+ *      refusing to report success or "already applied" from unverifiable
+ *      local state
  *
  * Three more defects fixed 2026-09-15 (a follow-up independent review):
  *  A. This script never touches --repo's real working tree/index while
@@ -120,6 +123,51 @@
  *     existing hard-refusal path), rolls the local ref back to match the
  *     remote before proceeding, so sequencing and diffing are always
  *     grounded in what's actually published, not a stale local artifact.
+ *
+ * Four more defects fixed 2026-09-15 (a THIRD independent review):
+ *  D. Fix C's own remote read treated "ls-remote returned nothing" as one
+ *     case, whether the remote was reachable-but-branchless (safe) or
+ *     entirely UNREACHABLE (network down, deleted, bad URL) — in the
+ *     latter case a retry after a failed push saw its own leftover local
+ *     commit and reported false "already applied" success while the
+ *     remote — unverifiable, but in fact never touched — still had
+ *     nothing. Fixed: an unreachable remote now throws (exit 10) instead
+ *     of silently falling through to local-only sequencing.
+ *  E. `toUpsert` was computed by filtering the DIFF between the last
+ *     guarded content SHA and this one — so a file that existed
+ *     (unreferenced) in an EARLIER content commit and only becomes
+ *     REFERENCED later, with its bytes never actually changing in
+ *     between, showed no diff at all and was silently never copied to
+ *     base — content-guard then correctly failed the final composed
+ *     result ("file missing"), incorrectly blocking a legitimate publish.
+ *     Fixed: `toUpsert` is now computed directly from content-guard's own
+ *     manifest of the content commit's CURRENT references, compared
+ *     against base's CURRENT blob for each — independent of any diff
+ *     history, so a newly-referenced-but-byte-identical file is included
+ *     exactly like any other.
+ *  F. The independent-target-conflict check (B, above) compared base's
+ *     current blob against the CONTENT branch's historical blob at the
+ *     last-applied content SHA — but that content commit's own tree can
+ *     contain files a prior guarded run correctly chose never to copy to
+ *     base (an orphaned, unreferenced media file). Deleting such a file
+ *     on the content branch looked exactly like "base independently
+ *     changed a path this run touches" and was wrongly rejected as a
+ *     conflict. Fixed: `lastGuardedCommit` now also returns the guard
+ *     commit's OWN SHA on `base`'s history (not just the content SHA
+ *     embedded in its message) — the only correct reference point for
+ *     "what did base itself have right after the last guarded publish".
+ *     Comparing against THAT tree instead correctly treats a
+ *     never-transferred file as absent on both sides — no conflict.
+ *  G. The "sync touched paths into the real checkout" step (A, above)
+ *     decided which paths were safe to touch using a SNAPSHOT of dirty
+ *     paths taken once, near the very start of the run. A user edit made
+ *     LATER — during the run's own execution, e.g. in the window between
+ *     that snapshot and the final push — was invisible to that snapshot
+ *     and got silently overwritten by the sync step. Fixed: dropped the
+ *     upfront snapshot entirely; each path is now checked JUST BEFORE it
+ *     is touched, comparing the CURRENT working tree against
+ *     `baseShaAtStart` at that exact moment — catching an edit made at
+ *     any point during the run, not just ones that predate it.
  */
 import { execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -256,15 +304,30 @@ function assertAllowlisted(changed: ChangedFiles): void {
 }
 
 /**
- * The content SHA this script last successfully applied to `base`, read
- * straight from base's own commit history — never a separate state file
- * that could itself drift out of sync with what's actually on the branch.
+ * The most recent guarded-publish commit on `base`'s own history, read
+ * straight from it — never a separate state file that could itself drift
+ * out of sync with what's actually on the branch. Returns BOTH SHAs,
+ * deliberately kept distinct (a real defect otherwise, found 2026-09-15 —
+ * a third independent review): `contentSha` (embedded in the commit
+ * message) is a commit on the CONTENT branch's own history, used for
+ * sequencing/diff purposes; `baseSha` is the commit ITSELF, on `base`'s
+ * own history — the only correct reference point for "what did base
+ * itself look like right after the last guarded publish", used by the
+ * independent-target-conflict check below. Conflating the two made that
+ * check compare against the wrong tree: `contentSha`'s tree includes
+ * files that a prior guarded run correctly chose NEVER to copy to base
+ * (an unreferenced/orphaned media file sitting in that content commit) —
+ * comparing base's absence of such a file against content's presence of
+ * it looked like an "independent deletion" that never happened.
  */
-function lastAppliedContentSha(base: string): string | null {
-  const line = gitOrNull(["log", base, "--fixed-strings", "--grep=(guarded ", "--format=%s", "-n", "1"]);
+function lastGuardedCommit(base: string): { baseSha: string; contentSha: string } | null {
+  const line = gitOrNull(["log", base, "--fixed-strings", "--grep=(guarded ", "--format=%H %s", "-n", "1"]);
   if (!line) return null;
-  const m = line.match(/\(guarded ([0-9a-f]{40})\)/);
-  return m ? m[1] : null;
+  const sp = line.indexOf(" ");
+  const baseSha = line.slice(0, sp);
+  const subject = line.slice(sp + 1);
+  const m = subject.match(/\(guarded ([0-9a-f]{40})\)/);
+  return m ? { baseSha, contentSha: m[1] } : null;
 }
 
 function isAncestor(maybeAncestor: string, of: string): boolean {
@@ -280,18 +343,38 @@ function isAncestor(maybeAncestor: string, of: string): boolean {
  * A previous run of this exact script may have committed locally and then
  * failed to push (network blip, server-side rejection). Left alone, that
  * leftover local commit would make a retry's own sequencing check
- * (`lastAppliedContentSha`) see the content as "already applied" and report
+ * (`lastGuardedCommit`) see the content as "already applied" and report
  * success without ever re-attempting the push. Reconciles narrowly: only
  * when local is a pure fast-forward ahead of the remote's own truth, and
  * every commit in that gap is one of THIS script's own guarded-publish
  * commits (its distinctive `(guarded <sha>)` message marker) — never when
  * the remote has moved independently (a real divergence there is left for
  * the existing hard-refusal push-rejection path, unchanged).
+ *
+ * Throws (never silently proceeds on local-only state) when the remote
+ * itself cannot be read at all — a real defect found 2026-09-15 (a third
+ * independent review): `git ls-remote` returning nothing was treated the
+ * SAME whether the remote was genuinely reachable-but-empty-for-this-
+ * branch (safe: proceed using local as truth, e.g. the very first publish
+ * ever) or entirely UNREACHABLE (network down, bad URL, deleted) — in the
+ * latter case a retry after a failed push saw its own unpushed local
+ * commit and reported "already applied" success while the remote (unverifiable,
+ * but in fact never touched) genuinely still had nothing. Now distinguished
+ * by `git ls-remote`'s own exit code, not just its output.
  */
 function reconcileWithRemoteTruth(base: string, baseRef: string, remote: string): void {
-  const remoteHeadLine = gitOrNull(["ls-remote", remote, base]);
+  let remoteHeadLine: string;
+  try {
+    remoteHeadLine = git(["ls-remote", remote, base]);
+  } catch (err) {
+    const e = err as { stderr?: string };
+    throw new PublishError(
+      10,
+      `remote "${remote}" could not be read — refusing to report success or "already applied" based on unverifiable local state: ${e.stderr ?? err}`,
+    );
+  }
   const remoteHead = remoteHeadLine ? remoteHeadLine.split("\t")[0]?.trim() : null;
-  if (!remoteHead) return; // remote has no such branch yet — nothing to reconcile against
+  if (!remoteHead) return; // remote IS reachable, genuinely has no such branch yet — nothing to reconcile against
   const localHead = git(["rev-parse", baseRef]);
   if (remoteHead === localHead) return; // already in sync
   git(["fetch", remote, remoteHead]); // ensure the object is present before any ancestry check
@@ -305,28 +388,33 @@ function reconcileWithRemoteTruth(base: string, baseRef: string, remote: string)
 }
 
 /**
- * Enforces publish ordering against base's own history. Returns the last-
- * applied SHA (null if this is the first-ever guarded publish to `base`)
- * plus a verdict: "noop" when the requested content SHA was already the
- * last one applied (idempotent re-run — not an error), "apply" otherwise.
- * The returned `last` is also the correct diff base for `changedFiles` —
- * see its own doc comment for why this must not be `merge-base(base,
- * content)` instead.
+ * Enforces publish ordering against base's own history. Returns the last
+ * guarded commit (null if this is the first-ever guarded publish to
+ * `base`) plus a verdict: "noop" when the requested content SHA was
+ * already the last one applied (idempotent re-run — not an error), "apply"
+ * otherwise. `last.contentSha` is the correct diff base for `changedFiles`
+ * — see its own doc comment for why this must not be `merge-base(base,
+ * content)` instead; `last.baseSha` is the correct reference point for the
+ * independent-target-conflict check — see `lastGuardedCommit`'s own doc
+ * comment for why these two must not be conflated.
  */
-function checkSequencing(base: string, content: string): { last: string | null; verdict: "noop" | "apply" } {
-  const last = lastAppliedContentSha(base);
+function checkSequencing(
+  base: string,
+  content: string,
+): { last: { baseSha: string; contentSha: string } | null; verdict: "noop" | "apply" } {
+  const last = lastGuardedCommit(base);
   if (last === null) return { last, verdict: "apply" }; // first-ever guarded publish to this base
-  if (last === content) return { last, verdict: "noop" };
-  if (isAncestor(content, last)) {
+  if (last.contentSha === content) return { last, verdict: "noop" };
+  if (isAncestor(content, last.contentSha)) {
     throw new PublishError(
       6,
-      `content ${content} is older than (an ancestor of) the last applied ${last} — refusing to roll a newer publish back`,
+      `content ${content} is older than (an ancestor of) the last applied ${last.contentSha} — refusing to roll a newer publish back`,
     );
   }
-  if (!isAncestor(last, content)) {
+  if (!isAncestor(last.contentSha, content)) {
     throw new PublishError(
       7,
-      `content ${content} has diverged from the last applied ${last} (neither is an ancestor of the other) — conflict, needs reconciliation, not an automatic merge`,
+      `content ${content} has diverged from the last applied ${last.contentSha} (neither is an ancestor of the other) — conflict, needs reconciliation, not an automatic merge`,
     );
   }
   return { last, verdict: "apply" };
@@ -457,36 +545,19 @@ async function main() {
   if (REMOTE) reconcileWithRemoteTruth(base, baseRef, REMOTE);
   const baseShaAtStart = git(["rev-parse", baseRef]);
 
-  // Captured BEFORE anything below touches any git state, so it reflects
-  // genuine pre-existing caller state — used at the very end to decide
-  // which touched paths are safe to sync into the real checkout. Uses a
-  // RAW (non-trimmed) call deliberately: `git()`'s own `.trim()` strips
-  // the leading space `git status --porcelain` puts on an unstaged-only
-  // entry (" M path") from the very first line of the whole output,
-  // silently shifting that one path's slice(3) parse by one character —
-  // a real bug caught only because it corrupted the FIRST status line
-  // specifically, not later ones (each preceded by its own "\n").
+  // Which branch (if any) the caller's checkout is actually on — used at
+  // the very end to decide whether it's meaningful to sync touched paths
+  // into the real working tree at all. Path-level dirtiness is checked
+  // JUST BEFORE each sync operation instead of from an upfront snapshot —
+  // see the sync step's own comment for why.
   const checkoutBranch = gitOrNull(["symbolic-ref", "-q", "--short", "HEAD"]);
-  const statusPorcelainRaw = (() => {
-    try {
-      return execFileSync("git", ["status", "--porcelain"], { cwd: REPO, encoding: "utf8" });
-    } catch {
-      return "";
-    }
-  })();
-  const dirtyAtStart = new Set(
-    statusPorcelainRaw
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.slice(3)),
-  );
 
   const seq = checkSequencing(base, CONTENT_SHA);
   if (seq.verdict === "noop") {
     console.log(`nothing to publish (content ${CONTENT_SHA} was already the last one applied to ${base})`);
     return;
   }
-  const diffFrom = seq.last ?? git(["merge-base", base, CONTENT_SHA]);
+  const diffFrom = seq.last?.contentSha ?? git(["merge-base", base, CONTENT_SHA]);
 
   const changed = changedFiles(diffFrom, CONTENT_SHA);
   if (changed.upserted.length === 0 && changed.removed.length === 0) {
@@ -504,26 +575,52 @@ async function main() {
   runContentGuard(contentInputs, contentManifestOut, 4, "the content commit's own snapshot/media");
   const contentManifest = await readManifest(contentManifestOut);
 
-  const toUpsert = changed.upserted.filter(
-    (f) => f === PUBLISHED_PATH || f === REVIEW_PATH || contentManifest.has(f),
-  );
-  const toRemove = changed.removed.filter((f) => f.startsWith("public/images/cms/"));
+  // `toUpsert` is every currently-referenced managed path (content-guard's
+  // own manifest, plus the two JSON files unconditionally) whose blob on
+  // base doesn't already match content's — NOT filtered through the diff
+  // between the last-applied content SHA and this one. A path can be
+  // legitimately referenced by content's CURRENT snapshot while showing NO
+  // diff at all against the last-applied SHA (its bytes never changed —
+  // only which item references it did, e.g. a photo sitting unreferenced
+  // in an earlier content commit that only becomes referenced later); a
+  // diff-only view would silently skip copying it, then fail the final
+  // integrity check for a "missing" file that was never actually upserted.
+  const desiredPaths = new Set<string>([PUBLISHED_PATH, REVIEW_PATH, ...contentManifest]);
+  const toUpsert = [...desiredPaths].filter((f) => blobAt(CONTENT_SHA, f) !== blobAt(baseShaAtStart, f));
+  const toRemove = changed.removed.filter((f) => f.startsWith("public/images/cms/") && !desiredPaths.has(f));
 
   // A content SHA can be a perfectly valid forward publish while `base`
   // ITSELF has independently changed one of these same managed paths since
-  // the last guarded publish (e.g. a manual hotfix commit directly on
-  // main). Blindly applying the new candidate would silently discard that
-  // independent change. For every path this run is about to touch, its
-  // current blob on base must still match what it was at `diffFrom` — a
-  // mismatch means something else changed it independently in between.
+  // the last shared reference point (e.g. a manual hotfix commit directly
+  // on main). Blindly applying the new candidate would silently discard
+  // that independent change. For every path this run is about to touch,
+  // its current blob on base must still match what it was at the anchor —
+  // a mismatch means something else changed it independently in between.
+  //
+  // The anchor is `seq.last.baseSha`'s own tree when a prior guarded
+  // publish exists — never `diffFrom` in that case, which is a commit on
+  // the CONTENT branch and can contain files this script correctly never
+  // copied to base (comparing against those would misreport a file base
+  // never had as an "independent deletion" — the exact false conflict a
+  // third independent review found, 2026-09-15). For the FIRST-EVER
+  // publish to a given base (no prior guarded commit at all), there is no
+  // `baseSha` to use instead — but the check itself is still needed: base
+  // may already have evolved independently since content and base last
+  // shared history, and `diffFrom` (their real `merge-base`, computed
+  // above) is the correct, git-native reference point for THAT case —
+  // dropping the check entirely for a first-ever publish was a regression
+  // (a real one, caught by the ORIGINAL Codex "final-media" scenario:
+  // base's own published.json had independently started referencing a
+  // photo that this content commit deletes — undetected without this).
+  const conflictAnchor = seq.last?.baseSha ?? diffFrom;
   for (const f of [...toUpsert, ...toRemove]) {
     const baseNow = blobAt(baseShaAtStart, f);
-    const baseAtDiffFrom = blobAt(diffFrom, f);
-    if (baseNow !== baseAtDiffFrom) {
+    const expected = blobAt(conflictAnchor, f);
+    if (baseNow !== expected) {
       throw new PublishError(
         9,
-        `base's current "${f}" has diverged independently since the last guarded publish ` +
-          `(was ${baseAtDiffFrom ?? "absent"} at ${diffFrom}, base now has ${baseNow ?? "absent"}) — ` +
+        `base's current "${f}" has diverged independently since the last shared reference point ` +
+          `(was ${expected ?? "absent"} at ${conflictAnchor}, base now has ${baseNow ?? "absent"}) — ` +
           `refusing to overwrite an independent change; reconcile manually`,
       );
     }
@@ -609,27 +706,46 @@ async function main() {
   // new commit, which `git status` shows as a pending staged rollback of
   // exactly what was just published. Left alone, the next unrelated commit
   // anyone makes in this checkout (`git add -A && git commit`, e.g.) would
-  // silently carry that stale rollback along and revert the publish. Only
-  // paths that were genuinely clean before this run started are touched —
-  // a path with a real pre-existing user edit is left exactly as it was,
-  // same guarantee as the isolated-index design already gives it.
+  // silently carry that stale rollback along and revert the publish.
+  //
+  // Each path is checked JUST BEFORE it's touched — not from a snapshot
+  // taken once near the start of the run — comparing the CURRENT working
+  // tree against `baseShaAtStart` at that exact moment. An earlier version
+  // captured "dirty paths" upfront and only ever consulted that snapshot;
+  // a real defect found 2026-09-15 (a third independent review): a user
+  // edit made LATER — during this run's own execution (e.g. in the window
+  // between that snapshot and the push actually happening) — was invisible
+  // to it and got silently overwritten here. Checking freshly right before
+  // each touch catches an edit made at any point during the run, not just
+  // ones that predate it, while still never flagging a path as "dirty"
+  // merely because `base`'s ref itself moved (that comparison is always
+  // against `baseShaAtStart`, never against the new HEAD).
   if (checkoutBranch === base) {
+    const unchangedSinceStart = (f: string): boolean => {
+      try {
+        execFileSync("git", ["diff", "--quiet", baseShaAtStart, "--", f], { cwd: REPO });
+        return true;
+      } catch {
+        return false; // differs (or the check itself failed) — never touch it
+      }
+    };
     // Best-effort hygiene, not the operation's own success/failure: the
     // actual publish (commit + ref update + optional push) already fully
     // succeeded above. `-f` on the removal is safe specifically because
-    // dirtyAtStart already proved this exact path had no real pending
-    // change of the caller's own — without it, plain `git rm` refuses
-    // ("has changes staged in the index"), because HEAD (a symref to
-    // `base`) has already moved past this path's removal while the real
-    // index still holds its pre-publish entry — the same underlying
-    // ref/checkout-desync artifact this whole sync step exists to clear.
+    // `unchangedSinceStart` already proved this exact path had no real
+    // pending change of the caller's own at the moment we touch it —
+    // without it, plain `git rm` refuses ("has changes staged in the
+    // index"), because HEAD (a symref to `base`) has already moved past
+    // this path's removal while the real index still holds its pre-publish
+    // entry — the same underlying ref/checkout-desync artifact this whole
+    // sync step exists to clear.
     try {
       for (const f of toUpsert) {
-        if (dirtyAtStart.has(f)) continue;
+        if (!unchangedSinceStart(f)) continue;
         git(["checkout", commitSha, "--", f]);
       }
       for (const f of toRemove) {
-        if (dirtyAtStart.has(f)) continue;
+        if (!unchangedSinceStart(f)) continue;
         git(["rm", "--ignore-unmatch", "--quiet", "-f", "--", f]);
       }
     } catch (err) {

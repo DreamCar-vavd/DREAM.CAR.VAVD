@@ -481,7 +481,13 @@ test("review: deletion must preserve media referenced by final target snapshot",
 
   const r = await runPublish(["--repo", dir, "--base", "main", "--content", sha]);
   assert.equal(r.ok, false, "must refuse rather than delete a photo the final snapshot still references");
-  assert.equal(r.code, 8);
+  // Now caught earlier and more precisely, by the independent-target-
+  // conflict check (base's own published.json diverged from the shared
+  // merge-base) rather than the later final-composed-tree integrity check
+  // — both are valid "rejected, nothing changed" outcomes; Codex's own
+  // repro.test.ts (unmodified) only asserts the photo survives, not which
+  // code catches it, and continues to pass either way.
+  assert.equal(r.code, 9);
   assert.equal(git(["rev-parse", "main"], dir), baseBeforePublish, "no commit must be made on a failed integrity check");
   assert.ok(git(["ls-tree", "main", mediaB], dir).length > 0, "the referenced photo must still exist on base");
 });
