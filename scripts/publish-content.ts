@@ -85,6 +85,12 @@
  *  10  `--remote` was given but the remote could not be read at all —
  *      refusing to report success or "already applied" from unverifiable
  *      local state
+ *  11  sequencing found this content SHA already guarded LOCALLY on base,
+ *      but `--remote`'s own current branch state does not confirm it (the
+ *      branch is missing on the remote entirely, or sits at a different
+ *      commit) — refusing to report "already applied" from local state
+ *      alone; the local commit is kept exactly as-is (never discarded),
+ *      resolve manually and re-run
  *
  * Three more defects fixed 2026-09-15 (a follow-up independent review):
  *  A. This script never touches --repo's real working tree/index while
@@ -168,6 +174,39 @@
  *     is touched, comparing the CURRENT working tree against
  *     `baseShaAtStart` at that exact moment — catching an edit made at
  *     any point during the run, not just ones that predate it.
+ *
+ * Two more defects fixed 2026-09-15 (a FOURTH independent review):
+ *  H. The end-of-run sync step (A/G, above) decided whether a touched path
+ *     was safe to copy into the real checkout by checking ONLY the working
+ *     tree against `baseShaAtStart` (`git diff <sha> -- f`). That check is
+ *     blind to the git INDEX: a user can stage an intentional edit (`git
+ *     add`) and then have their working file happen to match
+ *     `baseShaAtStart` again (e.g. reverted by hand, or an editor autosave
+ *     round-trip) while the STAGED version still differs. The old check saw
+ *     "working tree clean" and ran `git checkout <newCommit> -- f`, which
+ *     overwrites the index too — silently discarding the staged edit that
+ *     was never actually reflected anywhere else. Fixed: a path is only
+ *     "unchanged since start" when BOTH the working tree AND the index
+ *     (`git diff --cached <sha> -- f`) match `baseShaAtStart` — either one
+ *     differing is treated as real pending user content and left untouched,
+ *     exactly like any other dirty path.
+ *  I. `reconcileWithRemoteTruth` (C/D, above) correctly leaves local state
+ *     alone when the remote is reachable but genuinely has no such branch
+ *     yet (nothing to reconcile against). But `checkSequencing` right after
+ *     it reads its "last applied" verdict purely from base's LOCAL history
+ *     — so a retry of a first-ever publish, after an earlier attempt
+ *     committed locally but then failed to push (the exact case fix C
+ *     exists for on a branch that DOES already exist remotely), saw its own
+ *     unpushed local commit, matched it against the same `--content` SHA,
+ *     and reported "already applied" success — while the remote branch
+ *     still didn't exist at all and had received nothing. Fixed: when
+ *     sequencing verdicts "noop" and `--remote` was given, this script now
+ *     independently re-reads the remote's own current branch state and
+ *     requires it to exactly equal the local base ref before trusting the
+ *     noop; any mismatch (missing branch, or a different commit) is a clear
+ *     refusal (exit 11), never a silent false success — and never discards
+ *     the local commit, which stays exactly where it was for a manual push
+ *     or a corrected re-run.
  */
 import { execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -362,7 +401,13 @@ function isAncestor(maybeAncestor: string, of: string): boolean {
  * but in fact never touched) genuinely still had nothing. Now distinguished
  * by `git ls-remote`'s own exit code, not just its output.
  */
-function reconcileWithRemoteTruth(base: string, baseRef: string, remote: string): void {
+/**
+ * Reads `remote`'s own current commit for `base`, or `null` if the remote is
+ * reachable but genuinely has no such branch. Throws (never returns `null`
+ * to mean "unreadable") when the remote itself cannot be contacted at all —
+ * callers must never treat "could not verify" the same as "verified empty".
+ */
+function readRemoteHead(remote: string, base: string): string | null {
   let remoteHeadLine: string;
   try {
     remoteHeadLine = git(["ls-remote", remote, base]);
@@ -373,7 +418,11 @@ function reconcileWithRemoteTruth(base: string, baseRef: string, remote: string)
       `remote "${remote}" could not be read — refusing to report success or "already applied" based on unverifiable local state: ${e.stderr ?? err}`,
     );
   }
-  const remoteHead = remoteHeadLine ? remoteHeadLine.split("\t")[0]?.trim() : null;
+  return remoteHeadLine ? (remoteHeadLine.split("\t")[0]?.trim() ?? null) : null;
+}
+
+function reconcileWithRemoteTruth(base: string, baseRef: string, remote: string): void {
+  const remoteHead = readRemoteHead(remote, base);
   if (!remoteHead) return; // remote IS reachable, genuinely has no such branch yet — nothing to reconcile against
   const localHead = git(["rev-parse", baseRef]);
   if (remoteHead === localHead) return; // already in sync
@@ -554,6 +603,25 @@ async function main() {
 
   const seq = checkSequencing(base, CONTENT_SHA);
   if (seq.verdict === "noop") {
+    // Local history alone says this content SHA is already applied — but
+    // that history can be a leftover from a run whose COMMIT succeeded
+    // locally and whose PUSH then failed (see defect I in the top-of-file
+    // notes). Never report success on local state alone when a remote is in
+    // play: the remote's own branch must actually be at this exact commit.
+    if (REMOTE) {
+      const remoteHead = readRemoteHead(REMOTE, base);
+      if (remoteHead !== baseShaAtStart) {
+        throw new PublishError(
+          11,
+          `content ${CONTENT_SHA} is already guarded locally on "${base}" (${baseShaAtStart}), but remote "${REMOTE}" ` +
+            (remoteHead
+              ? `has "${base}" at a different commit (${remoteHead}) — local and remote have diverged`
+              : `has no "${base}" branch at all — this was likely never actually pushed (a previous push probably failed)`) +
+            `. Refusing to report "already applied" from local state alone. The local commit is kept exactly as-is — ` +
+            `push it manually once the remote state is resolved (e.g. \`git push ${REMOTE} ${base}\`), then re-run.`,
+        );
+      }
+    }
     console.log(`nothing to publish (content ${CONTENT_SHA} was already the last one applied to ${base})`);
     return;
   }
@@ -723,7 +791,15 @@ async function main() {
   if (checkoutBranch === base) {
     const unchangedSinceStart = (f: string): boolean => {
       try {
+        // BOTH the working tree and the index must still match
+        // `baseShaAtStart` — checking only the working tree misses a
+        // legitimately staged user edit whose working file happens to
+        // read back identical to baseline (defect H, top-of-file notes):
+        // `git checkout <newCommit> -- f` below overwrites the index too,
+        // silently discarding that staged edit even though the working
+        // tree alone looked perfectly clean.
         execFileSync("git", ["diff", "--quiet", baseShaAtStart, "--", f], { cwd: REPO });
+        execFileSync("git", ["diff", "--cached", "--quiet", baseShaAtStart, "--", f], { cwd: REPO });
         return true;
       } catch {
         return false; // differs (or the check itself failed) — never touch it
