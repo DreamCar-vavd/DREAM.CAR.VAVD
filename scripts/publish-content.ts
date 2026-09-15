@@ -175,12 +175,24 @@ function assertIsFetchedCommit(sha: string): void {
 
 interface ChangedFiles {
   upserted: string[]; // present (new/changed) at the content commit
-  removed: string[]; // absent at the content commit, present at merge-base
+  removed: string[]; // absent at the content commit, present at the diff base ("from")
 }
 
-function changedFiles(base: string, content: string): ChangedFiles {
-  const mergeBase = git(["merge-base", base, content]);
-  const raw = git(["diff", "--name-status", "--no-renames", mergeBase, content]);
+/**
+ * `from` must be the LAST content SHA actually applied to `base` (Б4 Block
+ * B, 2026-09-15), not `merge-base(base, content)` — a real content branch
+ * accumulates many publishes over its life, and a file that was added by
+ * an EARLIER already-applied publish and removed by THIS one nets to "no
+ * change" when diffed against a merge-base from before either of those —
+ * so the removal would silently never reach base (found by a realistic
+ * multi-publish-cycle test: publish A with a photo, publish B with a
+ * different photo, delete A's now-orphaned photo — that deletion diffed
+ * clean against the old merge-base and the stale photo never left base).
+ * `from` falls back to a real `merge-base(base, content)` only for the
+ * first-ever publish to a given base (no prior applied SHA to diff since).
+ */
+function changedFiles(from: string, content: string): ChangedFiles {
+  const raw = git(["diff", "--name-status", "--no-renames", from, content]);
   const upserted: string[] = [];
   const removed: string[] = [];
   for (const line of raw.split("\n").filter(Boolean)) {
@@ -224,14 +236,18 @@ function isAncestor(maybeAncestor: string, of: string): boolean {
 }
 
 /**
- * Enforces publish ordering against base's own history. Returns "noop" when
- * this exact content SHA was already the last one applied (idempotent
- * re-run — not an error), "apply" when it's safe to proceed.
+ * Enforces publish ordering against base's own history. Returns the last-
+ * applied SHA (null if this is the first-ever guarded publish to `base`)
+ * plus a verdict: "noop" when the requested content SHA was already the
+ * last one applied (idempotent re-run — not an error), "apply" otherwise.
+ * The returned `last` is also the correct diff base for `changedFiles` —
+ * see its own doc comment for why this must not be `merge-base(base,
+ * content)` instead.
  */
-function checkSequencing(base: string, content: string): "noop" | "apply" {
+function checkSequencing(base: string, content: string): { last: string | null; verdict: "noop" | "apply" } {
   const last = lastAppliedContentSha(base);
-  if (last === null) return "apply"; // first-ever guarded publish to this base
-  if (last === content) return "noop";
+  if (last === null) return { last, verdict: "apply" }; // first-ever guarded publish to this base
+  if (last === content) return { last, verdict: "noop" };
   if (isAncestor(content, last)) {
     throw new PublishError(
       6,
@@ -244,7 +260,7 @@ function checkSequencing(base: string, content: string): "noop" | "apply" {
       `content ${content} has diverged from the last applied ${last} (neither is an ancestor of the other) — conflict, needs reconciliation, not an automatic merge`,
     );
   }
-  return "apply";
+  return { last, verdict: "apply" };
 }
 
 /** mode + blob SHA for one path in a tree-ish, from `git ls-tree`. */
@@ -367,12 +383,13 @@ async function main() {
   const baseShaAtStart = git(["rev-parse", baseRef]);
 
   const seq = checkSequencing(base, CONTENT_SHA);
-  if (seq === "noop") {
+  if (seq.verdict === "noop") {
     console.log(`nothing to publish (content ${CONTENT_SHA} was already the last one applied to ${base})`);
     return;
   }
+  const diffFrom = seq.last ?? git(["merge-base", base, CONTENT_SHA]);
 
-  const changed = changedFiles(base, CONTENT_SHA);
+  const changed = changedFiles(diffFrom, CONTENT_SHA);
   if (changed.upserted.length === 0 && changed.removed.length === 0) {
     console.log("nothing to publish (content commit introduces no change vs base)");
     return;
