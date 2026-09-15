@@ -43,21 +43,43 @@
 # content branch an editor controls. The GitHub-native, server-enforced way
 # to guarantee that (independent of any workflow-file content, so an
 # attacker-modified copy of THIS FILE gains nothing from it) is a GitHub
-# **Environment** with a **deployment branch policy** restricted to `main`
-# only, holding the one credential this job needs to push — never a plain
-# repo-level secret, and never the job's own ambient `GITHUB_TOKEN`.
+# **Environment** with a **deployment branch and tag policy** restricted to
+# a "Selected branches and tags" rule naming `main` explicitly — NOT
+# "Protected branches only", which is a DIFFERENT setting that would admit
+# ANY branch that happens to have branch-protection rules turned on, not
+# only `main` — holding the one credential this job needs to push: never a
+# plain repo-level secret, and never the job's own ambient `GITHUB_TOKEN`.
 # GitHub resolves environment secrets by checking the RUN's own `ref`
 # against that policy BEFORE any step executes; a run dispatched with
 # `ref: <content-branch>` is refused the secret outright, no matter what
-# code the executing YAML contains. This job below declares
-# `environment: content-publish` for exactly this reason — that environment
-# does not exist yet (not created this session; doing so is a repository
-# settings change reserved for the owner) so, as written, the job simply
-# cannot run until the owner creates it. **This is deliberate**, not an
-# oversight: it keeps this file inert rather than silently falling back to
-# the current, weaker `GITHUB_TOKEN`-only protection. See
+# code the executing YAML contains.
+#
+# **Corrected 2026-09-15 (a follow-up independent review) — the previous
+# version of this comment overclaimed that referencing a not-yet-created
+# `environment: content-publish` would keep the job from running at all
+# until the owner created it.** That is not how GitHub Actions behaves:
+# per GitHub's own docs, "Running a workflow that references an environment
+# that does not exist will create an environment with the referenced name"
+# (https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) —
+# automatically, with NO protection rules and NO secrets, the first time
+# this workflow is dispatched. The job DOES start. What actually happens
+# instead: the `Checkout main (trusted)` step below passes
+# `token: ${{ secrets.CONTENT_PUBLISH_TOKEN }}` explicitly; with no such
+# secret configured, that expression resolves to an empty string, and
+# `actions/checkout`'s own `token` input is marked `required: true` in its
+# source (`core.getInput('token', {required: true})`) — an input the
+# caller explicitly supplied (even as `""`) is never replaced by the
+# action's own `default: ${{ github.token }}`, which only ever applies
+# when the `with:` key is omitted entirely. The result is an EXPLICIT,
+# named failure — `Input required and not supplied: token` — not a silent
+# fallback to `GITHUB_TOKEN` and not a blocked/non-starting job. This is
+# still the correct fail-closed behavior for an unconfigured environment,
+# just for a different, more precise reason than previously stated. See
 # docs/PANEL-hosting-and-approvals.md §1.3 for exactly what the owner needs
-# to set up, and why this file's activation stays blocked until then.
+# to set up (the Environment's branch policy AND the secret, both — an
+# environment that exists with the right branch policy but no secret still
+# fails this same way), and why this file's activation stays blocked until
+# both are done.
 #
 # ── Who/what can trigger this, once activated in .github/workflows/ ───────
 # `workflow_dispatch` needs a caller with at least `actions: write` on the
@@ -148,12 +170,19 @@ jobs:
   guard-and-merge:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # NOT YET CREATED (owner action, not this session) — see the big comment
-    # block above. Until the `content-publish` environment exists with a
-    # deployment branch policy restricted to `main` and its own dedicated
-    # `CONTENT_PUBLISH_TOKEN` secret, this job cannot run at all (GitHub
-    # refuses to start a job for an environment that doesn't exist) — that
-    # is the intended, fail-closed state, not a bug to route around.
+    # NOT YET CONFIGURED (owner action, not this session) — see the big
+    # comment block above. GitHub auto-creates an environment by this name
+    # (with no branch policy and no secrets) the first time this job is
+    # dispatched — it does NOT block the job from starting. What actually
+    # stops an unconfigured run: the checkout step below explicitly passes
+    # `token: ${{ secrets.CONTENT_PUBLISH_TOKEN }}`, and with no such secret
+    # set, that resolves to an empty string, which `actions/checkout`'s own
+    # `required: true` token input rejects outright (explicit failure, no
+    # fallback to GITHUB_TOKEN — see the comment above for the exact
+    # mechanism). The owner still needs to configure BOTH the Environment's
+    # branch policy (Selected branches and tags → `main`) AND the secret
+    # for a real, working run — an environment with only one of the two
+    # still fails this same way.
     environment: content-publish
     steps:
       # `ref: main` is what decides what CODE this job runs, once it has
