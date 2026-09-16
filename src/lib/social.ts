@@ -4,11 +4,12 @@ export interface SocialLink {
 }
 
 export const whatsappUrl = "https://wa.me/447706054203";
+export const telegramUrl = "https://t.me/DREAM_CAR_VAVD";
 
 export function getSocialLinks(): SocialLink[] {
   const entries: Array<[SocialLink["name"], string | undefined]> = [
     ["WhatsApp", whatsappUrl],
-    ["Telegram", process.env.NEXT_PUBLIC_TELEGRAM_URL],
+    ["Telegram", telegramUrl],
     ["Instagram", process.env.NEXT_PUBLIC_INSTAGRAM_URL],
     ["Facebook", process.env.NEXT_PUBLIC_FACEBOOK_URL],
     ["YouTube", process.env.NEXT_PUBLIC_YOUTUBE_URL],
