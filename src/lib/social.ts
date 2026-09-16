@@ -7,7 +7,8 @@ export interface SocialLink {
  * Pre-panel defaults. Now the fallback used by getDictionary() when no
  * contact record is published in the panel; a published record overrides
  * every value. The technical submission recipient (CONTACT_FORM_ENDPOINT)
- * is NOT here — it stays an env var.
+ * is NOT here — it stays an env var. Telegram has a permanent handle
+ * (@DREAM_CAR_VAVD) rather than an env var, same reasoning as WhatsApp.
  */
 export const DEFAULT_CONTACT = {
   phoneDisplay: "+44 7706 054203",
@@ -15,10 +16,12 @@ export const DEFAULT_CONTACT = {
   email: "dream.car.vavd@gmail.com",
   emailHref: "mailto:dream.car.vavd@gmail.com",
   whatsappUrl: "https://wa.me/447706054203",
+  telegramUrl: "https://t.me/DREAM_CAR_VAVD",
 } as const;
 
 // Back-compat re-exports (still imported in a few static places).
 export const whatsappUrl = DEFAULT_CONTACT.whatsappUrl;
+export const telegramUrl = DEFAULT_CONTACT.telegramUrl;
 export const phoneHref = DEFAULT_CONTACT.phoneHref;
 export const phoneDisplay = DEFAULT_CONTACT.phoneDisplay;
 export const emailHref = DEFAULT_CONTACT.emailHref;
@@ -43,7 +46,7 @@ export function getSocialLinks(from?: {
 }): SocialLink[] {
   const entries: Array<[SocialLink["name"], string | undefined]> = [
     ["WhatsApp", from?.whatsappUrl || DEFAULT_CONTACT.whatsappUrl],
-    ["Telegram", from?.telegramUrl || process.env.NEXT_PUBLIC_TELEGRAM_URL],
+    ["Telegram", from?.telegramUrl || DEFAULT_CONTACT.telegramUrl],
     ["Instagram", from?.instagramUrl || process.env.NEXT_PUBLIC_INSTAGRAM_URL],
     ["Facebook", from?.facebookUrl || process.env.NEXT_PUBLIC_FACEBOOK_URL],
     ["YouTube", from?.youtubeUrl || process.env.NEXT_PUBLIC_YOUTUBE_URL],

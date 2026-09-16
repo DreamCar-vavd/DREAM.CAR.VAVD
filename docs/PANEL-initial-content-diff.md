@@ -182,13 +182,16 @@ soon» / «Скоро».** Сам текст модалки не міняєть�
 Попередня версія стверджувала, що соцмережеві посилання «на сайті ніде не
 показуються» — це висновок лише з порожніх полів контент-моделі, і він
 неповний. Перевірено код: `src/lib/social.ts` (`getSocialLinks()`) формує
-іконки Telegram/Instagram/Facebook/YouTube **не з контент-моделі
+іконки Instagram/Facebook/YouTube **не з контент-моделі
 (published.json/dictionaries), а з env-змінних** —
-`NEXT_PUBLIC_TELEGRAM_URL`, `NEXT_PUBLIC_INSTAGRAM_URL`,
-`NEXT_PUBLIC_FACEBOOK_URL`, `NEXT_PUBLIC_YOUTUBE_URL` — і показує іконку
-лише для тих мереж, чия змінна реально задана. Ця функція активно
-використовується (`layout.tsx`, `SocialLinks.tsx`). WhatsApp — окремо,
-завжди показується (захардкожений номер, не залежить від env).
+`NEXT_PUBLIC_INSTAGRAM_URL`, `NEXT_PUBLIC_FACEBOOK_URL`,
+`NEXT_PUBLIC_YOUTUBE_URL` — і показує іконку лише для тих мереж, чия
+змінна реально задана (якщо порожнє поле контент-моделі не перекрило її).
+Ця функція активно використовується (`layout.tsx`, `SocialLinks.tsx`).
+WhatsApp і Telegram — окремо, завжди показуються (захардкожені в
+`DEFAULT_CONTACT`, не залежать від env; `NEXT_PUBLIC_TELEGRAM_URL`
+видалено як застарілу змінну — оновлено 16.09.2026 разом з переходом
+Telegram на постійне посилання `https://t.me/DREAM_CAR_VAVD`).
 
 **Отже, справжня відповідь «чи показуються соцмережі на сайті зараз»
 залежить від того, чи задані ці env-змінні у Vercel (Production/Preview)

@@ -53,7 +53,7 @@ export async function getDictionary(locale: Locale): Promise<Dictionary> {
       whatsappUrl:
         (contact.present && whatsappUrlFromNumber(contact.whatsappNumber)) ||
         DEFAULT_CONTACT.whatsappUrl,
-      telegramUrl: (contact.present && contact.telegramUrl) || process.env.NEXT_PUBLIC_TELEGRAM_URL || "",
+      telegramUrl: (contact.present && contact.telegramUrl) || DEFAULT_CONTACT.telegramUrl,
       instagramUrl: (contact.present && contact.instagramUrl) || process.env.NEXT_PUBLIC_INSTAGRAM_URL || "",
       facebookUrl: (contact.present && contact.facebookUrl) || process.env.NEXT_PUBLIC_FACEBOOK_URL || "",
       youtubeUrl: (contact.present && contact.youtubeUrl) || process.env.NEXT_PUBLIC_YOUTUBE_URL || "",
