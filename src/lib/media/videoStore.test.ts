@@ -7,6 +7,7 @@ import {
   BLOB_VIDEO_PREFIX,
   blobPathnameFor,
   getVideoStore,
+  isBlobConfigured,
   isValidVideoKey,
   LocalVideoStore,
   tokenRulesFor,
@@ -131,5 +132,31 @@ test("blob remove() rejects anything that is not a full blob URL", async () => {
     await assert.rejects(() => store.remove("https://evil.com/x.mp4"), /повний URL/);
   } finally {
     delete process.env.BLOB_READ_WRITE_TOKEN;
+  }
+});
+
+test("isBlobConfigured: false when BLOB_READ_WRITE_TOKEN is missing, empty, or whitespace-only", () => {
+  const original = process.env.BLOB_READ_WRITE_TOKEN;
+  try {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    assert.equal(isBlobConfigured(), false);
+    process.env.BLOB_READ_WRITE_TOKEN = "";
+    assert.equal(isBlobConfigured(), false);
+    process.env.BLOB_READ_WRITE_TOKEN = "   ";
+    assert.equal(isBlobConfigured(), false);
+  } finally {
+    if (original === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = original;
+  }
+});
+
+test("isBlobConfigured: true once a real token is set", () => {
+  const original = process.env.BLOB_READ_WRITE_TOKEN;
+  try {
+    process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+    assert.equal(isBlobConfigured(), true);
+  } finally {
+    if (original === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
+    else process.env.BLOB_READ_WRITE_TOKEN = original;
   }
 });

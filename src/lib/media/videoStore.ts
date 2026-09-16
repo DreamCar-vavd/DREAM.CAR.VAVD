@@ -65,6 +65,19 @@ export class VideoStoreNotConfiguredError extends Error {
   }
 }
 
+/**
+ * Whether the Blob adapter has a real token — read at call time, not module
+ * load, so a deploy that gains/loses the token behaves live (same reasoning
+ * as `BlobVideoStore.need()`, which this mirrors). Exported so callers that
+ * need to know "is Blob explicitly unconfigured" BEFORE attempting an
+ * operation — e.g. the upload API route deciding whether to even hand the
+ * request to `@vercel/blob`'s `handleUpload` — don't need their own copy of
+ * this check.
+ */
+export function isBlobConfigured(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+}
+
 export function validateSpec(spec: VideoUploadSpec): string | null {
   if (!spec.filename || spec.filename.length > 200) return "некоректна назва файлу";
   if (/[/\\]/.test(spec.filename) || spec.filename.includes("..")) return "недопустимі символи в назві";

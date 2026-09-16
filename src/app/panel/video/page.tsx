@@ -33,11 +33,16 @@ export default async function VideoPage() {
 
   let videos: VideoObject[] = [];
   let listError: string | null = null;
+  let notConfigured = false;
   try {
     videos = await store.list();
   } catch (err) {
-    listError =
-      err instanceof VideoStoreNotConfiguredError ? err.message : (err as Error).message;
+    if (err instanceof VideoStoreNotConfiguredError) {
+      notConfigured = true;
+      listError = err.message;
+    } else {
+      listError = (err as Error).message;
+    }
   }
 
   // Which uploaded video does each working car reference? A local key is a bare
@@ -74,16 +79,39 @@ export default async function VideoPage() {
         вставляється в поле «Відео» авто в Keystatic — саме воно й публікується.
       </p>
 
-      {store.kind === "blob" && listError && (
-        <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-          Хостинг-режим Vercel Blob: {listError} Перевірте <code>BLOB_READ_WRITE_TOKEN</code>{" "}
-          (Vercel → Storage → Blob).
+      {/*
+        Exactly one error message on the page, never two: a "not configured"
+        listError previously showed here (amber) AND again, byte-identical,
+        in the "Завантажені відео" section below (red) — this is the single
+        rendering of it, styled by which case it actually is.
+      */}
+      {listError && (
+        <p
+          className={
+            notConfigured
+              ? "mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+              : "mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300"
+          }
+        >
+          {listError}
+          {notConfigured && (
+            <>
+              {" "}
+              Перевірте <code>BLOB_READ_WRITE_TOKEN</code> (Vercel → Storage → Blob).
+            </>
+          )}
         </p>
       )}
 
       <h2 className="mt-6 text-sm font-semibold">Завантажити відео</h2>
       <div className="mt-2">
-        <VideoUploader mode={store.kind} />
+        {notConfigured ? (
+          <p className="rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500">
+            Завантаження недоступне, доки відеосховище не підключено.
+          </p>
+        ) : (
+          <VideoUploader mode={store.kind} />
+        )}
       </div>
 
       <h2 className="mt-8 text-sm font-semibold">
@@ -92,11 +120,7 @@ export default async function VideoPage() {
           (осиротілі не видаляються автоматично)
         </span>
       </h2>
-      {listError ? (
-        <p className="mt-2 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300">
-          {listError}
-        </p>
-      ) : (
+      {listError ? null : (
         <VideoList videos={videos} usage={usage} />
       )}
     </main>

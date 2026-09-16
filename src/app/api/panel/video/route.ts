@@ -3,6 +3,7 @@ import { keystaticEnabled } from "@/lib/keystaticEnabled";
 import { getStorage, NotConnectedError } from "@/lib/content/store";
 import {
   getVideoStore,
+  isBlobConfigured,
   isValidVideoKey,
   tokenRulesFor,
   validateSpec,
@@ -58,6 +59,11 @@ export async function POST(request: Request) {
   // --- Vercel Blob client-upload token exchange ---
   if (typeof body.type === "string" && body.type.startsWith("blob.")) {
     try {
+      // Fail fast, predictably, and WITHOUT ever handing the request to
+      // `@vercel/blob` when there's no token — otherwise the client SDK's
+      // own internal error (whatever shape/wording it happens to throw)
+      // leaks through instead of our own clear, consistent message.
+      if (!isBlobConfigured()) throw new VideoStoreNotConfiguredError();
       const { handleUpload } = await import("@vercel/blob/client");
       const res = await handleUpload({
         body: body as unknown as HandleUploadBody,
@@ -75,8 +81,10 @@ export async function POST(request: Request) {
       });
       return json(res);
     } catch (err) {
-      // 400 so the client SDK surfaces the message.
-      return json({ ok: false, message: (err as Error).message }, 400);
+      // Not-configured gets its own predictable 501 shape (checked above,
+      // before handleUpload ever runs); anything else is 400 so the client
+      // SDK surfaces the message.
+      return asNotConfigured(err) ?? json({ ok: false, message: (err as Error).message }, 400);
     }
   }
 
