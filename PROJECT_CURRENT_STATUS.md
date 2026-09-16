@@ -461,17 +461,32 @@ PR #26 draft, не змерджено):** панель керування кон
 технічні рішення й наступні кроки — `PROJECT_PROGRESS.md` (розділ
 «Панель…», актуальна контрольна точка вгорі) та `docs/PANEL*.md`.
 
-**Актуальна контрольна точка — 16.09.2026:** PR #26 head
-`ffa6ee707a21dd38b5bb1f5352e2a5ce1ebb837d`, `main` —
+**Актуальна контрольна точка — 16.09.2026:** `ffa6ee707a21dd38b5bb1f5352e2a5ce1ebb837d`
+— перевірений code checkpoint (останній коміт із кодом/тестами) перед
+подальшими docs-комітами; `b3bb0f5a6e71663a03e8061c371b8162768c9380` —
+перший docs-checkpoint поверх нього. **Поточний head PR #26 дивитись у
+GitHub/Git** (`gh pr view 26` / `git log -1 origin/codex/admin-panel-spike`)
+— кожен новий docs-коміт його змінює, фіксувати конкретний SHA тут як
+«поточний head» після кожного коміту не масштабується. `main` —
 `e143b94ecf0ab09a0aff9c6d2e90c576f958860a`, PR лишається Draft/open, не
-merged. GitHub CI (`Verify`) і Vercel Preview — успішні. Б1 (GitHub App) і
-Vercel Preview env — виконані (не просто «оформлено запит», як раніше).
-`/panel`, `/panel/leads` і Keystatic перевірені наживо в реальній
-авторизованій сесії (не порожній in-app браузер); робоча гілка в
-Keystatic — `codex/admin-panel-spike`. Telegram-посилання сайту —
-`https://t.me/DREAM_CAR_VAVD` (постійна константа, не env). Turbopack-
-попередження в `LocalFsStorage` усунуто комітом `ffa6ee7…`. Production і
-`main` панеллю не змінені; синтетичних тестових матеріалів не лишилось.
+merged. GitHub CI (`Verify`) і Vercel Preview — успішні на кожному з цих
+checkpoint-ів. Б1 (GitHub App) і Vercel Preview env — виконані (не просто
+«оформлено запит», як раніше). `/panel`, `/panel/leads` і Keystatic
+перевірені наживо в реальній авторизованій сесії (не порожній in-app
+браузер); робоча гілка в Keystatic — `codex/admin-panel-spike`.
+Telegram-посилання сайту — `https://t.me/DREAM_CAR_VAVD` (постійна
+константа, не env). Turbopack-попередження в `LocalFsStorage` усунуто
+комітом `ffa6ee7…`. Production і `main` панеллю не змінені; синтетичних
+тестових матеріалів не лишилось.
+
+**Результати перевірки стану коду (на code checkpoint `ffa6ee7…`; наступні
+docs-коміти код і контент не змінювали, тому ці результати лишаються
+чинними):** повний `npm test` — **483/483**; вузькі тести
+`LocalFsStorage` (`src/lib/content/store/localFs.test.ts`) перед
+Turbopack-фіксом — **6/6**; `npm run content:guard` —
+**3 авто, 8 робіт галереї, 5 послуг, 1 запис контактів, 0 промо-матеріалів,
+53 медіафайли**, усі перевірені.
+
 Деталі й докази — `PROJECT_PROGRESS.md` (розділ «Панель…», блок
 «АКТУАЛЬНА КОНТРОЛЬНА ТОЧКА — 16.09.2026»).
 
@@ -1005,6 +1020,7 @@ tests, build)` — **`success`** для head `665d88dc37606445d540c50ca92dbd233d
   `PROJECT_PROGRESS.md` (розділ «Панель…») + `docs/PANEL*.md`. **Актуально
   на 16.09.2026:** код перевірено наживо (`/panel`, `/panel/leads`,
   Keystatic — реальна авторизована сесія), Б1 (GitHub App) і Vercel Preview
-  env виконані, CI + Preview успішні, head `ffa6ee707a21dd38b5bb1f5352e2a5ce1ebb837d`
-  — деталі в `PROJECT_PROGRESS.md`, блок «АКТУАЛЬНА КОНТРОЛЬНА ТОЧКА —
-  16.09.2026».
+  env виконані, CI + Preview успішні на code checkpoint `ffa6ee7…`
+  (поточний head PR #26 — дивитись у GitHub/Git, бо кожен docs-коміт його
+  змінює) — деталі в `PROJECT_PROGRESS.md`, блок «АКТУАЛЬНА КОНТРОЛЬНА
+  ТОЧКА — 16.09.2026».
