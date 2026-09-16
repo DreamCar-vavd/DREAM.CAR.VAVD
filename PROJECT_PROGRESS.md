@@ -2129,6 +2129,61 @@ Commit/push/deployment для Етапів 1, 3, 4 — **не виконувал
 
 ---
 
+# АКТУАЛЬНА КОНТРОЛЬНА ТОЧКА — 16.09.2026
+
+> Цей блок — поточний стан панелі. Розділ **нижче** («Панель керування
+> контентом ... оновлено 2026-09-07») — **історичний журнал станом на
+> 07–08.09.2026**: інша (застаріла) робоча копія
+> (`/Users/apple/Projects/DREAM.CAR.VAVD-admin-panel-20260906`), старіший
+> head (`87fe84a`), і твердження «hosted-панель = 404, наживо не
+> перевірено» — усе це вже НЕ чинне. Журнал не видалено й не переписано —
+> зберігається як доказ пройдених кроків Б1 та живих перевірок безправного
+> акаунта (там же — фото-докази `VOLODYMYR-LUCKY`). Детальний покроковий
+> протокол hosted-перевірки (21 із 22 критеріїв ✅, актуальний, дата
+> 15.09.2026) — окремий документ `docs/PANEL-hosted-verification.md`, він
+> цим блоком не замінюється.
+
+- **Актуальний checkout:** `/Users/apple/Projects/dcv-panel-dev-20260909/repo`
+  (не `DREAM.CAR.VAVD-admin-panel-20260906` — та копія застаріла разом із
+  журналом нижче).
+- **Гілка:** `codex/admin-panel-spike` · **PR #26** — Draft, open, **не
+  merged**. Head PR: `ffa6ee707a21dd38b5bb1f5352e2a5ce1ebb837d`.
+- **`main`:** `e143b94ecf0ab09a0aff9c6d2e90c576f958860a` — панеллю за весь
+  час не змінювався.
+- **GitHub CI (`Verify (TypeScript, ESLint, tests, build)`) і Vercel
+  Preview** — успішні на поточному head.
+- **Б1 (GitHub App) і Vercel Preview env — ВИКОНАНО**, не просто
+  «оформлено запит», як у журналі нижче: App створено й встановлено лише
+  на `DREAM.CAR.VAVD`, Preview env для гілки `codex/admin-panel-spike`
+  налаштовано, redeploy виконано.
+- **`/panel`, `/panel/leads` і Keystatic перевірені наживо** в реальній
+  авторизованій сесії (Claude in Chrome, під'єднаний Chrome-профіль
+  власника) — не порожній in-app Browser pane, який раніше дав хибний
+  висновок «немає авторизованої сесії» (виправлено окремим звітом
+  16.09.2026). `/panel` показує повну «Панель публікації» з розділами
+  Автомобілі/Галерея/Послуги/Контакти й графік/Банери, акції, новини;
+  `/panel/leads` показує сторінку «Заявки»; Keystatic відкриває
+  авторизований Dashboard.
+- **Робоча гілка в Keystatic — `codex/admin-panel-spike`** — підтверджено
+  візуально (поле «Поточна гілка» на Dashboard і на `/panel`).
+- **Telegram URL сайту — `https://t.me/DREAM_CAR_VAVD`** — постійна
+  код-константа (`DEFAULT_CONTACT.telegramUrl` у `src/lib/social.ts`,
+  спільна функція `resolveTelegramUrl()`), не env-змінна;
+  `NEXT_PUBLIC_TELEGRAM_URL` видалено з коду й `.env.example`. Старий
+  `t.me/Volodymyr` на сайті відсутній.
+- **Turbopack-попередження в `LocalFsStorage` усунуто** комітом
+  `ffa6ee707a21dd38b5bb1f5352e2a5ce1ebb837d` (`/* turbopackIgnore: true */`
+  на динамічному `path.resolve()`, без зміни поведінки конструктора);
+  `npm run build` більше не показує «Dynamic filesystem access causes
+  tracing of the whole project».
+- **Production і `main` панеллю не змінені** протягом усієї цієї роботи.
+- **Синтетичних тестових матеріалів не лишилось** — `zzz-test` /
+  `zzz-conflict-test` та інші тестові записи з журналу нижче прибрані ще
+  до цієї контрольної точки (докази — `docs/PANEL-hosted-verification.md`,
+  рядок 13); нових синтетичних матеріалів ця контрольна точка не додавала.
+
+---
+
 # Панель керування контентом DREAM.CAR.VAVD — стан і handoff (оновлено 2026-09-07)
 
 > Розділ веде передачу в нову сесію Claude Code у цій самій папці.
