@@ -2,16 +2,28 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import {
   BLOB_VIDEO_PREFIX,
   blobPathnameFor,
   getVideoStore,
   isValidVideoKey,
+  LocalVideoStore,
   tokenRulesFor,
   validateSpec,
   VideoStoreNotConfiguredError,
   VIDEO_MAX_BYTES,
 } from "./videoStore";
+
+/** A fresh throwaway root under the OS temp dir — never the real repo path. */
+async function withTempLocalStore(run: (store: LocalVideoStore, root: string) => Promise<void>) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "videostore-test-"));
+  try {
+    await run(new LocalVideoStore(root), root);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+}
 
 const mp4 = () => Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmp42"), Buffer.alloc(200)]);
 
@@ -33,38 +45,36 @@ test("isValidVideoKey rejects traversal and junk", () => {
 });
 
 test("local store: createUpload -> receive (temp+rename) -> head -> list -> remove", async () => {
-  delete process.env.BLOB_READ_WRITE_TOKEN;
+  await withTempLocalStore(async (store, root) => {
+    assert.equal(store.kind, "local");
 
-  const store = getVideoStore();
-  assert.equal(store.kind, "local");
+    const created = await store.createUpload({ filename: "Walk Around!.mp4", contentType: "video/mp4", size: 300 });
+    assert.ok(isValidVideoKey(created.key));
+    assert.equal(created.publicUrl, `/uploads/videos/${created.key}`);
+    assert.match(created.uploadUrl, /^\/api\/panel\/video\?key=/);
 
-  const created = await store.createUpload({ filename: "Walk Around!.mp4", contentType: "video/mp4", size: 300 });
-  assert.ok(isValidVideoKey(created.key));
-  assert.equal(created.publicUrl, `/uploads/videos/${created.key}`);
-  assert.match(created.uploadUrl, /^\/api\/panel\/video\?key=/);
+    const obj = await store.receive!(created.key, mp4());
+    assert.equal(obj.key, created.key);
+    assert.ok(obj.size > 0);
 
-  const obj = await store.receive!(created.key, mp4());
-  assert.equal(obj.key, created.key);
-  assert.ok(obj.size > 0);
+    const disk = path.join(root, created.key);
+    assert.ok((await fs.stat(disk)).isFile());
+    // no leftover .part file
+    const siblings = await fs.readdir(path.dirname(disk));
+    assert.ok(!siblings.some((n) => n.includes(".part-")));
 
-  const disk = path.join(process.cwd(), "public/uploads/videos", created.key);
-  assert.ok((await fs.stat(disk)).isFile());
-  // no leftover .part file
-  const siblings = await fs.readdir(path.dirname(disk));
-  assert.ok(!siblings.some((n) => n.includes(".part-")));
+    assert.equal((await store.head(created.key))?.key, created.key);
+    assert.ok((await store.list()).some((v) => v.key === created.key));
 
-  assert.equal((await store.head(created.key))?.key, created.key);
-  assert.ok((await store.list()).some((v) => v.key === created.key));
-
-  await store.remove(created.key);
-  assert.equal(await store.head(created.key), null);
+    await store.remove(created.key);
+    assert.equal(await store.head(created.key), null);
+  });
 });
 
 test("local store: receive rejects a bad key", async () => {
-
-  delete process.env.BLOB_READ_WRITE_TOKEN;
-  const store = getVideoStore();
-  await assert.rejects(() => store.receive!("../evil.mp4", mp4()));
+  await withTempLocalStore(async (store) => {
+    await assert.rejects(() => store.receive!("../evil.mp4", mp4()));
+  });
 });
 
 test("a BLOB token selects the Blob adapter; createUpload is a client-side flow, not this", async () => {

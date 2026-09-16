@@ -123,9 +123,14 @@ export function tokenRulesFor(pathname: string): {
 
 // --- local store ----------------------------------------------------------
 
-class LocalVideoStore implements VideoStore {
+export class LocalVideoStore implements VideoStore {
   readonly kind = "local" as const;
-  private dir = path.join(process.cwd(), "public", "uploads", "videos");
+  private dir: string;
+
+  /** `root` is test-only — production always uses the real repo path below. */
+  constructor(root: string = path.join(process.cwd(), "public", "uploads", "videos")) {
+    this.dir = root;
+  }
 
   private async ensureDir() {
     await fs.mkdir(this.dir, { recursive: true });

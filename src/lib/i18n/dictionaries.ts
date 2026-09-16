@@ -5,7 +5,7 @@ import { getCarListingCopy } from "@/lib/content/publishedCars";
 import { getGalleryProjectCopy } from "@/lib/content/publishedGallery";
 import { getServiceCopyForDict } from "@/lib/content/publishedServices";
 import { getContactData } from "@/lib/content/publishedContact";
-import { DEFAULT_CONTACT, telHref, whatsappUrlFromNumber } from "@/lib/social";
+import { DEFAULT_CONTACT, resolveTelegramUrl, telHref, whatsappUrlFromNumber } from "@/lib/social";
 
 const dictionaries: Record<Locale, () => Promise<Dictionary>> = {
   uk: () => import("@/content/dictionaries/uk").then((m) => m.default),
@@ -53,7 +53,7 @@ export async function getDictionary(locale: Locale): Promise<Dictionary> {
       whatsappUrl:
         (contact.present && whatsappUrlFromNumber(contact.whatsappNumber)) ||
         DEFAULT_CONTACT.whatsappUrl,
-      telegramUrl: (contact.present && contact.telegramUrl) || DEFAULT_CONTACT.telegramUrl,
+      telegramUrl: resolveTelegramUrl(contact.present ? contact.telegramUrl : undefined),
       instagramUrl: (contact.present && contact.instagramUrl) || process.env.NEXT_PUBLIC_INSTAGRAM_URL || "",
       facebookUrl: (contact.present && contact.facebookUrl) || process.env.NEXT_PUBLIC_FACEBOOK_URL || "",
       youtubeUrl: (contact.present && contact.youtubeUrl) || process.env.NEXT_PUBLIC_YOUTUBE_URL || "",

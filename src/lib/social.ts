@@ -19,6 +19,19 @@ export const DEFAULT_CONTACT = {
   telegramUrl: "https://t.me/DREAM_CAR_VAVD",
 } as const;
 
+/**
+ * The single source of truth for "what Telegram link does the site show":
+ * a real published/override value always wins; empty, missing, or
+ * whitespace-only falls back to the permanent handle. Used by both
+ * getSocialLinks() below and getDictionary() (src/lib/i18n/dictionaries.ts)
+ * so there is exactly one fallback rule, not two independently-maintained
+ * copies of it.
+ */
+export function resolveTelegramUrl(published?: string | null): string {
+  const trimmed = published?.trim();
+  return trimmed ? trimmed : DEFAULT_CONTACT.telegramUrl;
+}
+
 // Back-compat re-exports (still imported in a few static places).
 export const whatsappUrl = DEFAULT_CONTACT.whatsappUrl;
 export const telegramUrl = DEFAULT_CONTACT.telegramUrl;
@@ -46,7 +59,7 @@ export function getSocialLinks(from?: {
 }): SocialLink[] {
   const entries: Array<[SocialLink["name"], string | undefined]> = [
     ["WhatsApp", from?.whatsappUrl || DEFAULT_CONTACT.whatsappUrl],
-    ["Telegram", from?.telegramUrl || DEFAULT_CONTACT.telegramUrl],
+    ["Telegram", resolveTelegramUrl(from?.telegramUrl)],
     ["Instagram", from?.instagramUrl || process.env.NEXT_PUBLIC_INSTAGRAM_URL],
     ["Facebook", from?.facebookUrl || process.env.NEXT_PUBLIC_FACEBOOK_URL],
     ["YouTube", from?.youtubeUrl || process.env.NEXT_PUBLIC_YOUTUBE_URL],
