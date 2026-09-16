@@ -223,9 +223,8 @@ class BlobVideoStore implements VideoStore {
 
   /** Read at call time so a deploy that gains/loses the token behaves live. */
   private need(): string {
-    const t = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-    if (!t) throw new VideoStoreNotConfiguredError();
-    return t;
+    if (!isBlobConfigured()) throw new VideoStoreNotConfiguredError();
+    return process.env.BLOB_READ_WRITE_TOKEN!.trim();
   }
 
   async createUpload(): Promise<CreatedUpload> {
@@ -278,7 +277,7 @@ class BlobVideoStore implements VideoStore {
 }
 
 export function getVideoStore(): VideoStore {
-  const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  const hasBlob = isBlobConfigured();
   // A real token -> the real Blob adapter. Production without a token -> also
   // the Blob adapter, but its methods raise VideoStoreNotConfiguredError; it
   // must never fall back to writing the repo FS on a serverless deploy.

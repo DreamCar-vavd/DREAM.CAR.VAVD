@@ -1,27 +1,68 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { keystaticEnabled } from "@/lib/keystaticEnabled";
-import { getStorage, NotConnectedError } from "@/lib/content/store";
+import {
+  NotConnectedError,
+  StorageAuthError,
+  StorageBackendError,
+  StorageForbiddenError,
+} from "@/lib/content/store/adapter";
+import { loadVideoAccess } from "@/lib/media/videoAccessGate";
 import { coerceCar } from "@/lib/content/coerce";
-import { getVideoStore, VideoStoreNotConfiguredError, type VideoObject } from "@/lib/media/videoStore";
+import { VideoStoreNotConfiguredError, type VideoObject } from "@/lib/media/videoStore";
 import { VideoUploader } from "./VideoUploader";
 import { VideoList } from "./VideoList";
+import { RefreshButton } from "../PanelActions";
 
 export const dynamic = "force-dynamic";
 
 export default async function VideoPage() {
   if (!keystaticEnabled) notFound();
 
-  let storage;
-  try {
-    storage = await getStorage();
-  } catch (err) {
-    if (err instanceof NotConnectedError) {
+  // Same server-side gate as /panel and /panel/leads (loadVideoAccess ->
+  // assertWriteAccess): a live storage session alone is not evidence the
+  // signed-in user still has push access, so this is re-checked live, every
+  // request — and getVideoStore() (Blob API, local filesystem) is never
+  // called until it has already succeeded (see videoAccessGate.test.ts).
+  const gate = await loadVideoAccess();
+  if (!gate.ok) {
+    const err = gate.error;
+    if (err instanceof NotConnectedError || err instanceof StorageAuthError) {
       return (
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-xl font-bold">Відео авто</h1>
-          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
-            {err.message}
+          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+            {(err as Error).message}
+          </p>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- separate app tree */}
+          <a className="mt-3 inline-block underline" href="/keystatic">
+            Відкрити Keystatic і увійти →
+          </a>
+        </main>
+      );
+    }
+    if (err instanceof StorageForbiddenError) {
+      // Access was refused or revoked — a fresh sign-in will not restore a
+      // permission the token never had.
+      return (
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-xl font-bold">Відео авто</h1>
+          <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+            {(err as Error).message}
+          </p>
+        </main>
+      );
+    }
+    if (err instanceof StorageBackendError && err.retriable) {
+      // Unreachable or rate-limited — never claim "no access" for this.
+      return (
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-xl font-bold">Відео авто</h1>
+          <p className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+            {(err as Error).message}
+          </p>
+          <p className="mt-3">
+            <RefreshButton />
           </p>
         </main>
       );
@@ -29,7 +70,7 @@ export default async function VideoPage() {
     throw err;
   }
 
-  const store = getVideoStore();
+  const { storage, videoStore: store } = gate;
 
   let videos: VideoObject[] = [];
   let listError: string | null = null;
