@@ -41,7 +41,12 @@ export class LocalFsStorage implements PanelStorage {
   private readonly root: string;
 
   constructor(opts: LocalFsStorageOptions = {}) {
-    this.root = path.resolve(opts.root ?? process.cwd());
+    // Turbopack's build-time file tracer can't statically prove this
+    // resolves inside the project (it's `process.cwd()` or a caller-supplied
+    // root, never request input), so without the ignore comment it traces
+    // and bundles the entire repo into the server output. Purely a tracer
+    // hint — does not change what this resolves to at runtime.
+    this.root = path.resolve(/* turbopackIgnore: true */ opts.root ?? process.cwd());
   }
 
   /** Local dev: single trusted operator on the filesystem — nothing to check. */
