@@ -267,8 +267,8 @@ export default config({
               options: [
                 { label: "Немає", value: "none" },
                 { label: "Наявний локальний файл (перенесений)", value: "legacy-file" },
-                { label: "Зовнішнє посилання", value: "external-link" },
-                { label: "Завантажене відео (через /panel/video)", value: "hosted-file" },
+                { label: "Зовнішнє посилання (YouTube — поточний основний спосіб)", value: "external-link" },
+                { label: "Завантажене відео (через /panel/video) — додатковий спосіб на майбутнє", value: "hosted-file" },
                 { label: "Завантажений файл — НЕ ПІДКЛЮЧЕНО (не використовувати)", value: "uploaded-file" },
               ],
               defaultValue: "none",
@@ -276,7 +276,7 @@ export default config({
             src: fields.text({
               label: "Шлях / посилання на відео",
               description:
-                "«Наявний локальний файл» — шлях у /images/…. «Зовнішнє посилання» — повний https-URL. «Завантажене відео» — заповнюється автоматично зі сторінки /panel/video (не редагуйте вручну).",
+                "«Наявний локальний файл» — шлях у /images/…. «Зовнішнє посилання» — YouTube (Public або Unlisted — Unlisted НЕ є приватним) або будь-який інший повний https-URL; перевірити й нормалізувати посилання можна на /panel/video. «Завантажене відео» — заповнюється автоматично зі сторінки /panel/video (не редагуйте вручну).",
             }),
             posterSrc: fields.text({
               label: "Постер відео (шлях до фото)",

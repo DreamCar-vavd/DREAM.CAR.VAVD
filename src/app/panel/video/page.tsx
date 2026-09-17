@@ -12,6 +12,7 @@ import { coerceCar } from "@/lib/content/coerce";
 import { VideoStoreNotConfiguredError, type VideoObject } from "@/lib/media/videoStore";
 import { VideoUploader } from "./VideoUploader";
 import { VideoList } from "./VideoList";
+import { YoutubeLinkHelper } from "./YoutubeLinkHelper";
 import { RefreshButton } from "../PanelActions";
 
 export const dynamic = "force-dynamic";
@@ -114,10 +115,30 @@ export default async function VideoPage() {
       </div>
 
       <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+        Для відео огляду авто є <strong>два способи</strong>: посилання на YouTube (нижче,
+        працює вже зараз, без додаткової оплати) і завантаження власного файлу (окремий розділ,
+        додатковий варіант на майбутнє). В обох випадках результат вставляється в поле «Відео»
+        авто в Keystatic — саме воно й публікується.
+      </p>
+
+      <h2 className="mt-6 text-base font-bold">YouTube — безкоштовний варіант, використовуємо зараз</h2>
+      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+        Не потребує підключення Vercel Blob і не додає плати за передачу відео через наш сайт —
+        файл і трафік обслуговує сам YouTube. Вставте посилання нижче, щоб перевірити його й
+        отримати покрокову інструкцію.
+      </p>
+      <div className="mt-2">
+        <YoutubeLinkHelper />
+      </div>
+
+      <h2 className="mt-10 text-base font-bold">
+        Завантажений відеофайл — додатковий варіант на майбутнє
+      </h2>
+      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
         Відеофайли зберігаються <strong>поза Git</strong>. Локально —{" "}
         <code>public/uploads/videos/</code> (не потрапляє в репозиторій); на хостингу —
-        зовнішнє сховище Vercel Blob (потрібне підключення — docs/PANEL-video-hosting.md, там же про приватність чернеток). Після завантаження посилання
-        вставляється в поле «Відео» авто в Keystatic — саме воно й публікується.
+        зовнішнє сховище Vercel Blob (потрібне підключення — docs/PANEL-video-hosting.md, там же
+        про приватність чернеток).
       </p>
 
       {/*
@@ -144,7 +165,7 @@ export default async function VideoPage() {
         </p>
       )}
 
-      <h2 className="mt-6 text-sm font-semibold">Завантажити відео</h2>
+      <h3 className="mt-6 text-sm font-semibold">Завантажити відео</h3>
       <div className="mt-2">
         {notConfigured ? (
           <p className="rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500">
@@ -155,12 +176,12 @@ export default async function VideoPage() {
         )}
       </div>
 
-      <h2 className="mt-8 text-sm font-semibold">
+      <h3 className="mt-8 text-sm font-semibold">
         Завантажені відео{" "}
         <span className="font-normal text-neutral-500">
           (осиротілі не видаляються автоматично)
         </span>
-      </h2>
+      </h3>
       {listError ? null : (
         <VideoList videos={videos} usage={usage} />
       )}

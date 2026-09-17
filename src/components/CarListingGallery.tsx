@@ -9,7 +9,7 @@ import type { CarListingCopy } from "@/content/types";
 export interface CarListingMedia {
   id: string;
   photos: { src: string }[];
-  video: { src: string; posterSrc: string } | null;
+  video: { kind: "youtube" | "file"; src: string; posterSrc: string } | null;
 }
 import { setRequestedVehicle } from "@/lib/vehicleContactIntent";
 import { isModifiedClick } from "@/lib/isModifiedClick";
@@ -26,7 +26,7 @@ interface GalleryLabels {
 
 type MediaItem =
   | { type: "photo"; src: string }
-  | { type: "video"; src: string; posterSrc: string };
+  | { type: "video"; kind: "youtube" | "file"; src: string; posterSrc: string };
 
 export function CarListingGallery({
   listing,
@@ -42,7 +42,14 @@ export function CarListingGallery({
   const media: MediaItem[] = [
     ...listing.photos.map((photo) => ({ type: "photo" as const, src: photo.src })),
     ...(listing.video
-      ? [{ type: "video" as const, src: listing.video.src, posterSrc: listing.video.posterSrc }]
+      ? [
+          {
+            type: "video" as const,
+            kind: listing.video.kind,
+            src: listing.video.src,
+            posterSrc: listing.video.posterSrc,
+          },
+        ]
       : []),
   ];
 
@@ -111,7 +118,7 @@ export function CarListingGallery({
 
       const focusable = Array.from(
         dialog.querySelectorAll<HTMLElement>(
-          'button, a[href], video, [tabindex]:not([tabindex="-1"])',
+          'button, a[href], video, iframe, [tabindex]:not([tabindex="-1"])',
         ),
       ).filter((element) => !element.hasAttribute("disabled"));
       if (focusable.length === 0) return;
@@ -218,6 +225,16 @@ export function CarListingGallery({
                         sizes="(min-width: 1024px) 70vw, 100vw"
                         className="object-contain"
                         priority
+                      />
+                    ) : activeMedia.kind === "youtube" ? (
+                      <iframe
+                        key={activeMedia.src}
+                        src={activeMedia.src}
+                        title={`${copy.title} — ${labels.videoAlt}`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        loading="lazy"
+                        className="h-full w-full border-0"
                       />
                     ) : (
                       <video

@@ -8,6 +8,7 @@ import {
   isPlayableVideoSrc,
   isPublishable,
   isRenderable,
+  videoSrcProblem,
   type CmsCar,
   type CmsCarLanguage,
   type ReviewState,
@@ -151,6 +152,65 @@ test("video mode 'hosted-file' with a valid src publishes; deleting it does not 
     video: { mode: "hosted-file", src: "https://blob.example/clip.mp4", posterSrc: "/x/0/image.jpg" },
   });
   assert.deepEqual(getPublishBlockers(c, { review: reviewedAll(car()), sha256 }), []);
+});
+
+test("video mode 'external-link' with a valid YouTube URL publishes", () => {
+  const c = car({
+    video: {
+      mode: "external-link",
+      src: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      posterSrc: "/x/0/image.jpg",
+    },
+  });
+  assert.deepEqual(getPublishBlockers(c, { review: reviewedAll(car()), sha256 }), []);
+});
+
+test("video mode 'external-link' with a spoofed YouTube domain blocks publish with a specific, non-generic reason", () => {
+  const c = car({
+    video: {
+      mode: "external-link",
+      src: "https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ",
+      posterSrc: "",
+    },
+  });
+  const failures = getPublishBlockers(c, { review: reviewedAll(car()), sha256 });
+  const failure = failures.find((f) => f.kind === "video-link-invalid");
+  assert.ok(failure, "expected a video-link-invalid failure");
+  if (failure?.kind === "video-link-invalid") {
+    assert.match(failure.reason, /домен/);
+  }
+  // Must NOT be lumped in with the unrelated "uploaded-file not connected" message.
+  assert.ok(!failures.some((f) => f.kind === "video-not-connected"));
+});
+
+test("video mode 'external-link' with an ordinary (non-YouTube) https link still publishes — no regression", () => {
+  const c = car({
+    video: { mode: "external-link", src: "https://cdn.example.com/reviews/clip.mp4", posterSrc: "" },
+  });
+  assert.deepEqual(getPublishBlockers(c, { review: reviewedAll(car()), sha256 }), []);
+});
+
+test("video mode 'external-link' with a non-https, non-YouTube link blocks publish", () => {
+  const c = car({
+    video: { mode: "external-link", src: "http://cdn.example.com/clip.mp4", posterSrc: "" },
+  });
+  const failures = getPublishBlockers(c, { review: reviewedAll(car()), sha256 });
+  assert.ok(failures.some((f) => f.kind === "video-link-invalid"));
+});
+
+test("video mode 'external-link' with an empty src is not a blocker (mode simply unused)", () => {
+  const c = car({ video: { mode: "external-link", src: "", posterSrc: "" } });
+  assert.deepEqual(getPublishBlockers(c, { review: reviewedAll(car()), sha256 }), []);
+});
+
+test("videoSrcProblem: mirrors isPlayableVideoSrc, plus a specific reason for a spoofed YouTube domain", () => {
+  assert.equal(videoSrcProblem("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), null);
+  assert.equal(videoSrcProblem("https://blob.vercel-storage.com/x.mp4"), null);
+  assert.match(
+    videoSrcProblem("https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ") ?? "",
+    /YouTube/,
+  );
+  assert.equal(videoSrcProblem(""), "порожнє посилання");
 });
 
 test("getLangStatus: empty -> needs-review -> reviewed", () => {

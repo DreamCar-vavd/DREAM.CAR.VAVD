@@ -12,8 +12,11 @@
  *    written only by the panel's "Позначити перевіреним" action; any later
  *    edit to that language's text invalidates it (hash mismatch).
  *
- * Pure, dependency-free, covered by carsGate.test.ts.
+ * Pure, dependency-free (aside from the equally pure ../media/youtube),
+ * covered by carsGate.test.ts.
  */
+
+import { looksLikeYoutubeUrl, parseYoutubeUrl } from "../media/youtube";
 
 export type SaleStatus = "preparing" | "for-sale" | "reserved" | "sold";
 export type VideoMode =
@@ -23,17 +26,38 @@ export type VideoMode =
   | "hosted-file" // uploaded via /panel/video to external storage; src is its URL
   | "uploaded-file"; // legacy placeholder for the not-yet-connected mode — a blocker
 
-/** A hosted-file / external-link src must be https, or (dev) a /uploads/ path. */
-export function isPlayableVideoSrc(src: string): boolean {
+/**
+ * Why a hosted-file / external-link src is not currently playable, or `null`
+ * if it's fine. A src that LOOKS like an attempted YouTube link (see
+ * `looksLikeYoutubeUrl`) must pass strict YouTube validation — this is what
+ * catches a spoofed domain like `youtube.com.evil.example` that would
+ * otherwise sail through as "any https URL is fine". A src that is NOT
+ * YouTube-shaped at all keeps the original, unrelated behaviour: any https
+ * URL (a direct MP4/WebM link, a Blob URL) or a local `/uploads/videos/`
+ * path.
+ */
+export function videoSrcProblem(src: string): string | null {
   const s = (src ?? "").trim();
-  if (!s) return false;
-  if (s.startsWith("/uploads/videos/") && !s.includes("..")) return true;
+  if (!s) return "порожнє посилання";
+  if (s.startsWith("/uploads/videos/")) {
+    return s.includes("..") ? "недопустимий шлях" : null;
+  }
+  if (looksLikeYoutubeUrl(s)) {
+    const parsed = parseYoutubeUrl(s);
+    return parsed.ok ? null : `некоректне посилання YouTube — ${parsed.reason}`;
+  }
   try {
-    return new URL(s).protocol === "https:";
+    return new URL(s).protocol === "https:" ? null : "лише https-посилання";
   } catch {
-    return false;
+    return "некоректний URL";
   }
 }
+
+/** A hosted-file / external-link src must be https, or (dev) a /uploads/ path. */
+export function isPlayableVideoSrc(src: string): boolean {
+  return videoSrcProblem(src) === null;
+}
+
 export const LOCALES = ["uk", "en", "ru"] as const;
 export type ContentLocale = (typeof LOCALES)[number];
 
@@ -163,7 +187,8 @@ export type GateFailure =
   | { kind: "missing-field"; locale: ContentLocale; field: string }
   | { kind: "needs-review"; locale: ContentLocale }
   | { kind: "no-photos" }
-  | { kind: "video-not-connected" };
+  | { kind: "video-not-connected" }
+  | { kind: "video-link-invalid"; reason: string };
 
 /**
  * Reasons this car may NOT be published right now. Empty array = publishable.
@@ -180,16 +205,21 @@ export function getPublishBlockers(car: CmsCar, ctx: GateContext = {}): GateFail
 
   if (car.video?.mode === "uploaded-file") failures.push({ kind: "video-not-connected" });
   // A "hosted-file" whose upload never finished (no usable src) must not
-  // publish as if it were ready.
-  if (
-    (car.video?.mode === "hosted-file" || car.video?.mode === "external-link") &&
-    car.video.src?.trim() &&
-    !isPlayableVideoSrc(car.video.src)
-  ) {
+  // publish as if it were ready. Its src is machine-generated (the Blob
+  // upload response), so a bad one means the connection itself is broken —
+  // "video-not-connected" is the right message, not a link-typo message.
+  if (car.video?.mode === "hosted-file" && car.video.src?.trim() && !isPlayableVideoSrc(car.video.src)) {
     failures.push({ kind: "video-not-connected" });
   }
   if (car.video?.mode === "hosted-file" && !car.video.src?.trim()) {
     failures.push({ kind: "video-not-connected" });
+  }
+  // "external-link" (YouTube or a direct https link) is hand-typed by the
+  // owner, so a bad one gets a specific reason instead of the generic
+  // "not connected" message — e.g. a malformed or spoofed YouTube URL.
+  if (car.video?.mode === "external-link" && car.video.src?.trim()) {
+    const problem = videoSrcProblem(car.video.src);
+    if (problem) failures.push({ kind: "video-link-invalid", reason: problem });
   }
 
   for (const locale of LOCALES) {
@@ -258,5 +288,7 @@ export function describeFailure(f: GateFailure): string {
       return "немає жодного фото";
     case "video-not-connected":
       return "обрано «Завантажений файл» для відео — ця функція ще не підключена; приберіть або замініть посиланням";
+    case "video-link-invalid":
+      return `посилання на відео некоректне — ${f.reason}`;
   }
 }

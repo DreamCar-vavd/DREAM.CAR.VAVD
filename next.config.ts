@@ -1,8 +1,15 @@
 import type { NextConfig } from "next";
 
 /**
- * Public site CSP — unchanged from before the panel. Strict: no external
- * origins at all.
+ * Public site CSP. One deliberate addition beyond the pre-panel baseline:
+ * `frame-src` allows ONLY `youtube-nocookie.com` — required for a car's
+ * YouTube video embed (`CarListingGallery`'s iframe). That iframe's `src`
+ * is never the owner's raw pasted URL; it is always a
+ * `youtube-nocookie.com/embed/<id>` address built by
+ * `src/lib/content/carVideo.ts` from a strictly-validated video id (see
+ * `src/lib/media/youtube.ts`), so this CSP entry can only ever load a real
+ * YouTube embed, never an arbitrary attacker-chosen frame. No other origin
+ * is added anywhere else in this policy.
  */
 const publicCsp = `
   default-src 'self';
@@ -16,7 +23,7 @@ const publicCsp = `
   font-src 'self' data:;
   media-src 'self' blob:;
   connect-src 'self';
-  frame-src 'none';
+  frame-src https://www.youtube-nocookie.com;
   worker-src 'none';
   manifest-src 'self';
 `
@@ -46,6 +53,10 @@ const publicCsp = `
  * `script-src` ONLY in development (`next dev`) — React's dev build needs it
  * and Keystatic's editor overlay is otherwise unusable locally; `next build`
  * output does not need it (verified) so production `script-src` stays strict.
+ *  - frame-src adds youtube-nocookie.com — same reasoning as the public CSP
+ *    above: `/panel/video`'s YoutubeLinkHelper shows a live preview iframe
+ *    of the pasted link before the owner copies it into Keystatic, built
+ *    from the same strictly-validated embed URL, never the raw input.
  */
 const devUnsafeEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
 const panelCsp = `
@@ -60,7 +71,7 @@ const panelCsp = `
   font-src 'self' data: https://fonts.gstatic.com;
   media-src 'self' blob:;
   connect-src 'self' https://api.github.com https://github.com https://raw.githubusercontent.com;
-  frame-src 'none';
+  frame-src https://www.youtube-nocookie.com;
   worker-src 'none';
   manifest-src 'self';
 `

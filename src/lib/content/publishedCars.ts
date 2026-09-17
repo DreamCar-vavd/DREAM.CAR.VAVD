@@ -3,6 +3,7 @@ import type { ContentLocale } from "./carsGate";
 import { isRenderable, type CmsCar } from "./carsGate";
 import { formatMileage } from "./mileage";
 import { readSiteContent } from "./siteContent";
+import { resolveCarVideo } from "./carVideo";
 
 /** Shapes the existing site components already consume. */
 export interface CarListingCopy {
@@ -16,7 +17,7 @@ export interface CarListingCopy {
 export interface CarMedia {
   id: string;
   photos: { src: string }[];
-  video: { src: string; posterSrc: string } | null;
+  video: { kind: "youtube" | "file"; src: string; posterSrc: string } | null;
 }
 
 async function getVisibleCars(): Promise<CmsCar[]> {
@@ -51,13 +52,6 @@ export async function getPublicCarMedia(): Promise<CarMedia[]> {
   return (await getVisibleCars()).map((car) => ({
     id: car.id,
     photos: car.photos.filter((p) => p.image).map((p) => ({ src: toPublicImagePath(p.image) })),
-    video:
-      car.video &&
-      (car.video.mode === "legacy-file" ||
-        car.video.mode === "external-link" ||
-        car.video.mode === "hosted-file") &&
-      car.video.src
-        ? { src: car.video.src, posterSrc: toPublicImagePath(car.video.posterSrc) }
-        : null,
+    video: resolveCarVideo(car, toPublicImagePath),
   }));
 }

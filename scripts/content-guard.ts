@@ -26,7 +26,7 @@ import {
 import {
   getPublishBlockers,
   describeFailure,
-  isPlayableVideoSrc,
+  videoSrcProblem,
   type ReviewState,
 } from "../src/lib/content/carsGate";
 import { getGalleryPublishBlockers } from "../src/lib/content/galleryGate";
@@ -173,12 +173,16 @@ async function main() {
     // external-link src is an external URL (Blob) or a git-ignored /uploads
     // path -> it must NOT enter the git manifest; just sanity-check it.
     if (car.video?.mode === "legacy-file") checkMedia(`${w} відео`, car.video.src);
-    if (
-      (car.video?.mode === "hosted-file" || car.video?.mode === "external-link") &&
-      String(car.video.src ?? "").trim() &&
-      !isPlayableVideoSrc(car.video.src)
-    ) {
-      problems.push(`${w}: посилання на відео «${car.video.src}» не https і не /uploads/`);
+    if (car.video?.mode === "hosted-file" || car.video?.mode === "external-link") {
+      const src = String(car.video.src ?? "").trim();
+      const problem = src ? videoSrcProblem(src) : null;
+      // Same rule as getPublishBlockers/describeFailure above (both call
+      // through to videoSrcProblem) -- reported again here, with the real
+      // reason, so a manifest-focused reviewer scanning content-guard's
+      // output doesn't need to cross-reference the earlier "video-*" line.
+      // The old hardcoded "не https і не /uploads/" wording was actively
+      // wrong for a rejected-but-https link (e.g. a spoofed YouTube domain).
+      if (problem) problems.push(`${w}: посилання на відео «${src}» — ${problem}`);
     }
     if (car.video?.mode === "uploaded-file") {
       problems.push(`${w}: відео у режимі «завантажений файл — не підключено»`);
