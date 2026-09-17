@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { carListings } from "@/content/carListings";
+import { getPublicCarMedia } from "@/lib/content/publishedCars";
 import { CarListingGallery } from "@/components/CarListingGallery";
 import { siteUrl, buildLanguageAlternates } from "@/lib/site";
 
@@ -41,6 +41,7 @@ export default async function CarsForSalePage({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
+  const carMedia = await getPublicCarMedia();
 
   return (
     <section className="mx-auto max-w-[1760px] px-6 py-16 sm:px-8 lg:px-10">
@@ -51,8 +52,9 @@ export default async function CarsForSalePage({
       </div>
 
       <div className="mx-auto mt-12 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {carListings.map((listing) => {
+        {carMedia.map((listing) => {
           const copy = dict.carsForSale.listings[listing.id];
+          if (!copy) return null;
           return (
             <CarListingGallery
               key={listing.id}
