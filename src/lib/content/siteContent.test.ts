@@ -17,14 +17,24 @@ import assert from "node:assert/strict";
  * `import "server-only"` / `import { draftMode } from "next/headers"` are
  * static and evaluated at that point — hence the dynamic `await import`
  * inside each test rather than a top-level `import`.
+ *
+ * `{ exports }` (not the deprecated `{ namedExports }`) is the current
+ * runtime option — Node's own DeprecationWarning on `namedExports` says so.
+ * The `@types/node` version pinned in this repo predates that option, so
+ * these options objects go through a typed helper (not an inline literal) to
+ * sidestep the stale type's excess-property check; same pattern as
+ * `src/app/api/panel/video/route.test.ts`.
  */
+const mockExports = (exports: object): Parameters<typeof mock.module>[1] =>
+  ({ exports }) as Parameters<typeof mock.module>[1];
 
-mock.module("server-only", { namedExports: {} });
+mock.module("server-only", mockExports({}));
 
 let draftEnabled = true;
-mock.module("next/headers", {
-  namedExports: { draftMode: async () => ({ isEnabled: draftEnabled }) },
-});
+mock.module(
+  "next/headers",
+  mockExports({ draftMode: async () => ({ isEnabled: draftEnabled }) }),
+);
 
 const publishedSnapshot = {
   cars: [],
@@ -33,22 +43,24 @@ const publishedSnapshot = {
   contact: [],
   promos: [],
 };
-mock.module("./snapshot", {
-  namedExports: { readPublishedSnapshot: async () => publishedSnapshot },
-});
+mock.module(
+  "./snapshot",
+  mockExports({ readPublishedSnapshot: async () => publishedSnapshot }),
+);
 
 let storeMock: { restore(): void } | undefined;
 function mockStore(assertWriteAccess: () => Promise<void>, readDir?: () => Promise<{ data: unknown[]; version: string }>) {
   storeMock?.restore();
-  storeMock = mock.module("./store", {
-    namedExports: {
+  storeMock = mock.module(
+    "./store",
+    mockExports({
       getStorage: async () => ({
         mode: "github",
         assertWriteAccess,
         readDir: readDir ?? (async () => { throw new Error("readDir must not be called on a failed access check"); }),
       }),
-    },
-  });
+    }),
+  );
 }
 
 test("draft mode off: published content returned, storage never touched", async () => {
