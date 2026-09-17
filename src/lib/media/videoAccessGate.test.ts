@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { loadVideoAccess } from "./videoAccessGate";
 import {
   NotConnectedError,
@@ -8,6 +11,7 @@ import {
   StorageUnavailableError,
 } from "../content/store/adapter";
 import type { PanelStorage } from "../content/store/adapter";
+import { LocalVideoStore } from "./videoStore";
 import type { VideoObject, VideoStore } from "./videoStore";
 
 /**
@@ -165,3 +169,47 @@ test("regression guard: a gate that never calls assertWriteAccess is caught by t
   await loadVideoAccess({ getStorage: async () => storage, getVideoStore: videoStore.getVideoStore });
   assert.equal(getCalls(), 1, "assertWriteAccess must be called on every gate evaluation");
 });
+
+test(
+  "allowed user, REAL LocalVideoStore(tempRoot): gate pass-through actually works against disk, " +
+    "isolated from the repo's public/uploads/videos",
+  async () => {
+    // Every test above injects countingVideoStore() -- a fake -- to prove
+    // ordering. This one instead injects the real LocalVideoStore class
+    // (same one production's getVideoStore() returns for local dev), pointed
+    // at a throwaway mkdtemp() root, to prove the gate's pass-through also
+    // works against genuine disk I/O. `route.test.ts` used to cover this at
+    // the route level by letting requireVideoAccess() fall through to the
+    // REAL, un-injected getVideoStore() -- which defaults to
+    // `<repo>/public/uploads/videos` (see videoStore.ts's LocalVideoStore
+    // constructor). PANEL_CONTENT_ROOT does not influence that default at
+    // all, so that route test was silently reading/writing the real repo
+    // directory. It was removed; this test plus videoStore.test.ts's own
+    // `withTempLocalStore()` coverage (createUpload/receive/head/list/remove
+    // against a temp root) now cover the same ground in isolation.
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "video-access-gate-local-"));
+    try {
+      const store = new LocalVideoStore(tmpRoot);
+      const { storage, getCalls } = countingStorage(async () => {
+        /* resolves -- this account has push access */
+      });
+      const result = await loadVideoAccess({
+        getStorage: async () => storage,
+        getVideoStore: () => store,
+      });
+      assert.equal(result.ok, true);
+      assert.equal(getCalls(), 1);
+      if (!result.ok) return;
+      assert.equal(result.videoStore, store);
+      // Starts empty -- proof this never fell back to a real, possibly
+      // non-empty repo directory.
+      assert.deepEqual(await result.videoStore.list(), []);
+      const created = await store.createUpload({ filename: "clip.mp4", contentType: "video/mp4", size: 10 });
+      await store.receive!(created.key, Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmp42")]));
+      const onDisk = await fs.readdir(tmpRoot);
+      assert.deepEqual(onDisk, [created.key], "the file must land in the temp root, not the repo");
+    } finally {
+      await fs.rm(tmpRoot, { recursive: true, force: true });
+    }
+  },
+);

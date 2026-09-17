@@ -1,8 +1,5 @@
 import { test, mock, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import {
   NotConnectedError,
   StorageAuthError,
@@ -52,33 +49,40 @@ mock.module(
 
 // requireVideoAccess() -> loadVideoAccess() -> getStorage(), mocked above by
 // default to a trusted local session (no auth needed) so most tests don't
-// need to think about it. PANEL_CONTENT_ROOT (dev/test-only) still points
-// LocalVideoStore/LocalFsStorage at a throwaway temp dir as a second layer
-// of isolation for tests that DO exercise the real default.
-let tmpRoot: string;
+// need to think about it.
+//
+// None of the tests in this file exercise the REAL, un-injected
+// getVideoStore() (the "no push -> 403" etc. tests all return from the gate
+// before it would run). PANEL_CONTENT_ROOT used to be set here on the
+// (incorrect) belief that it redirects LocalVideoStore/LocalFsStorage to a
+// throwaway temp dir -- it does not: LocalVideoStore's root defaults to
+// `path.join(process.cwd(), "public", "uploads", "videos")`
+// (src/lib/media/videoStore.ts) and never reads that env var, and
+// `@/lib/content/store` is fully mocked below so it never reaches the real
+// module (and PANEL_CONTENT_ROOT) either. A route-level "trusted local
+// session -> GET lists successfully" test used to rely on that false
+// isolation and silently read the repo's real public/uploads/videos. That
+// test was removed; see videoAccessGate.test.ts's "REAL LocalVideoStore
+// (tempRoot)" test (gate pass-through + genuine disk I/O, isolated via
+// mkdtemp()) and videoStore.test.ts's withTempLocalStore() coverage
+// (createUpload/receive/head/list/remove) for the same ground covered in
+// isolation, without touching this file's route-level mocks.
 let originalBlobToken: string | undefined;
 let originalStorageKind: string | undefined;
-let originalPanelRoot: string | undefined;
 
-beforeEach(async () => {
+beforeEach(() => {
   originalBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
   originalStorageKind = process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND;
-  originalPanelRoot = process.env.PANEL_CONTENT_ROOT;
   delete process.env.BLOB_READ_WRITE_TOKEN;
   delete process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND;
-  tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "panel-video-route-test-"));
-  process.env.PANEL_CONTENT_ROOT = tmpRoot;
   currentGetStorage = async () => stubStorage(async () => {});
 });
 
-afterEach(async () => {
+afterEach(() => {
   if (originalBlobToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
   else process.env.BLOB_READ_WRITE_TOKEN = originalBlobToken;
   if (originalStorageKind === undefined) delete process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND;
   else process.env.NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND = originalStorageKind;
-  if (originalPanelRoot === undefined) delete process.env.PANEL_CONTENT_ROOT;
-  else process.env.PANEL_CONTENT_ROOT = originalPanelRoot;
-  await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
 function blobTokenRequest(): Request {
@@ -158,15 +162,4 @@ test("GitHub unavailable/timed out (StorageUnavailableError, retriable): PUT ret
   const body = (await response.json()) as { ok: boolean; message?: string };
   assert.equal(response.status, 503);
   assert.equal(body.ok, false);
-});
-
-test("trusted local session (default mock, assertWriteAccess resolves): GET still lists successfully", async () => {
-  // The default beforeEach mock already represents this — this test exists
-  // to prove the access gate does not break the ordinary local-dev path.
-  const { GET } = await import("./route");
-  const response = await GET();
-  const body = (await response.json()) as { ok: boolean; videos?: unknown[] };
-  assert.equal(response.status, 200);
-  assert.equal(body.ok, true);
-  assert.ok(Array.isArray(body.videos));
 });
