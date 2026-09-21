@@ -39,8 +39,19 @@ export function YoutubeLinkHelper() {
 
       <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
         Підходить <strong>Public</strong> або <strong>Unlisted</strong>. «Unlisted» —{" "}
-        <strong>не приватне</strong>: відео відкриється кожному, хто має посилання, YouTube лише
-        не показує його в пошуку й на каналі.
+        <strong>не приватне</strong>: переглянути й поширити відео може кожен, хто має
+        посилання. Воно не зʼявляється на вкладці «Відео» каналу і зазвичай не показується в
+        пошуку YouTube — але виняток є: якщо хтось додасть його до публічного плейлиста, воно
+        стане доступним звідти.{" "}
+        <a
+          href="https://support.google.com/youtube/answer/157177"
+          target="_blank"
+          rel="noreferrer"
+          className="underline"
+        >
+          Офіційна довідка YouTube про приватність відео
+        </a>
+        .
       </p>
 
       {trimmed && parsed && !parsed.ok && (

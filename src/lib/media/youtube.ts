@@ -29,23 +29,58 @@ export type YoutubeParseResult =
   | { ok: false; reason: string };
 
 /**
+ * The dot-separated label sequences that make a hostname "YouTube-shaped".
+ * Matched at LABEL boundaries, not as a raw substring — `/youtu/i.test(host)`
+ * used to flag anything containing those five letters anywhere, which wrongly
+ * caught ordinary unrelated domains like `my-youtube-cdn.example` (single
+ * label "my-youtube-cdn", never actually "youtube") or
+ * `youtube-review-files.example`. Label-boundary matching only flags a
+ * hostname that contains "youtube"+"com", "youtu"+"be", or
+ * "youtube-nocookie"+"com" as ADJACENT, WHOLE labels — which is exactly the
+ * domain-confusion pattern used to spoof YouTube (`youtube.com.evil.example`,
+ * `www.youtube.com.example`, `youtu.be.evil.example` all contain one of
+ * these sequences), while a hostname that merely has "youtube" baked into a
+ * single compound label does not.
+ */
+const YOUTUBE_CORE_DOMAIN_LABELS: readonly (readonly string[])[] = [
+  ["youtube", "com"],
+  ["youtu", "be"],
+  ["youtube-nocookie", "com"],
+];
+
+function containsLabelSequence(labels: readonly string[], seq: readonly string[]): boolean {
+  for (let i = 0; i <= labels.length - seq.length; i++) {
+    if (seq.every((label, j) => labels[i + j] === label)) return true;
+  }
+  return false;
+}
+
+/**
  * Loose heuristic ONLY: does this URL look like someone intended to paste a
  * YouTube link? Used purely to decide whether the strict check below applies
  * at all — an ordinary, unrelated https link (a direct MP4/WebM URL, a Blob
- * URL) must keep working exactly as before, unexamined by YouTube rules. A
- * link that DOES look YouTube-shaped but fails the strict parse below is
- * rejected with a clear reason, rather than silently falling through to "any
- * https URL is fine" (which would let `https://youtube.com.evil.example/`
- * through as if it were real).
+ * URL, a domain that merely happens to mention "youtube" as part of a
+ * compound name) must keep working exactly as before, unexamined by YouTube
+ * rules. A link that DOES look YouTube-shaped but fails the strict parse
+ * below is rejected with a clear reason, rather than silently falling
+ * through to "any https URL is fine" (which would let
+ * `https://youtube.com.evil.example/` through as if it were real).
  */
 export function looksLikeYoutubeUrl(input: string): boolean {
   const s = (input ?? "").trim();
   if (!s) return false;
+  let hostname: string;
   try {
-    return /youtu/i.test(new URL(s).hostname);
+    hostname = new URL(s).hostname.toLowerCase();
   } catch {
+    // Not even a parseable URL -- parseYoutubeUrl() will reject it as an
+    // invalid URL regardless of this classification, so a coarse fallback
+    // here changes nothing about the outcome, only which message path is
+    // taken.
     return /youtu/i.test(s);
   }
+  const labels = hostname.split(".");
+  return YOUTUBE_CORE_DOMAIN_LABELS.some((seq) => containsLabelSequence(labels, seq));
 }
 
 /**

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
   confirmedText,
+  describeFailure,
   getLangStatus,
   getPublishBlockers,
   isPlayableVideoSrc,
@@ -198,8 +199,35 @@ test("video mode 'external-link' with a non-https, non-YouTube link blocks publi
   assert.ok(failures.some((f) => f.kind === "video-link-invalid"));
 });
 
-test("video mode 'external-link' with an empty src is not a blocker (mode simply unused)", () => {
-  const c = car({ video: { mode: "external-link", src: "", posterSrc: "" } });
+test("video mode 'external-link': a domain that merely mentions 'youtube' in a compound name publishes like any other https file link — not examined by YouTube rules at all", () => {
+  for (const src of [
+    "https://my-youtube-cdn.example/clip.mp4",
+    "https://youtube-review-files.example/clip.webm",
+  ]) {
+    const c = car({ video: { mode: "external-link", src, posterSrc: "" } });
+    assert.deepEqual(
+      getPublishBlockers(c, { review: reviewedAll(car()), sha256 }),
+      [],
+      `expected ${src} to publish with no blockers`,
+    );
+  }
+});
+
+test("video mode 'external-link' with an empty or whitespace-only src blocks publish (choosing the mode is a commitment, not left unfinished)", () => {
+  for (const src of ["", "   "]) {
+    const c = car({ video: { mode: "external-link", src, posterSrc: "" } });
+    const failures = getPublishBlockers(c, { review: reviewedAll(car()), sha256 });
+    const failure = failures.find((f) => f.kind === "video-link-invalid");
+    assert.ok(failure, `expected a video-link-invalid failure for src=${JSON.stringify(src)}`);
+    if (failure?.kind === "video-link-invalid") {
+      assert.match(failure.reason, /порожнє посилання/);
+      assert.match(describeFailure(failure), /вставте YouTube-посилання|виберіть режим/);
+    }
+  }
+});
+
+test("video mode 'none' with an empty src is still not a blocker — only 'external-link' requires a filled src", () => {
+  const c = car({ video: { mode: "none", src: "", posterSrc: "" } });
   assert.deepEqual(getPublishBlockers(c, { review: reviewedAll(car()), sha256 }), []);
 });
 

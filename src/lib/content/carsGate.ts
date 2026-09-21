@@ -216,9 +216,16 @@ export function getPublishBlockers(car: CmsCar, ctx: GateContext = {}): GateFail
   }
   // "external-link" (YouTube or a direct https link) is hand-typed by the
   // owner, so a bad one gets a specific reason instead of the generic
-  // "not connected" message — e.g. a malformed or spoofed YouTube URL.
-  if (car.video?.mode === "external-link" && car.video.src?.trim()) {
-    const problem = videoSrcProblem(car.video.src);
+  // "not connected" message — e.g. a malformed or spoofed YouTube URL. An
+  // EMPTY src is also a blocker here, unlike "hosted-file": choosing
+  // "external-link" is an explicit statement of intent to use a link, so a
+  // blank field means the step was left unfinished, not "mode unused" —
+  // the owner must either paste a link or switch back to "Немає".
+  if (car.video?.mode === "external-link") {
+    const src = car.video.src?.trim() ?? "";
+    const problem = src
+      ? videoSrcProblem(src)
+      : "порожнє посилання — вставте YouTube-посилання або виберіть режим «Немає»";
     if (problem) failures.push({ kind: "video-link-invalid", reason: problem });
   }
 

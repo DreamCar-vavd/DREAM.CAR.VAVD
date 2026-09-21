@@ -69,10 +69,14 @@ test("parseYoutubeUrl: rejects empty and garbage input", () => {
   assert.equal(parseYoutubeUrl("not a url at all").ok, false);
 });
 
-test("looksLikeYoutubeUrl: true for anything youtube-shaped, including spoofed domains (that's the point)", () => {
+test("looksLikeYoutubeUrl: true for the real domains, and for domain-confusion spoofs where a real YouTube domain appears as a whole label sequence", () => {
   assert.equal(looksLikeYoutubeUrl(`https://www.youtube.com/watch?v=${ID}`), true);
-  assert.equal(looksLikeYoutubeUrl(`https://youtube.com.evil.example/watch?v=${ID}`), true);
   assert.equal(looksLikeYoutubeUrl(`https://youtu.be/${ID}`), true);
+  // Spoofs: "youtube.com" / "youtu.be" appear as an exact, adjacent label
+  // pair somewhere in the hostname -- the classic domain-confusion pattern.
+  assert.equal(looksLikeYoutubeUrl(`https://youtube.com.evil.example/watch?v=${ID}`), true);
+  assert.equal(looksLikeYoutubeUrl(`https://youtu.be.evil.example/${ID}`), true);
+  assert.equal(looksLikeYoutubeUrl(`https://www.youtube.com.example/watch?v=${ID}`), true);
 });
 
 test("looksLikeYoutubeUrl: false for ordinary, unrelated links (direct files, Blob, empty)", () => {
@@ -80,6 +84,11 @@ test("looksLikeYoutubeUrl: false for ordinary, unrelated links (direct files, Bl
   assert.equal(looksLikeYoutubeUrl("/uploads/videos/abc12345-clip.mp4"), false);
   assert.equal(looksLikeYoutubeUrl(""), false);
   assert.equal(looksLikeYoutubeUrl("https://vimeo.com/12345"), false);
+});
+
+test("looksLikeYoutubeUrl: false for domains that merely mention 'youtube' inside a compound label — 'youtube' never appears as its own whole label there", () => {
+  assert.equal(looksLikeYoutubeUrl("https://my-youtube-cdn.example/clip.mp4"), false);
+  assert.equal(looksLikeYoutubeUrl("https://youtube-review-files.example/clip.webm"), false);
 });
 
 test("videoKindForSrc: 'youtube' only for a genuinely valid YouTube link", () => {
@@ -92,4 +101,22 @@ test("videoKindForSrc: 'file' for direct video links, Blob URLs, local paths, an
   assert.equal(videoKindForSrc("/uploads/videos/abc12345-clip.mp4"), "file");
   assert.equal(videoKindForSrc("https://youtube.com.evil.example/watch?v=" + ID), "file");
   assert.equal(videoKindForSrc(""), "file");
+});
+
+test("regression: 'youtube'-in-domain-name links behave as ordinary files, spoofed YouTube domains are recognized-but-rejected", () => {
+  // The exact three examples flagged in review: a domain that merely
+  // mentions "youtube" in a compound name must behave EXACTLY like any
+  // other direct file link (not examined by YouTube rules at all -- not
+  // even recognized as YouTube-shaped), while a domain that reproduces the
+  // real "youtube.com" label pair as a spoof must still be recognized and
+  // rejected, never silently treated as an ordinary link.
+  assert.equal(looksLikeYoutubeUrl("https://my-youtube-cdn.example/clip.mp4"), false);
+  assert.equal(videoKindForSrc("https://my-youtube-cdn.example/clip.mp4"), "file");
+
+  assert.equal(looksLikeYoutubeUrl("https://youtube-review-files.example/clip.webm"), false);
+  assert.equal(videoKindForSrc("https://youtube-review-files.example/clip.webm"), "file");
+
+  assert.equal(looksLikeYoutubeUrl(`https://youtube.com.evil.example/watch?v=${ID}`), true);
+  assert.equal(parseYoutubeUrl(`https://youtube.com.evil.example/watch?v=${ID}`).ok, false);
+  assert.equal(videoKindForSrc(`https://youtube.com.evil.example/watch?v=${ID}`), "file");
 });
