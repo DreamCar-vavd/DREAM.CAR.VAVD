@@ -7,6 +7,14 @@
 
 export const MAX_IMAGE_SIDE = 2400;
 
+/**
+ * The project's documented "technical maximum" for one photo (see the
+ * Keystatic field hints: "Технічний максимум — 12 МБ на одне зображення").
+ * Named here, once, rather than repeating the raw byte count unexplained at
+ * each call site.
+ */
+export const MAX_SOURCE_IMAGE_BYTES = 12 * 1024 * 1024;
+
 export interface Dimensions {
   width: number;
   height: number;

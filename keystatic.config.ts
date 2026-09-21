@@ -1,4 +1,5 @@
 import { config, fields, collection, singleton } from "@keystatic/core";
+import { compressedImage } from "./src/lib/keystatic/compressedImageField";
 
 /**
  * DREAM.CAR.VAVD — content model for the management panel.
@@ -241,7 +242,7 @@ export default config({
         // ---- Медіа (спільні) ----
         photos: fields.array(
           fields.object({
-            image: fields.image({
+            image: compressedImage({
               label: "Фото",
               // Keystatic stores car images per entry:
               // public/images/cms/cars/<id>/<file>. The stored value is the
@@ -325,7 +326,7 @@ export default config({
         year: fields.text({ label: "Рік (спільний)" }),
         photos: fields.array(
           fields.object({
-            image: fields.image({
+            image: compressedImage({
               label: "Фото",
               directory: "public/images/cms/gallery",
               publicPath: "/images/cms/gallery",
@@ -399,7 +400,7 @@ export default config({
         }),
         photos: fields.array(
           fields.object({
-            image: fields.image({
+            image: compressedImage({
               label: "Фото",
               directory: "public/images/cms/services",
               publicPath: "/images/cms/services",
@@ -455,7 +456,7 @@ export default config({
           description: "Зніміть — матеріал лишиться в панелі, але зникне з сайту.",
           defaultValue: true,
         }),
-        image: fields.image({
+        image: compressedImage({
           label: "Зображення (необов'язково)",
           description:
             "Рекомендовано: WebP, ширина 2000–2400 px, розмір 200–800 КБ. Технічний максимум — 12 МБ на одне зображення.",

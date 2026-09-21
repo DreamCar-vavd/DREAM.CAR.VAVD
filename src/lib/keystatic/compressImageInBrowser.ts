@@ -16,7 +16,12 @@
  * This module is NOT wired into keystatic.config.ts yet — see
  * PANEL-PHOTO-AUTO-OPTIMIZATION-CORE-01.
  */
-import { computeTargetSize, isWebpMagicBytes, toWebpFilename } from "./imageOptimization";
+import {
+  computeTargetSize,
+  isWebpMagicBytes,
+  toWebpFilename,
+  MAX_SOURCE_IMAGE_BYTES,
+} from "./imageOptimization";
 
 export interface KeystaticImageValue {
   data: Uint8Array;
@@ -33,6 +38,10 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 };
 
 export const WEBP_QUALITY = 0.84;
+
+function formatMebibytes(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1);
+}
 
 /** The minimal surface `compressImageInBrowser` needs from a decoded bitmap. */
 export interface ImageBitmapLike {
@@ -111,9 +120,11 @@ export function createDefaultBrowserImageAdapter(): BrowserImageAdapter {
 
 /**
  * Compresses one Keystatic-picked photo to WebP in the browser. Throws a
- * descriptive Error on any failure (unsupported source format, decode
- * failure, missing 2D context, `toBlob`/`convertToBlob` returning `null`, a
- * result whose MIME type or magic bytes are not actually WebP) — it never
+ * descriptive Error on any failure (unsupported source format, source over
+ * `MAX_SOURCE_IMAGE_BYTES` -- rejected BEFORE the adapter is touched at all,
+ * decode failure, missing 2D context, `toBlob`/`convertToBlob` returning
+ * `null`, a result whose MIME type or magic bytes are not actually WebP, or
+ * an encoded result somehow still over `MAX_SOURCE_IMAGE_BYTES`) — it never
  * falls back to silently returning the original value; a caller that wants
  * a "keep the original on failure" fallback must catch this itself.
  */
@@ -125,6 +136,14 @@ export async function compressImageInBrowser(
   const mime = MIME_BY_EXTENSION[ext];
   if (!mime) {
     throw new Error(`непідтримуваний формат зображення для стиснення: «${value.extension}»`);
+  }
+
+  // Checked BEFORE the adapter is touched at all -- an oversized source must
+  // never reach createImageBitmap/canvas.
+  if (value.data.byteLength > MAX_SOURCE_IMAGE_BYTES) {
+    throw new Error(
+      `файл завеликий (${formatMebibytes(value.data.byteLength)} МБ) — технічний максимум ${formatMebibytes(MAX_SOURCE_IMAGE_BYTES)} МБ на одне зображення`,
+    );
   }
 
   // `.slice()` copies into a fresh, plain ArrayBuffer-backed Uint8Array --
@@ -160,6 +179,11 @@ export async function compressImageInBrowser(
     const data = new Uint8Array(await blob.arrayBuffer());
     if (!isWebpMagicBytes(data)) {
       throw new Error("результат стиснення не є коректним WebP-файлом (magic bytes не збігаються)");
+    }
+    if (data.byteLength > MAX_SOURCE_IMAGE_BYTES) {
+      throw new Error(
+        `стиснений WebP завеликий (${formatMebibytes(data.byteLength)} МБ) — технічний максимум ${formatMebibytes(MAX_SOURCE_IMAGE_BYTES)} МБ на одне зображення`,
+      );
     }
 
     return {

@@ -7,8 +7,14 @@ import {
   type ImageBitmapLike,
   type KeystaticImageValue,
 } from "./compressImageInBrowser";
+import { MAX_SOURCE_IMAGE_BYTES } from "./imageOptimization";
 
-/** A real, valid (if minimal) WebP byte sequence — RIFF/WEBP header + a VP8 chunk tag. */
+/**
+ * NOT a real, decodable WebP image — just enough bytes (RIFF/WEBP header +
+ * a VP8 chunk tag) to satisfy `isWebpMagicBytes()`, which is the only thing
+ * these tests need it for. A real WebP file also needs a correct RIFF
+ * chunk size and actual VP8 bitstream data; this buffer has neither.
+ */
 const REAL_WEBP_BYTES = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20,
 ]);
@@ -65,6 +71,40 @@ test("compressImageInBrowser: correct result -- webp bytes, extension, .webp fil
   assert.equal(result.filename, "walkaround.webp");
   assert.deepEqual(Array.from(result.data), Array.from(REAL_WEBP_BYTES));
   assert.equal(getCloseCalls(), 1, "ImageBitmap.close() must be called on success");
+});
+
+test("compressImageInBrowser: rejects a source over MAX_SOURCE_IMAGE_BYTES before ever touching the adapter", async () => {
+  const adapter = adapterWith({}); // would throw if used -- must never be called
+  const oversized: KeystaticImageValue = {
+    data: new Uint8Array(MAX_SOURCE_IMAGE_BYTES + 1),
+    extension: "jpg",
+    filename: "huge.jpg",
+  };
+  await assert.rejects(() => compressImageInBrowser(oversized, adapter), /завеликий/);
+});
+
+test("compressImageInBrowser: accepts a source exactly at MAX_SOURCE_IMAGE_BYTES (only over the limit is rejected)", async () => {
+  const { bitmap } = fakeBitmap(10, 10);
+  const blob = new Blob([REAL_WEBP_BYTES], { type: "image/webp" });
+  const adapter = adapterWith({ bitmap, webpBlob: blob });
+  const atLimit: KeystaticImageValue = {
+    data: new Uint8Array(MAX_SOURCE_IMAGE_BYTES),
+    extension: "jpg",
+    filename: "at-limit.jpg",
+  };
+  const result = await compressImageInBrowser(atLimit, adapter);
+  assert.equal(result.extension, "webp");
+});
+
+test("compressImageInBrowser: rejects an encoded WebP result over MAX_SOURCE_IMAGE_BYTES, and still closes the bitmap", async () => {
+  const { bitmap, getCloseCalls } = fakeBitmap(1000, 1000);
+  const oversizedWebpBytes = new Uint8Array(MAX_SOURCE_IMAGE_BYTES + 1);
+  oversizedWebpBytes.set(REAL_WEBP_BYTES); // keep the real WebP header at the start
+  const oversizedBlob = new Blob([oversizedWebpBytes], { type: "image/webp" });
+  const adapter = adapterWith({ bitmap, webpBlob: oversizedBlob });
+
+  await assert.rejects(() => compressImageInBrowser(fakeSource(), adapter), /завеликий/);
+  assert.equal(getCloseCalls(), 1, "ImageBitmap.close() must be called even when it throws");
 });
 
 test("compressImageInBrowser: throws when the encoded blob's MIME type is not image/webp, and still closes the bitmap", async () => {
