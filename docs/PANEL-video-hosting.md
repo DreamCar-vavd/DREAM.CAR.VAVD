@@ -30,7 +30,7 @@
   поточну роботу сайту, бо Blob зараз не використовується взагалі.
 
 Обидва способи проходять через те саме поле `video.mode` /
-`video.src`(картка авто, Keystatic): `external-link` для YouTube (і будь-
+`video.src` (картка авто, Keystatic): `external-link` для YouTube (і будь-
 якого іншого прямого https-посилання), `hosted-file` для завантаженого
 через `/panel/video` файлу. Один спільний helper
 (`src/lib/media/youtube.ts`) визначає, чи `external-link` є YouTube-
@@ -82,9 +82,18 @@ Vercel обмежує **тіло запиту Serverless/Edge Function до 4.5 
 - `src/lib/media/youtube.ts` — єдиний спільний helper (жодних окремих копій
   логіки на сайті, в панелі чи в content-guard):
   - `looksLikeYoutubeUrl()` — м'яка евристика «це схоже на спробу вставити
-    YouTube-посилання?» (перевіряє лише, чи є `youtu` в хості) — вирішує,
-    чи взагалі застосовувати сувору перевірку нижче; звичайне пряме
-    посилання на файл чи Blob її не проходить і лишається без змін.
+    YouTube-посилання?»: hostname розбивається на доменні частини
+    (лейбли), і домен вважається YouTube-подібним, лише якщо серед них є
+    СУСІДНІ цілі частини `youtube`+`com`, `youtu`+`be` або
+    `youtube-nocookie`+`com` — не підрядок, а точна пара лейблів. Це
+    вирішує, чи взагалі застосовувати сувору перевірку нижче:
+    `youtube.com.evil.example` розпізнається як спроба підробки (містить
+    пару лейблів `youtube`+`com`) і передається суворій перевірці, яка
+    його відхиляє; а `my-youtube-cdn.example` та
+    `youtube-review-files.example` YouTube-подібними НЕ вважаються (слово
+    «youtube» там — частина одного складеного лейбла, а не окрема
+    частина домену) і лишаються звичайними зовнішніми https-посиланнями
+    без змін.
   - `parseYoutubeUrl()` — сувора перевірка: лише `https`, лише точний
     реальний хост YouTube (`youtube.com`, `www.youtube.com`, `m.youtube.com`,
     `youtu.be`, `youtube-nocookie.com` — **точний збіг**, не підрядок, тож
@@ -103,7 +112,8 @@ Vercel обмежує **тіло запиту Serverless/Edge Function до 4.5 
   Фокус-пастка діалогу тепер враховує й `iframe`.
 - `src/lib/content/carsGate.ts` (`videoSrcProblem`, `getPublishBlockers`) —
   публікація з режимом `external-link`: коректний YouTube-URL публікується;
-  URL, що ВИГЛЯДАЄ як спроба вставити YouTube (домен містить `youtu`), але
+  URL, що ВИГЛЯДАЄ як спроба вставити YouTube (домен містить сусідню пару
+  лейблів `youtube`+`com`, `youtu`+`be` або `youtube-nocookie`+`com`), але
   не проходить сувору перевірку (підроблений домен, зіпсований ID) —
   **блокує публікацію** з конкретною причиною (`video-link-invalid`), а не
   узагальненим «не підключено». Звичайний нерелевантний https-URL (прямий
