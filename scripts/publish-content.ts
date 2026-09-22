@@ -1,0 +1,841 @@
+/**
+ * publish-content — the actual file-transfer logic behind the guarded
+ * content-publish merge (docs/PANEL-hosting-and-approvals.md §1.3).
+ *
+ * Rewritten 2026-09-15 after an independent review (Codex) reproduced 5 real
+ * defects in the first version against real git repos — see the commit this
+ * file is part of for the full report. Every defect is a design property
+ * fixed here, not a patched symptom:
+ *
+ *   1. Pre-staged/unstaged/untracked changes already in `--repo` could leak
+ *      into the publish commit. FIX: this script never touches `--repo`'s
+ *      own working tree or index at all. It reads commits (diff/ls-tree/
+ *      cat-file — pure object-database reads) and writes new commits
+ *      through an ISOLATED temporary index (GIT_INDEX_FILE) that starts
+ *      empty and is seeded only from the base branch's own tree — the
+ *      caller's real index/working tree is invisible to it.
+ *   2. Replaying an older content commit against a base that had already
+ *      moved forward (via a newer content commit) silently rolled the
+ *      published price back. FIX: every base branch commit this script
+ *      makes records the content SHA it applied, in the commit message; a
+ *      new run reads the LAST applied SHA off the base branch's own history
+ *      and requires the new content SHA to be a proper git descendant of it
+ *      (an ancestor => stale, reject; neither ancestor nor descendant =>
+ *      diverged, reject as a conflict; equal => already applied, no-op).
+ *   3. `${{ inputs.content_sha }}` was interpolated directly into workflow
+ *      `run:` shell text, and a shell string was built by hand for
+ *      `git archive | tar`. FIX (workflow): the input is only ever read via
+ *      `env:` + `$CONTENT_SHA`, per GitHub's own hardening guidance — see
+ *      .github/workflows-proposed/content-guard.yml. FIX (here): every SHA
+ *      this script accepts is validated as a full 40-hex commit object
+ *      before use; `git archive`/`tar` run as argv arrays with no shell.
+ *   4. Same isolation as #1.
+ *   5. The old race guard only checked "has base moved since I started" —
+ *      not whether the content SHA I'm applying is even sequence-valid
+ *      relative to what's already published (that's #2). The mechanical
+ *      "base moved" case is now closed atomically: the local ref update is
+ *      a `git update-ref <base> <new> <old>` compare-and-swap (not a
+ *      read-then-write with a gap), and the remote push is a plain
+ *      fast-forward-only push (never `--force`/`--force-with-lease`) whose
+ *      parent is exactly the base SHA this run started from, so git itself
+ *      refuses it the moment the remote has moved.
+ *   6. A content commit that only deletes a media file was applied without
+ *      checking whether the FINAL resulting base tree still had every photo
+ *      the FINAL published.json on base references — deleting a photo that
+ *      base had started referencing (via a separate, unrelated commit)
+ *      produced a broken result. FIX: after composing the new tree in the
+ *      isolated index, this script extracts published.json + review-
+ *      state.json + every media file from THAT COMPOSED TREE (not from the
+ *      content commit in isolation) and re-runs content-guard against it.
+ *      A failure here aborts with no commit made at all.
+ *   7. `git commit-tree` needs an author/committer identity; a runner with
+ *      no configured git identity previously failed outright. FIX: identity
+ *      is passed explicitly via GIT_AUTHOR_NAME/EMAIL and
+ *      GIT_COMMITTER_NAME/EMAIL env vars on the commit-tree call itself —
+ *      never relies on global/repo git config, and works even with
+ *      `user.useConfigOnly=true` set.
+ *
+ * Usage:
+ *   node --import tsx scripts/publish-content.ts \
+ *     --repo <path>        # default: cwd. Working tree/index NEVER touched.
+ *     --base <branch>      # default: --repo's current branch name
+ *     --content <full-40-hex-sha>
+ *     [--remote <name>]    # if given, pushes (plain, never --force) after
+ *
+ * Exit codes:
+ *   0  success — a commit was made, or nothing needed publishing (including
+ *      an exact replay of the already-applied content SHA)
+ *   1  usage/input error (bad args, malformed SHA, content SHA not a
+ *      locally-known commit object, base branch doesn't resolve)
+ *   2  the content commit touched files outside the allowlist
+ *   3  a required file (published.json) is missing/unreadable at the
+ *      content commit
+ *   4  content-guard rejected the content commit's OWN snapshot/media
+ *   5  the base branch moved (locally or on the remote) since this run
+ *      started — never silently overwritten, never force-pushed
+ *   6  the content SHA is older than (an ancestor of) what's already
+ *      applied to base — refusing to roll a newer publish back
+ *   7  the content SHA has diverged from what's already applied to base
+ *      (neither an ancestor nor a descendant) — a real conflict
+ *   8  the FINAL composed base tree failed content-guard (e.g. it would
+ *      reference a media file this run just removed) — no commit made
+ *   9  a managed path (published.json/review-state.json/a media file this
+ *      run touches) has independently diverged on base since the last
+ *      guarded publish — refusing to silently overwrite that change
+ *  10  `--remote` was given but the remote could not be read at all —
+ *      refusing to report success or "already applied" from unverifiable
+ *      local state
+ *  11  sequencing found this content SHA already guarded LOCALLY on base,
+ *      but `--remote`'s own current branch state does not confirm it (the
+ *      branch is missing on the remote entirely, or sits at a different
+ *      commit) — refusing to report "already applied" from local state
+ *      alone; the local commit is kept exactly as-is (never discarded),
+ *      resolve manually and re-run
+ *
+ * Three more defects fixed 2026-09-15 (a follow-up independent review):
+ *  A. This script never touches --repo's real working tree/index while
+ *     composing the commit (still true) — but it used to leave the real
+ *     checkout's INDEX stale relative to the NEW `base` ref it had just
+ *     advanced, on a checkout that was otherwise perfectly clean. Git
+ *     status then showed the old content as a pending staged rollback —
+ *     harmless until literally anything else committed in that checkout
+ *     (e.g. `git add -A && git commit` for an unrelated reason), which
+ *     would silently carry that stale rollback into ITS OWN commit and
+ *     revert the just-published change. Fixed: after a successful publish,
+ *     if the checkout is actually ON `base`, the specific touched paths
+ *     (never a blanket add) are synced into the real working tree/index —
+ *     but ONLY the ones that were clean before this run started; a path
+ *     with a genuine pre-existing user edit is still left completely
+ *     alone, preserving defect #1/#4's guarantee for real dirty state.
+ *  B. A content SHA could be a perfectly valid forward publish while a
+ *     managed path had ALSO been changed independently and directly on
+ *     `base` since the last guarded publish (e.g. a manual hotfix commit)
+ *     — the isolated index blindly overwrote it with the new candidate's
+ *     value, silently discarding the independent change. Fixed: before
+ *     applying, each touched path's blob on `base` right now is compared
+ *     to what it was at the last-applied SHA; a mismatch means something
+ *     else changed it independently — reject (code 9) rather than choose
+ *     a side automatically.
+ *  C. A push that failed (network blip, server-side rejection) still left
+ *     a LOCAL commit + advanced local ref behind. A retry with the SAME
+ *     content SHA read its own leftover local commit as "already applied"
+ *     (sequencing) and reported success without ever attempting the push
+ *     again — while the remote genuinely still had nothing. Fixed: when
+ *     `--remote` is given, this script first reads the remote's OWN
+ *     current truth (`git ls-remote`) and, if local is ahead of it by
+ *     nothing but this script's own previously-unpushed guarded commits
+ *     (identified by their own commit-message marker — never touches a
+ *     divergence caused by anything/anyone else, which still hits the
+ *     existing hard-refusal path), rolls the local ref back to match the
+ *     remote before proceeding, so sequencing and diffing are always
+ *     grounded in what's actually published, not a stale local artifact.
+ *
+ * Four more defects fixed 2026-09-15 (a THIRD independent review):
+ *  D. Fix C's own remote read treated "ls-remote returned nothing" as one
+ *     case, whether the remote was reachable-but-branchless (safe) or
+ *     entirely UNREACHABLE (network down, deleted, bad URL) — in the
+ *     latter case a retry after a failed push saw its own leftover local
+ *     commit and reported false "already applied" success while the
+ *     remote — unverifiable, but in fact never touched — still had
+ *     nothing. Fixed: an unreachable remote now throws (exit 10) instead
+ *     of silently falling through to local-only sequencing.
+ *  E. `toUpsert` was computed by filtering the DIFF between the last
+ *     guarded content SHA and this one — so a file that existed
+ *     (unreferenced) in an EARLIER content commit and only becomes
+ *     REFERENCED later, with its bytes never actually changing in
+ *     between, showed no diff at all and was silently never copied to
+ *     base — content-guard then correctly failed the final composed
+ *     result ("file missing"), incorrectly blocking a legitimate publish.
+ *     Fixed: `toUpsert` is now computed directly from content-guard's own
+ *     manifest of the content commit's CURRENT references, compared
+ *     against base's CURRENT blob for each — independent of any diff
+ *     history, so a newly-referenced-but-byte-identical file is included
+ *     exactly like any other.
+ *  F. The independent-target-conflict check (B, above) compared base's
+ *     current blob against the CONTENT branch's historical blob at the
+ *     last-applied content SHA — but that content commit's own tree can
+ *     contain files a prior guarded run correctly chose never to copy to
+ *     base (an orphaned, unreferenced media file). Deleting such a file
+ *     on the content branch looked exactly like "base independently
+ *     changed a path this run touches" and was wrongly rejected as a
+ *     conflict. Fixed: `lastGuardedCommit` now also returns the guard
+ *     commit's OWN SHA on `base`'s history (not just the content SHA
+ *     embedded in its message) — the only correct reference point for
+ *     "what did base itself have right after the last guarded publish".
+ *     Comparing against THAT tree instead correctly treats a
+ *     never-transferred file as absent on both sides — no conflict.
+ *  G. The "sync touched paths into the real checkout" step (A, above)
+ *     decided which paths were safe to touch using a SNAPSHOT of dirty
+ *     paths taken once, near the very start of the run. A user edit made
+ *     LATER — during the run's own execution, e.g. in the window between
+ *     that snapshot and the final push — was invisible to that snapshot
+ *     and got silently overwritten by the sync step. Fixed: dropped the
+ *     upfront snapshot entirely; each path is now checked JUST BEFORE it
+ *     is touched, comparing the CURRENT working tree against
+ *     `baseShaAtStart` at that exact moment — catching an edit made at
+ *     any point during the run, not just ones that predate it.
+ *
+ * Two more defects fixed 2026-09-15 (a FOURTH independent review):
+ *  H. The end-of-run sync step (A/G, above) decided whether a touched path
+ *     was safe to copy into the real checkout by checking ONLY the working
+ *     tree against `baseShaAtStart` (`git diff <sha> -- f`). That check is
+ *     blind to the git INDEX: a user can stage an intentional edit (`git
+ *     add`) and then have their working file happen to match
+ *     `baseShaAtStart` again (e.g. reverted by hand, or an editor autosave
+ *     round-trip) while the STAGED version still differs. The old check saw
+ *     "working tree clean" and ran `git checkout <newCommit> -- f`, which
+ *     overwrites the index too — silently discarding the staged edit that
+ *     was never actually reflected anywhere else. Fixed: a path is only
+ *     "unchanged since start" when BOTH the working tree AND the index
+ *     (`git diff --cached <sha> -- f`) match `baseShaAtStart` — either one
+ *     differing is treated as real pending user content and left untouched,
+ *     exactly like any other dirty path.
+ *  I. `reconcileWithRemoteTruth` (C/D, above) correctly leaves local state
+ *     alone when the remote is reachable but genuinely has no such branch
+ *     yet (nothing to reconcile against). But `checkSequencing` right after
+ *     it reads its "last applied" verdict purely from base's LOCAL history
+ *     — so a retry of a first-ever publish, after an earlier attempt
+ *     committed locally but then failed to push (the exact case fix C
+ *     exists for on a branch that DOES already exist remotely), saw its own
+ *     unpushed local commit, matched it against the same `--content` SHA,
+ *     and reported "already applied" success — while the remote branch
+ *     still didn't exist at all and had received nothing. Fixed: when
+ *     sequencing verdicts "noop" and `--remote` was given, this script now
+ *     independently re-reads the remote's own current branch state and
+ *     requires it to exactly equal the local base ref before trusting the
+ *     noop; any mismatch (missing branch, or a different commit) is a clear
+ *     refusal (exit 11), never a silent false success — and never discards
+ *     the local commit, which stays exactly where it was for a manual push
+ *     or a corrected re-run.
+ */
+import { execFileSync } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname);
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..");
+
+function arg(name: string, fallback?: string): string | undefined {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+}
+
+const REPO = path.resolve(arg("repo", ".")!);
+const CONTENT_SHA = arg("content");
+const REMOTE = arg("remote");
+// Two DIFFERENT boundaries, deliberately kept separate (Б4 Block A,
+// 2026-09-15 — the panel's real write path interleaves commits this
+// script must tolerate seeing without ever transferring them):
+//
+//   EDITING_SOURCE_ALLOWLIST — what's safe for the content branch's history
+//   to contain at all, without refusing the whole publish. A real panel
+//   session commits to THIS branch on every Keystatic save (one commit per
+//   working-copy file, e.g. `src/content/cms/cars/<slug>.json`) and on
+//   every "Позначити перевіреним" (review-state.json) — entirely separate
+//   commits from `publishItem`'s own published.json/media writes (verified
+//   directly against panelStore.ts: confirmLocale/publishItem never share
+//   a commit). Treating any of that as "the content branch touched a
+//   disallowed file" would make a real, correctly-used branch unpublishable
+//   the moment more than one edit had ever happened on it.
+//
+//   The actual TRANSFER stays exactly as narrow as before — see toUpsert/
+//   toRemove below, which only ever consider PUBLISHED_PATH, REVIEW_PATH,
+//   and content-guard's own approved media manifest. A working-copy file
+//   under `src/content/cms/<other-collection>/*.json` is now ALLOWED to
+//   exist in the diff (so it doesn't block the publish) but is still NEVER
+//   eligible to be committed to base — it simply isn't in that filter.
+//   Anything outside src/content/cms/** or public/images/cms/** entirely
+//   (any `.ts`/`.js`/`.yml`/`package.json`/etc.) is unaffected: still
+//   rejected outright, exactly as before.
+const EDITING_SOURCE_ALLOWLIST = /^(src\/content\/cms\/.+|public\/images\/cms\/.+)$/;
+const PUBLISHED_PATH = "src/content/cms/published.json";
+const REVIEW_PATH = "src/content/cms/review-state.json";
+const FULL_SHA_RE = /^[0-9a-f]{40}$/;
+const COMMIT_IDENTITY = {
+  GIT_AUTHOR_NAME: "content-guard",
+  GIT_AUTHOR_EMAIL: "content-guard@users.noreply.github.com",
+  GIT_COMMITTER_NAME: "content-guard",
+  GIT_COMMITTER_EMAIL: "content-guard@users.noreply.github.com",
+};
+
+class PublishError extends Error {
+  constructor(
+    public readonly code: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function git(args: string[], opts: { cwd?: string; env?: Record<string, string> } = {}): string {
+  return execFileSync("git", args, {
+    cwd: opts.cwd ?? REPO,
+    env: opts.env ? { ...process.env, ...opts.env } : process.env,
+    encoding: "utf8",
+  }).trim();
+}
+
+function gitOrNull(args: string[], opts: { cwd?: string; env?: Record<string, string> } = {}): string | null {
+  try {
+    return git(args, opts);
+  } catch {
+    return null;
+  }
+}
+
+function assertFullSha(sha: string | undefined, label: string): asserts sha is string {
+  if (!sha || !FULL_SHA_RE.test(sha)) {
+    throw new PublishError(1, `${label} must be a full 40-character hex commit SHA, got: ${JSON.stringify(sha)}`);
+  }
+}
+
+/** Confirms `sha` is a commit object this repo already has (post-fetch). */
+function assertIsFetchedCommit(sha: string): void {
+  const type = gitOrNull(["cat-file", "-t", sha]);
+  if (type !== "commit") {
+    throw new PublishError(
+      1,
+      `content SHA ${sha} is not a fetched commit object in this repo (git cat-file -t returned ${JSON.stringify(type)})`,
+    );
+  }
+}
+
+interface ChangedFiles {
+  upserted: string[]; // present (new/changed) at the content commit
+  removed: string[]; // absent at the content commit, present at the diff base ("from")
+}
+
+/**
+ * `from` must be the LAST content SHA actually applied to `base` (Б4 Block
+ * B, 2026-09-15), not `merge-base(base, content)` — a real content branch
+ * accumulates many publishes over its life, and a file that was added by
+ * an EARLIER already-applied publish and removed by THIS one nets to "no
+ * change" when diffed against a merge-base from before either of those —
+ * so the removal would silently never reach base (found by a realistic
+ * multi-publish-cycle test: publish A with a photo, publish B with a
+ * different photo, delete A's now-orphaned photo — that deletion diffed
+ * clean against the old merge-base and the stale photo never left base).
+ * `from` falls back to a real `merge-base(base, content)` only for the
+ * first-ever publish to a given base (no prior applied SHA to diff since).
+ */
+function changedFiles(from: string, content: string): ChangedFiles {
+  const raw = git(["diff", "--name-status", "--no-renames", from, content]);
+  const upserted: string[] = [];
+  const removed: string[] = [];
+  for (const line of raw.split("\n").filter(Boolean)) {
+    const [status, ...rest] = line.split("\t");
+    const file = rest.join("\t");
+    if (status === "D") removed.push(file);
+    else upserted.push(file);
+  }
+  return { upserted, removed };
+}
+
+function assertAllowlisted(changed: ChangedFiles): void {
+  const bad = [...changed.upserted, ...changed.removed].filter((f) => !EDITING_SOURCE_ALLOWLIST.test(f));
+  if (bad.length > 0) {
+    throw new PublishError(
+      2,
+      `content branch touched files outside the allowlist:\n${bad.map((f) => `  ${f}`).join("\n")}`,
+    );
+  }
+}
+
+/**
+ * The most recent guarded-publish commit on `base`'s own history, read
+ * straight from it — never a separate state file that could itself drift
+ * out of sync with what's actually on the branch. Returns BOTH SHAs,
+ * deliberately kept distinct (a real defect otherwise, found 2026-09-15 —
+ * a third independent review): `contentSha` (embedded in the commit
+ * message) is a commit on the CONTENT branch's own history, used for
+ * sequencing/diff purposes; `baseSha` is the commit ITSELF, on `base`'s
+ * own history — the only correct reference point for "what did base
+ * itself look like right after the last guarded publish", used by the
+ * independent-target-conflict check below. Conflating the two made that
+ * check compare against the wrong tree: `contentSha`'s tree includes
+ * files that a prior guarded run correctly chose NEVER to copy to base
+ * (an unreferenced/orphaned media file sitting in that content commit) —
+ * comparing base's absence of such a file against content's presence of
+ * it looked like an "independent deletion" that never happened.
+ */
+function lastGuardedCommit(base: string): { baseSha: string; contentSha: string } | null {
+  const line = gitOrNull(["log", base, "--fixed-strings", "--grep=(guarded ", "--format=%H %s", "-n", "1"]);
+  if (!line) return null;
+  const sp = line.indexOf(" ");
+  const baseSha = line.slice(0, sp);
+  const subject = line.slice(sp + 1);
+  const m = subject.match(/\(guarded ([0-9a-f]{40})\)/);
+  return m ? { baseSha, contentSha: m[1] } : null;
+}
+
+function isAncestor(maybeAncestor: string, of: string): boolean {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", maybeAncestor, of], { cwd: REPO });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A previous run of this exact script may have committed locally and then
+ * failed to push (network blip, server-side rejection). Left alone, that
+ * leftover local commit would make a retry's own sequencing check
+ * (`lastGuardedCommit`) see the content as "already applied" and report
+ * success without ever re-attempting the push. Reconciles narrowly: only
+ * when local is a pure fast-forward ahead of the remote's own truth, and
+ * every commit in that gap is one of THIS script's own guarded-publish
+ * commits (its distinctive `(guarded <sha>)` message marker) — never when
+ * the remote has moved independently (a real divergence there is left for
+ * the existing hard-refusal push-rejection path, unchanged).
+ *
+ * Throws (never silently proceeds on local-only state) when the remote
+ * itself cannot be read at all — a real defect found 2026-09-15 (a third
+ * independent review): `git ls-remote` returning nothing was treated the
+ * SAME whether the remote was genuinely reachable-but-empty-for-this-
+ * branch (safe: proceed using local as truth, e.g. the very first publish
+ * ever) or entirely UNREACHABLE (network down, bad URL, deleted) — in the
+ * latter case a retry after a failed push saw its own unpushed local
+ * commit and reported "already applied" success while the remote (unverifiable,
+ * but in fact never touched) genuinely still had nothing. Now distinguished
+ * by `git ls-remote`'s own exit code, not just its output.
+ */
+/**
+ * Reads `remote`'s own current commit for `base`, or `null` if the remote is
+ * reachable but genuinely has no such branch. Throws (never returns `null`
+ * to mean "unreadable") when the remote itself cannot be contacted at all —
+ * callers must never treat "could not verify" the same as "verified empty".
+ */
+function readRemoteHead(remote: string, base: string): string | null {
+  let remoteHeadLine: string;
+  try {
+    remoteHeadLine = git(["ls-remote", remote, base]);
+  } catch (err) {
+    const e = err as { stderr?: string };
+    throw new PublishError(
+      10,
+      `remote "${remote}" could not be read — refusing to report success or "already applied" based on unverifiable local state: ${e.stderr ?? err}`,
+    );
+  }
+  return remoteHeadLine ? (remoteHeadLine.split("\t")[0]?.trim() ?? null) : null;
+}
+
+function reconcileWithRemoteTruth(base: string, baseRef: string, remote: string): void {
+  const remoteHead = readRemoteHead(remote, base);
+  if (!remoteHead) return; // remote IS reachable, genuinely has no such branch yet — nothing to reconcile against
+  const localHead = git(["rev-parse", baseRef]);
+  if (remoteHead === localHead) return; // already in sync
+  git(["fetch", remote, remoteHead]); // ensure the object is present before any ancestry check
+  if (!isAncestor(remoteHead, localHead)) return; // remote diverged/moved independently — leave for the normal path
+  const onlyOurs = git(["log", `${remoteHead}..${localHead}`, "--format=%s"])
+    .split("\n")
+    .filter(Boolean)
+    .every((subject) => /\(guarded [0-9a-f]{40}\)$/.test(subject));
+  if (!onlyOurs) return; // something else also committed locally in that gap — don't discard it silently
+  git(["update-ref", baseRef, remoteHead]);
+}
+
+/**
+ * Enforces publish ordering against base's own history. Returns the last
+ * guarded commit (null if this is the first-ever guarded publish to
+ * `base`) plus a verdict: "noop" when the requested content SHA was
+ * already the last one applied (idempotent re-run — not an error), "apply"
+ * otherwise. `last.contentSha` is the correct diff base for `changedFiles`
+ * — see its own doc comment for why this must not be `merge-base(base,
+ * content)` instead; `last.baseSha` is the correct reference point for the
+ * independent-target-conflict check — see `lastGuardedCommit`'s own doc
+ * comment for why these two must not be conflated.
+ */
+function checkSequencing(
+  base: string,
+  content: string,
+): { last: { baseSha: string; contentSha: string } | null; verdict: "noop" | "apply" } {
+  const last = lastGuardedCommit(base);
+  if (last === null) return { last, verdict: "apply" }; // first-ever guarded publish to this base
+  if (last.contentSha === content) return { last, verdict: "noop" };
+  if (isAncestor(content, last.contentSha)) {
+    throw new PublishError(
+      6,
+      `content ${content} is older than (an ancestor of) the last applied ${last.contentSha} — refusing to roll a newer publish back`,
+    );
+  }
+  if (!isAncestor(last.contentSha, content)) {
+    throw new PublishError(
+      7,
+      `content ${content} has diverged from the last applied ${last.contentSha} (neither is an ancestor of the other) — conflict, needs reconciliation, not an automatic merge`,
+    );
+  }
+  return { last, verdict: "apply" };
+}
+
+/** mode + blob SHA for one path in a tree-ish, from `git ls-tree`. */
+function lsTreeEntry(treeish: string, filePath: string): { mode: string; sha: string } | null {
+  const line = gitOrNull(["ls-tree", treeish, "--", filePath]);
+  if (!line) return null;
+  const m = line.match(/^(\d+) blob ([0-9a-f]{40})\t/);
+  return m ? { mode: m[1], sha: m[2] } : null;
+}
+
+/** The blob SHA a path resolves to in a tree-ish, or null if absent there. */
+function blobAt(treeish: string, filePath: string): string | null {
+  return lsTreeEntry(treeish, filePath)?.sha ?? null;
+}
+
+/** Does this tree-ish have anything at all under `dirPath`? Read-only. */
+function treeHasDir(treeish: string, dirPath: string): boolean {
+  return gitOrNull(["ls-tree", "-d", treeish, "--", dirPath]) !== null && !!gitOrNull(["ls-tree", treeish, dirPath]);
+}
+
+/**
+ * Extracts published.json + review-state.json + the full media tree from a
+ * tree-ish (a real commit OR a composed-but-uncommitted tree object — both
+ * work identically for `git cat-file`/`git archive`) into a fresh temp dir,
+ * for content-guard.ts to validate. A genuinely empty/absent media
+ * directory is fine (nothing has ever been published yet); anything else
+ * that goes wrong while a media directory DOES exist is a real failure and
+ * is never treated as "no media, fine".
+ */
+async function extractGuardInputs(
+  treeish: string,
+): Promise<{ publishedPath: string; reviewPath: string; mediaRoot: string }> {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "publish-content-"));
+
+  const published = gitOrNull(["cat-file", "-p", `${treeish}:${PUBLISHED_PATH}`]);
+  if (published === null) {
+    throw new PublishError(
+      3,
+      `required file missing/unreadable at ${treeish}: ${PUBLISHED_PATH} — refusing to publish (never substituting empty content)`,
+    );
+  }
+  const publishedPath = path.join(tmpDir, "published.json");
+  await fs.writeFile(publishedPath, published, "utf8");
+
+  // review-state.json is allowed to be genuinely absent (content-guard.ts's
+  // own default already tolerates that) — but if it exists, use it as-is.
+  const review = gitOrNull(["cat-file", "-p", `${treeish}:${REVIEW_PATH}`]) ?? "{}";
+  const reviewPath = path.join(tmpDir, "review.json");
+  await fs.writeFile(reviewPath, review, "utf8");
+
+  const mediaRoot = path.join(tmpDir, "media");
+  await fs.mkdir(mediaRoot, { recursive: true });
+
+  if (treeHasDir(treeish, "public/images/cms")) {
+    // No shell string-building: `git archive -o` writes a real file, `tar`
+    // reads a real file — both invoked as argv arrays, so nothing in
+    // `treeish` (already validated as a 40-hex SHA before this point) or
+    // any path can be interpreted as shell syntax.
+    const tarPath = path.join(tmpDir, "media.tar");
+    // `-o <path>` must come BEFORE the `--` pathspec separator — after it,
+    // git treats "-o" and the path as pathspecs instead of the output flag
+    // (a real bug caught only by running this against a genuinely separate
+    // temp directory, not the project's own `public/`).
+    git(["archive", treeish, "-o", tarPath, "--", "public/images/cms"]);
+    execFileSync("tar", ["-x", "-C", mediaRoot, "--strip-components=1", "-f", tarPath]);
+  }
+  // else: no public/images/cms directory in this tree at all yet — a real,
+  // legitimate empty state, not an error we had to catch and hope was this.
+
+  return { publishedPath, reviewPath, mediaRoot };
+}
+
+function runContentGuard(
+  inputs: { publishedPath: string; reviewPath: string; mediaRoot: string },
+  manifestOut: string,
+  rejectionCode: number,
+  contextLabel: string,
+): void {
+  try {
+    execFileSync(
+      "node",
+      [
+        "--import",
+        "tsx",
+        "scripts/content-guard.ts",
+        "--published",
+        inputs.publishedPath,
+        "--review",
+        inputs.reviewPath,
+        "--media-root",
+        inputs.mediaRoot,
+        "--manifest-out",
+        manifestOut,
+      ],
+      { cwd: PROJECT_ROOT, stdio: "pipe", encoding: "utf8" },
+    );
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string };
+    throw new PublishError(
+      rejectionCode,
+      `content-guard rejected ${contextLabel}:\n${e.stdout ?? ""}${e.stderr ?? ""}`,
+    );
+  }
+}
+
+async function readManifest(manifestOut: string): Promise<Set<string>> {
+  const text = await fs.readFile(manifestOut, "utf8").catch(() => "");
+  return new Set(
+    text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean),
+  );
+}
+
+async function main() {
+  assertFullSha(CONTENT_SHA, "--content");
+  assertIsFetchedCommit(CONTENT_SHA);
+
+  const base = arg("base") ?? git(["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (base === "HEAD" || !base) {
+    throw new PublishError(1, "no usable base branch name — pass --base explicitly, or check out a real branch");
+  }
+  const baseRef = `refs/heads/${base}`;
+  if (REMOTE) reconcileWithRemoteTruth(base, baseRef, REMOTE);
+  const baseShaAtStart = git(["rev-parse", baseRef]);
+
+  // Which branch (if any) the caller's checkout is actually on — used at
+  // the very end to decide whether it's meaningful to sync touched paths
+  // into the real working tree at all. Path-level dirtiness is checked
+  // JUST BEFORE each sync operation instead of from an upfront snapshot —
+  // see the sync step's own comment for why.
+  const checkoutBranch = gitOrNull(["symbolic-ref", "-q", "--short", "HEAD"]);
+
+  const seq = checkSequencing(base, CONTENT_SHA);
+  if (seq.verdict === "noop") {
+    // Local history alone says this content SHA is already applied — but
+    // that history can be a leftover from a run whose COMMIT succeeded
+    // locally and whose PUSH then failed (see defect I in the top-of-file
+    // notes). Never report success on local state alone when a remote is in
+    // play: the remote's own branch must actually be at this exact commit.
+    if (REMOTE) {
+      const remoteHead = readRemoteHead(REMOTE, base);
+      if (remoteHead !== baseShaAtStart) {
+        throw new PublishError(
+          11,
+          `content ${CONTENT_SHA} is already guarded locally on "${base}" (${baseShaAtStart}), but remote "${REMOTE}" ` +
+            (remoteHead
+              ? `has "${base}" at a different commit (${remoteHead}) — local and remote have diverged`
+              : `has no "${base}" branch at all — this was likely never actually pushed (a previous push probably failed)`) +
+            `. Refusing to report "already applied" from local state alone. The local commit is kept exactly as-is — ` +
+            `push it manually once the remote state is resolved (e.g. \`git push ${REMOTE} ${base}\`), then re-run.`,
+        );
+      }
+    }
+    console.log(`nothing to publish (content ${CONTENT_SHA} was already the last one applied to ${base})`);
+    return;
+  }
+  const diffFrom = seq.last?.contentSha ?? git(["merge-base", base, CONTENT_SHA]);
+
+  const changed = changedFiles(diffFrom, CONTENT_SHA);
+  if (changed.upserted.length === 0 && changed.removed.length === 0) {
+    console.log("nothing to publish (content commit introduces no change vs base)");
+    return;
+  }
+  assertAllowlisted(changed);
+
+  // Pass 1: validate the content commit's OWN snapshot in isolation, and
+  // learn exactly which media files it legitimately references (the
+  // manifest) — an orphan file the content branch happens to carry outside
+  // any real item's reference is never eligible for upsert below.
+  const contentInputs = await extractGuardInputs(CONTENT_SHA);
+  const contentManifestOut = path.join(path.dirname(contentInputs.publishedPath), "manifest.txt");
+  runContentGuard(contentInputs, contentManifestOut, 4, "the content commit's own snapshot/media");
+  const contentManifest = await readManifest(contentManifestOut);
+
+  // `toUpsert` is every currently-referenced managed path (content-guard's
+  // own manifest, plus the two JSON files unconditionally) whose blob on
+  // base doesn't already match content's — NOT filtered through the diff
+  // between the last-applied content SHA and this one. A path can be
+  // legitimately referenced by content's CURRENT snapshot while showing NO
+  // diff at all against the last-applied SHA (its bytes never changed —
+  // only which item references it did, e.g. a photo sitting unreferenced
+  // in an earlier content commit that only becomes referenced later); a
+  // diff-only view would silently skip copying it, then fail the final
+  // integrity check for a "missing" file that was never actually upserted.
+  const desiredPaths = new Set<string>([PUBLISHED_PATH, REVIEW_PATH, ...contentManifest]);
+  const toUpsert = [...desiredPaths].filter((f) => blobAt(CONTENT_SHA, f) !== blobAt(baseShaAtStart, f));
+  const toRemove = changed.removed.filter((f) => f.startsWith("public/images/cms/") && !desiredPaths.has(f));
+
+  // A content SHA can be a perfectly valid forward publish while `base`
+  // ITSELF has independently changed one of these same managed paths since
+  // the last shared reference point (e.g. a manual hotfix commit directly
+  // on main). Blindly applying the new candidate would silently discard
+  // that independent change. For every path this run is about to touch,
+  // its current blob on base must still match what it was at the anchor —
+  // a mismatch means something else changed it independently in between.
+  //
+  // The anchor is `seq.last.baseSha`'s own tree when a prior guarded
+  // publish exists — never `diffFrom` in that case, which is a commit on
+  // the CONTENT branch and can contain files this script correctly never
+  // copied to base (comparing against those would misreport a file base
+  // never had as an "independent deletion" — the exact false conflict a
+  // third independent review found, 2026-09-15). For the FIRST-EVER
+  // publish to a given base (no prior guarded commit at all), there is no
+  // `baseSha` to use instead — but the check itself is still needed: base
+  // may already have evolved independently since content and base last
+  // shared history, and `diffFrom` (their real `merge-base`, computed
+  // above) is the correct, git-native reference point for THAT case —
+  // dropping the check entirely for a first-ever publish was a regression
+  // (a real one, caught by the ORIGINAL Codex "final-media" scenario:
+  // base's own published.json had independently started referencing a
+  // photo that this content commit deletes — undetected without this).
+  const conflictAnchor = seq.last?.baseSha ?? diffFrom;
+  for (const f of [...toUpsert, ...toRemove]) {
+    const baseNow = blobAt(baseShaAtStart, f);
+    const expected = blobAt(conflictAnchor, f);
+    if (baseNow !== expected) {
+      throw new PublishError(
+        9,
+        `base's current "${f}" has diverged independently since the last shared reference point ` +
+          `(was ${expected ?? "absent"} at ${conflictAnchor}, base now has ${baseNow ?? "absent"}) — ` +
+          `refusing to overwrite an independent change; reconcile manually`,
+      );
+    }
+  }
+
+  // ── Isolated index: never the real --repo working tree or index ────────
+  const indexDir = await fs.mkdtemp(path.join(os.tmpdir(), "publish-index-"));
+  const GIT_INDEX_FILE = path.join(indexDir, "index");
+  const idxEnv = { GIT_INDEX_FILE };
+  git(["read-tree", baseShaAtStart], { env: idxEnv });
+  for (const f of toUpsert) {
+    const entry = lsTreeEntry(CONTENT_SHA, f);
+    if (!entry) {
+      // Listed as changed by the diff but unreadable via ls-tree — treat
+      // exactly like any other missing-required-data case, never silently
+      // skipped.
+      throw new PublishError(3, `content SHA ${CONTENT_SHA} changed ${f} but it is not readable via git ls-tree`);
+    }
+    git(["update-index", "--add", "--cacheinfo", `${entry.mode},${entry.sha},${f}`], { env: idxEnv });
+  }
+  for (const f of toRemove) {
+    git(["update-index", "--force-remove", "--", f], { env: idxEnv });
+  }
+  const newTreeSha = git(["write-tree"], { env: idxEnv });
+  const baseTreeSha = git(["rev-parse", `${baseShaAtStart}^{tree}`]);
+  if (newTreeSha === baseTreeSha) {
+    console.log("nothing to publish (target already matches content)");
+    return;
+  }
+
+  // Pass 2: the FINAL, fully-composed result — the tree this run is about
+  // to commit — must itself still be internally consistent. This is what
+  // catches a media file removal that base's OWN published.json (changed
+  // by a different, unrelated commit since content's merge-base) still
+  // references: the content commit alone looked fine in isolation, but the
+  // composed result would not be.
+  const finalInputs = await extractGuardInputs(newTreeSha);
+  const finalManifestOut = path.join(path.dirname(finalInputs.publishedPath), "manifest.txt");
+  runContentGuard(finalInputs, finalManifestOut, 8, "the final composed result (published.json + all referenced media together)");
+
+  const commitSha = git(
+    [
+      "commit-tree",
+      newTreeSha,
+      "-p",
+      baseShaAtStart,
+      "-m",
+      `content: publish ${new Date().toISOString()} (guarded ${CONTENT_SHA})`,
+    ],
+    { env: COMMIT_IDENTITY },
+  );
+
+  // Local ref update is an atomic compare-and-swap: if `base` moved since
+  // baseShaAtStart was captured (by any other process touching this same
+  // repo), this fails outright — no read-then-write gap to race into.
+  try {
+    git(["update-ref", baseRef, commitSha, baseShaAtStart]);
+  } catch (err) {
+    const e = err as { stderr?: string };
+    throw new PublishError(5, `base branch moved locally during processing — aborting, not overwriting: ${e.stderr ?? ""}`);
+  }
+  console.log(`published ${commitSha} on ${base} (guarded ${CONTENT_SHA})`);
+
+  if (REMOTE) {
+    // Plain push — no force flag of any kind. Its parent is exactly
+    // baseShaAtStart, so this is only a fast-forward (and therefore only
+    // succeeds) if the remote is still at baseShaAtStart; otherwise git
+    // itself refuses it and nothing is overwritten.
+    try {
+      git(["push", REMOTE, `${commitSha}:refs/heads/${base}`]);
+    } catch (err) {
+      const e = err as { stderr?: string };
+      throw new PublishError(
+        5,
+        `push to "${REMOTE}" refused (base moved on the remote during processing) — commit kept locally, NOT force-pushed: ${e.stderr ?? ""}`,
+      );
+    }
+  }
+
+  // If this checkout is actually ON `base`, sync the specific touched paths
+  // into the REAL working tree/index too — otherwise the index still holds
+  // the pre-publish blob while HEAD (a symref to base) now resolves to the
+  // new commit, which `git status` shows as a pending staged rollback of
+  // exactly what was just published. Left alone, the next unrelated commit
+  // anyone makes in this checkout (`git add -A && git commit`, e.g.) would
+  // silently carry that stale rollback along and revert the publish.
+  //
+  // Each path is checked JUST BEFORE it's touched — not from a snapshot
+  // taken once near the start of the run — comparing the CURRENT working
+  // tree against `baseShaAtStart` at that exact moment. An earlier version
+  // captured "dirty paths" upfront and only ever consulted that snapshot;
+  // a real defect found 2026-09-15 (a third independent review): a user
+  // edit made LATER — during this run's own execution (e.g. in the window
+  // between that snapshot and the push actually happening) — was invisible
+  // to it and got silently overwritten here. Checking freshly right before
+  // each touch catches an edit made at any point during the run, not just
+  // ones that predate it, while still never flagging a path as "dirty"
+  // merely because `base`'s ref itself moved (that comparison is always
+  // against `baseShaAtStart`, never against the new HEAD).
+  if (checkoutBranch === base) {
+    const unchangedSinceStart = (f: string): boolean => {
+      try {
+        // BOTH the working tree and the index must still match
+        // `baseShaAtStart` — checking only the working tree misses a
+        // legitimately staged user edit whose working file happens to
+        // read back identical to baseline (defect H, top-of-file notes):
+        // `git checkout <newCommit> -- f` below overwrites the index too,
+        // silently discarding that staged edit even though the working
+        // tree alone looked perfectly clean.
+        execFileSync("git", ["diff", "--quiet", baseShaAtStart, "--", f], { cwd: REPO });
+        execFileSync("git", ["diff", "--cached", "--quiet", baseShaAtStart, "--", f], { cwd: REPO });
+        return true;
+      } catch {
+        return false; // differs (or the check itself failed) — never touch it
+      }
+    };
+    // Best-effort hygiene, not the operation's own success/failure: the
+    // actual publish (commit + ref update + optional push) already fully
+    // succeeded above. `-f` on the removal is safe specifically because
+    // `unchangedSinceStart` already proved this exact path had no real
+    // pending change of the caller's own at the moment we touch it —
+    // without it, plain `git rm` refuses ("has changes staged in the
+    // index"), because HEAD (a symref to `base`) has already moved past
+    // this path's removal while the real index still holds its pre-publish
+    // entry — the same underlying ref/checkout-desync artifact this whole
+    // sync step exists to clear.
+    try {
+      for (const f of toUpsert) {
+        if (!unchangedSinceStart(f)) continue;
+        git(["checkout", commitSha, "--", f]);
+      }
+      for (const f of toRemove) {
+        if (!unchangedSinceStart(f)) continue;
+        git(["rm", "--ignore-unmatch", "--quiet", "-f", "--", f]);
+      }
+    } catch (err) {
+      const e = err as { message?: string };
+      console.error(`WARNING: publish succeeded, but syncing the local checkout afterward failed: ${e.message ?? err}`);
+    }
+  }
+}
+
+main().catch((err) => {
+  if (err instanceof PublishError) {
+    console.error(`REJECTED (${err.code}): ${err.message}`);
+    process.exit(err.code);
+  }
+  console.error(err);
+  process.exit(1);
+});

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
 import { getNavItems } from "@/lib/nav";
-import { emailDisplay, emailHref, phoneDisplay, phoneHref } from "@/lib/social";
+
 import { DreamLogo } from "./DreamLogo";
 import { SocialLinks } from "./SocialLinks";
 
@@ -35,13 +35,13 @@ export function SiteFooter({ dict, locale }: { dict: Dictionary; locale: Locale 
         </nav>
 
         <div className="flex flex-col gap-4">
-          <a href={phoneHref} className="text-sm text-text transition-colors hover:text-gold">
-            {phoneDisplay}
+          <a href={dict.contact.phoneHref} className="text-sm text-text transition-colors hover:text-gold">
+            {dict.contact.phone}
           </a>
-          <a href={emailHref} className="text-sm text-text transition-colors hover:text-gold">
-            {emailDisplay}
+          <a href={dict.contact.emailHref} className="text-sm text-text transition-colors hover:text-gold">
+            {dict.contact.email}
           </a>
-          <SocialLinks />
+          <SocialLinks links={dict.contact} />
         </div>
       </div>
 

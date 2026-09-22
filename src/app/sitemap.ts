@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
 import { locales } from "@/lib/i18n/config";
-import { serviceSlugs } from "@/content/services";
+import { getPublishedServiceSlugs } from "@/lib/content/publishedServices";
 import { siteUrl } from "@/lib/site";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
+  const serviceSlugs = await getPublishedServiceSlugs();
 
   for (const locale of locales) {
     entries.push({ url: `${siteUrl}/${locale}`, changeFrequency: "monthly", priority: 1 });

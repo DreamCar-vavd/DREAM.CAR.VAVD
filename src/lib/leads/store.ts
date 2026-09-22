@@ -1,0 +1,226 @@
+/**
+ * Incoming contact-form submissions ("заявки"), read-only, for the panel.
+ *
+ * (No `import "server-only"` here so the pure demo generator stays unit
+ * testable under node:test — only server components import this module, and
+ * it touches nothing but `process.env` and `Math`.)
+ *
+ * NO database is wired yet. Until `LEADS_DATABASE_URL` is set, `getLeadsStore()`
+ * returns a DEMO store that generates synthetic rows in memory — they are
+ * clearly labelled in the UI, never written to Git, a static file, or any
+ * public cache, and never leave the server unlabelled. The real adapter
+ * (Neon / Postgres) implements the same interface; nothing else changes.
+ *
+ * This layer is read-only on purpose: submissions are delivered by the
+ * existing Formspree/endpoint pipeline (env `CONTACT_FORM_ENDPOINT`), which
+ * this does not touch. Wiring a database here would ADD a durable copy for
+ * the owner to browse — it must not change or duplicate delivery.
+ */
+
+export interface Lead {
+  id: string;
+  /** ISO timestamp */
+  createdAt: string;
+  name: string;
+  phone: string;
+  email: string;
+  /** service slug or free text as submitted */
+  service: string;
+  vehicle: string;
+  message: string;
+  /** true when this row is synthetic demo data, not a real submission */
+  demo: boolean;
+}
+
+export interface LeadsPage {
+  leads: Lead[];
+  /** opaque cursor for the next page, or null at the end */
+  nextCursor: string | null;
+  /** total count when the backend can give one cheaply */
+  total: number | null;
+}
+
+/** What the contact form submits (already validated upstream). */
+export interface LeadInput {
+  name: string;
+  phone: string;
+  email: string;
+  service: string;
+  vehicle: string;
+  message: string;
+}
+
+export interface LeadsStore {
+  readonly kind: "demo" | "database" | "not-configured";
+  list(opts: { limit: number; cursor?: string | null }): Promise<LeadsPage>;
+  get(id: string): Promise<Lead | null>;
+}
+
+/** A store that can persist new submissions (the real DB, not the demo). */
+export interface WritableLeadsStore extends LeadsStore {
+  readonly kind: "database";
+  /**
+   * Insert one submission, keyed by `keys.current`
+   * (INSERT ... ON CONFLICT (idempotency_key) DO NOTHING). On a conflict — or
+   * a match on `keys.previous` (a retry that straddled a bucket boundary) —
+   * no new row is written and `inserted` is false. Returns the row id either
+   * way, so the caller can always report the submission as captured.
+   */
+  create(
+    input: LeadInput,
+    keys: { current: string; previous: string },
+  ): Promise<{ id: string; inserted: boolean }>;
+}
+
+/** How leads are stored for the current environment. */
+export type LeadsMode = "database" | "demo" | "not-configured";
+
+/**
+ * Demo data is a TEST mode — never a silent stand-in for a missing database in
+ * a hosted environment. It is used only in local dev, or when explicitly
+ * turned on with LEADS_DEMO_MODE=1 (the UI always shows a prominent banner).
+ * A hosted deployment with no LEADS_DATABASE_URL shows "not configured".
+ */
+export function resolveLeadsMode(): LeadsMode {
+  if (process.env.LEADS_DATABASE_URL?.trim()) return "database";
+  if (process.env.LEADS_DEMO_MODE === "1") return "demo";
+  if (process.env.NODE_ENV !== "production") return "demo";
+  return "not-configured";
+}
+
+const BUCKET_MS = 600_000; // 10 minutes
+
+async function keyForBucket(input: LeadInput, bucket: number): Promise<string> {
+  const material = [
+    input.name.trim().toLowerCase(),
+    input.phone.replace(/[^\d+]/g, ""),
+    input.email.trim().toLowerCase(),
+    input.message.trim(),
+    bucket,
+  ].join(" ");
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(material).digest("hex");
+}
+
+/**
+ * Idempotency keys for de-duplicating a RETRIED submission. Returns the key
+ * for the CURRENT 10-minute bucket plus the PREVIOUS one, so a retry that
+ * straddles a bucket boundary (e.g. a 10 s timeout at 23:59:55) still matches
+ * — the adapter checks `idempotency_key IN (current, previous)`. Effective
+ * dedup window: 10-20 min. A genuinely new enquiry (different text, or the
+ * same text >20 min later) gets fresh keys and a new row.
+ */
+export async function deriveIdempotencyKeys(
+  input: LeadInput,
+  now = Date.now(),
+): Promise<{ current: string; previous: string }> {
+  const bucket = Math.floor(now / BUCKET_MS);
+  return {
+    current: await keyForBucket(input, bucket),
+    previous: await keyForBucket(input, bucket - 1),
+  };
+}
+
+/** Back-compat: the single current-bucket key. */
+export async function deriveIdempotencyKey(input: LeadInput, now = Date.now()): Promise<string> {
+  return (await deriveIdempotencyKeys(input, now)).current;
+}
+
+// --- demo store ------------------------------------------------------------
+
+const DEMO_SERVICES = ["car-selection", "diagnostics", "srs-airbag", "за домовленістю", "car-service"];
+const DEMO_NAMES = ["Олег К.", "Sarah M.", "Іван П.", "James T.", "Марина Л.", "Андрій В.", "Kate R."];
+const DEMO_VEHICLES = ["BMW 320d, 2016", "Audi A4, 2018", "", "Ford Focus, 2015", "VW Passat B8"];
+const DEMO_MESSAGES = [
+  "Доброго дня, цікавить діагностика перед покупкою.",
+  "Please call me back regarding an inspection.",
+  "Потрібна консультація щодо підбору авто до £8000.",
+  "Коли можна записатися на цей тиждень?",
+  "",
+];
+
+/** Deterministic pseudo-random so the demo list is stable between renders. */
+function seeded(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+class DemoLeadsStore implements LeadsStore {
+  readonly kind = "demo" as const;
+  private readonly count = 47;
+
+  private row(i: number): Lead {
+    const r = (k: number) => seeded(i * 7 + k);
+    const daysAgo = Math.floor(r(1) * 60);
+    const created = new Date(Date.UTC(2026, 8, 7) - daysAgo * 86_400_000 - Math.floor(r(2) * 86_400_000));
+    return {
+      id: `demo-${String(i).padStart(3, "0")}`,
+      createdAt: created.toISOString(),
+      name: DEMO_NAMES[i % DEMO_NAMES.length],
+      phone: `+44 7${String(100_000_000 + Math.floor(r(3) * 899_999_999)).slice(0, 9)}`,
+      email: r(4) > 0.4 ? `user${i}@example.com` : "",
+      service: DEMO_SERVICES[i % DEMO_SERVICES.length],
+      vehicle: DEMO_VEHICLES[i % DEMO_VEHICLES.length],
+      message: DEMO_MESSAGES[i % DEMO_MESSAGES.length],
+      demo: true,
+    };
+  }
+
+  async list({ limit, cursor }: { limit: number; cursor?: string | null }): Promise<LeadsPage> {
+    const all = Array.from({ length: this.count }, (_, i) => this.row(i)).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+    const start = cursor ? Math.max(0, parseInt(cursor, 10) || 0) : 0;
+    const slice = all.slice(start, start + limit);
+    const next = start + limit;
+    return {
+      leads: slice,
+      nextCursor: next < all.length ? String(next) : null,
+      total: all.length,
+    };
+  }
+
+  async get(id: string): Promise<Lead | null> {
+    const m = /^demo-(\d+)$/.exec(id);
+    if (!m) return null;
+    const i = parseInt(m[1], 10);
+    return i >= 0 && i < this.count ? this.row(i) : null;
+  }
+}
+
+/** Read store for /panel/leads. "not-configured" is a real, distinct state. */
+class NotConfiguredLeadsStore implements LeadsStore {
+  readonly kind = "not-configured" as const;
+  async list(): Promise<LeadsPage> {
+    return { leads: [], nextCursor: null, total: null };
+  }
+  async get(): Promise<Lead | null> {
+    return null;
+  }
+}
+
+export async function getLeadsStore(): Promise<LeadsStore> {
+  switch (resolveLeadsMode()) {
+    case "database": {
+      // `pg` is loaded lazily so the demo/not-configured paths never pull it in.
+      const { getPgLeadsStore } = await import("./postgres");
+      return getPgLeadsStore();
+    }
+    case "demo":
+      return new DemoLeadsStore();
+    case "not-configured":
+      return new NotConfiguredLeadsStore();
+  }
+}
+
+/**
+ * The store the CONTACT ROUTE writes to. `null` when no database is
+ * configured — the route then skips the DB step entirely and the existing
+ * email pipeline is unchanged. The demo store is never returned here (it is
+ * a read-only panel view, not a place to write real submissions).
+ */
+export async function getWritableLeadsStore(): Promise<WritableLeadsStore | null> {
+  if (resolveLeadsMode() !== "database") return null;
+  const { getPgLeadsStore } = await import("./postgres");
+  return getPgLeadsStore();
+}

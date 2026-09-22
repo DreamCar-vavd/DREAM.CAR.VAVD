@@ -1,0 +1,243 @@
+# PROPOSED — owner applies this by moving it to .github/workflows/content-guard.yml
+# (kept here because this session's token has no `workflow` scope).
+#
+# ── Why `workflow_dispatch`, not `on: push` (2026-09-15 fix) ──────────────
+# The original version of this file triggered on `push` to the content
+# branch and its own comment claimed "the content branch's own copy of this
+# workflow never runs (the copy on `main` fires on the push event)". That
+# claim is FALSE for a `push` trigger: GitHub Actions resolves which version
+# of the workflow YAML to run from THE PUSHED REF ITSELF, not from `main` —
+# confirmed against GitHub's own docs ("push: ... GITHUB_SHA: Tip commit
+# pushed to the ref", https://docs.github.com/en/actions/reference/events-that-trigger-workflows).
+# The job's own `actions/checkout ref: main` step only decides what CODE
+# runs inside the job once it has already started — it has no effect on
+# which YAML (steps, `permissions:`, triggers) GitHub used to schedule the
+# job in the first place. So on `push`, anyone who can push a commit to the
+# content branch (which, at the git level, is anyone with repo Write access —
+# not limited to what the panel's own UI/API lets an editor do) could also
+# push a modified copy of THIS FILE on that same branch, and that modified
+# definition — with whatever `permissions:` and steps the attacker wrote —
+# is what would actually execute, as the trusted automation actor.
+#
+# `workflow_dispatch` fixes part of this, but NOT the whole trust problem —
+# corrected 2026-09-15 after an independent review (Codex) challenged an
+# earlier, too-confident version of this comment that claimed
+# "workflow_dispatch always runs main's YAML, full stop". That claim does
+# not hold up: GitHub's own docs only clearly guarantee that a
+# `workflow_dispatch`-triggered workflow must already exist ON the default
+# branch to be dispatchable AT ALL ("This event will only trigger a workflow
+# run if the workflow file exists on the default branch",
+# https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+# Separately, dispatching accepts a `ref` telling it which commit to run
+# against — and whether THAT invocation then executes the YAML content AS IT
+# EXISTS ON `ref`, or always main's copy regardless of `ref`, is NOT
+# something this session could confirm one way or the other: GitHub's own
+# docs page is silent on it, and community reports on this exact point
+# conflict with each other. Rather than ship a workflow whose safety
+# depends on guessing which way that ambiguity resolves, the design below
+# does not rely on it at all — see the next section.
+#
+# ── The actual privilege boundary: a GitHub Environment, not the trigger ──
+# Regardless of which copy of this YAML a given run executes, this job's
+# write access to `main` must not be obtainable by a run whose `ref` is a
+# content branch an editor controls. The GitHub-native, server-enforced way
+# to guarantee that (independent of any workflow-file content, so an
+# attacker-modified copy of THIS FILE gains nothing from it) is a GitHub
+# **Environment** with a **deployment branch and tag policy** restricted to
+# a "Selected branches and tags" rule naming `main` explicitly — NOT
+# "Protected branches only", which is a DIFFERENT setting that would admit
+# ANY branch that happens to have branch-protection rules turned on, not
+# only `main` — holding the one credential this job needs to push: never a
+# plain repo-level secret, and never the job's own ambient `GITHUB_TOKEN`.
+# GitHub resolves environment secrets by checking the RUN's own `ref`
+# against that policy BEFORE any step executes; a run dispatched with
+# `ref: <content-branch>` is refused the secret outright, no matter what
+# code the executing YAML contains.
+#
+# **Corrected 2026-09-15 (a follow-up independent review) — the previous
+# version of this comment overclaimed that referencing a not-yet-created
+# `environment: content-publish` would keep the job from running at all
+# until the owner created it.** That is not how GitHub Actions behaves:
+# per GitHub's own docs, "Running a workflow that references an environment
+# that does not exist will create an environment with the referenced name"
+# (https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) —
+# automatically, with NO protection rules and NO secrets, the first time
+# this workflow is dispatched. The job DOES start. What actually happens
+# instead: the `Checkout main (trusted)` step below passes
+# `token: ${{ secrets.CONTENT_PUBLISH_TOKEN }}` explicitly; with no such
+# secret configured, that expression resolves to an empty string, and
+# `actions/checkout`'s own `token` input is marked `required: true` in its
+# source (`core.getInput('token', {required: true})`) — an input the
+# caller explicitly supplied (even as `""`) is never replaced by the
+# action's own `default: ${{ github.token }}`, which only ever applies
+# when the `with:` key is omitted entirely. The result is an EXPLICIT,
+# named failure — `Input required and not supplied: token` — not a silent
+# fallback to `GITHUB_TOKEN` and not a blocked/non-starting job. This is
+# still the correct fail-closed behavior for an unconfigured environment,
+# just for a different, more precise reason than previously stated. See
+# docs/PANEL-hosting-and-approvals.md §1.3 for exactly what the owner needs
+# to set up (the Environment's branch policy AND the secret, both — an
+# environment that exists with the right branch policy but no secret still
+# fails this same way), and why this file's activation stays blocked until
+# both are done.
+#
+# ── Who/what can trigger this, once activated in .github/workflows/ ───────
+# `workflow_dispatch` needs a caller with at least `actions: write` on the
+# repo (a classic PAT needs the `repo` scope; a fine-grained token or GitHub
+# App installation token needs `actions: write` specifically — GitHub REST
+# docs, "Create a workflow dispatch event"). Two ways to trigger it, in order
+# of how much this proposal actually builds:
+#   1. MANUAL (what this proposal assumes): the owner, or a Collaborator with
+#      repo Write access, runs `gh workflow run content-guard.yml -f
+#      content_sha=<sha>` or clicks "Run workflow" in the Actions tab. This
+#      needs NO new grant — Write access already includes `actions: write`.
+#   2. AUTOMATIC (a later, separate owner decision — NOT built here): the
+#      panel's own publish path calls the REST dispatch endpoint right after
+#      a successful content write. The panel currently authenticates each
+#      write with the SIGNED-IN EDITOR's own GitHub App installation token,
+#      scoped to `contents: write, metadata: read, pull_requests: read`
+#      (see PR #26's description) — that scope does NOT include Actions, so
+#      automatic dispatch needs either widening the GitHub App's permission
+#      manifest to add `actions: write`, or a separate dedicated token
+#      stored as a repository secret used only for this call. Either is a
+#      real permission/secret decision for the owner to make deliberately —
+#      not something to add silently as a side effect of this file.
+#
+# ── What happens after this workflow's own push to `main` ─────────────────
+# GitHub does NOT start a new workflow run from an event caused by a job's
+# own `GITHUB_TOKEN` specifically (two named exceptions, `workflow_dispatch`
+# and `repository_dispatch` themselves — "Triggering a workflow from a
+# workflow", https://docs.github.com/en/actions/using-workflows/triggering-a-workflow).
+# That carve-out does not even apply to this job's push, since it
+# authenticates as `CONTENT_PUBLISH_TOKEN` (the environment's own dedicated
+# credential — see above), not `GITHUB_TOKEN` — worth naming so it is not
+# assumed by accident either way: whether a PAT/App token's own push
+# re-triggers `on: push` workflows depends on that token's own type/settings,
+# not on the GITHUB_TOKEN carve-out, and was not verified live this session.
+# Separately, the "Verify (TypeScript, ESLint, tests, build)" CI workflow's
+# own `on: push: branches: [main]` should be assumed to NOT automatically
+# re-run against this guarded commit unless/until confirmed otherwise. That
+# is an accepted, correct default for a content-only change either way:
+# `content:guard` (run inside THIS job, from `main`'s own trusted checkout)
+# is the actual safety gate for this class of change — a redundant full
+# Verify run afterwards would be defense in depth, not a requirement.
+# Vercel is unaffected by any of this: its GitHub App has its own webhook
+# subscription to repository `push` events, entirely outside GitHub Actions'
+# token-triggering rules, so a deployment is still expected to fire
+# normally from this push — noted as "most likely, not live-verified this
+# session" (no push to `main` was made to confirm it).
+#
+# What this file still does, unchanged from the original design:
+#   1. `scripts/publish-content.ts` (regression-tested in
+#      publish-content.test.ts against real temporary git repos) computes
+#      the diff between `main` and the content commit, refuses anything
+#      outside { published.json, review-state.json, public/images/cms/** },
+#      and refuses (rather than substituting empty data for) a missing or
+#      unreadable published.json;
+#   2. it runs `npm run content:guard` (the validator, from `main`'s own
+#      checkout — the content commit's own copy is never executed);
+#   3. on success, it stages exactly the guard-approved files (additions,
+#      byte replacements, AND removals of no-longer-referenced media — never
+#      a blanket `git add -A`, so nothing else already sitting in the
+#      runner's checkout can leak into the commit) and fast-forwards `main`;
+#   4. it is idempotent (re-processing an already-applied content commit
+#      makes no new commit) and never force-pushes — if `main` moved since
+#      this run started, it aborts instead of overwriting.
+
+name: content-guard
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_sha:
+        description: "Commit SHA on the content branch to validate and merge into main"
+        required: true
+        type: string
+
+# GITHUB_TOKEN itself no longer needs write access to `main` — the actual
+# push authenticates as the `content-publish` environment's own dedicated
+# credential (see the big comment block above), not this token. Kept at
+# `read` (not omitted) so `actions/checkout` and `npm ci` still work even
+# before the owner has set up that environment.
+permissions:
+  contents: read
+
+concurrency:
+  group: content-guard
+  cancel-in-progress: false
+
+jobs:
+  guard-and-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # NOT YET CONFIGURED (owner action, not this session) — see the big
+    # comment block above. GitHub auto-creates an environment by this name
+    # (with no branch policy and no secrets) the first time this job is
+    # dispatched — it does NOT block the job from starting. What actually
+    # stops an unconfigured run: the checkout step below explicitly passes
+    # `token: ${{ secrets.CONTENT_PUBLISH_TOKEN }}`, and with no such secret
+    # set, that resolves to an empty string, which `actions/checkout`'s own
+    # `required: true` token input rejects outright (explicit failure, no
+    # fallback to GITHUB_TOKEN — see the comment above for the exact
+    # mechanism). The owner still needs to configure BOTH the Environment's
+    # branch policy (Selected branches and tags → `main`) AND the secret
+    # for a real, working run — an environment with only one of the two
+    # still fails this same way.
+    environment: content-publish
+    steps:
+      # `ref: main` is what decides what CODE this job runs, once it has
+      # already been allowed to start — it is not, on its own, what makes
+      # this job trustworthy (see the corrected comment above: whether a
+      # `workflow_dispatch` run always executes main's own copy of this YAML
+      # regardless of the dispatched `ref` was not something this session
+      # could confirm). The actual privilege gate is the `environment:` key
+      # above.
+      - name: Checkout main (trusted)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+          # The environment's own dedicated token, never GITHUB_TOKEN — see
+          # the big comment block above for why. Empty/undefined until the
+          # owner creates the `content-publish` environment and this secret.
+          token: ${{ secrets.CONTENT_PUBLISH_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install (from main)
+        run: npm ci
+
+      # `${{ inputs.content_sha }}` is only ever read through `env:` below,
+      # never interpolated directly into a `run:` script body. GitHub's own
+      # hardening guidance: an expression substituted straight into shell
+      # text is executed as shell syntax verbatim, not passed as a safe
+      # string — a `content_sha` value containing `$(...)`/backticks/`;`
+      # would otherwise run as a command with this job's `contents: write`
+      # token. `$CONTENT_SHA` here is always just a shell VARIABLE
+      # reference, never re-parsed as script text, regardless of its value.
+      - name: Validate content_sha is a full 40-hex commit SHA
+        env:
+          CONTENT_SHA: ${{ inputs.content_sha }}
+        run: |
+          case "$CONTENT_SHA" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) echo "::error::content_sha is not a full 40-character hex commit SHA: $CONTENT_SHA"; exit 1 ;;
+          esac
+
+      - name: Fetch the content commit
+        env:
+          CONTENT_SHA: ${{ inputs.content_sha }}
+        run: git fetch origin "$CONTENT_SHA"
+
+      - name: Guard and publish (scripts/publish-content.ts)
+        env:
+          CONTENT_SHA: ${{ inputs.content_sha }}
+        run: |
+          node --import tsx scripts/publish-content.ts \
+            --content "$CONTENT_SHA" \
+            --remote origin

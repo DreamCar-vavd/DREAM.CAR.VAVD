@@ -3,23 +3,68 @@ export interface SocialLink {
   url: string;
 }
 
-export const whatsappUrl = "https://wa.me/447706054203";
-export const telegramUrl = "https://t.me/DREAM_CAR_VAVD";
+/**
+ * Pre-panel defaults. Now the fallback used by getDictionary() when no
+ * contact record is published in the panel; a published record overrides
+ * every value. The technical submission recipient (CONTACT_FORM_ENDPOINT)
+ * is NOT here — it stays an env var. Telegram has a permanent handle
+ * (@DREAM_CAR_VAVD) rather than an env var, same reasoning as WhatsApp.
+ */
+export const DEFAULT_CONTACT = {
+  phoneDisplay: "+44 7706 054203",
+  phoneHref: "tel:+447706054203",
+  email: "dream.car.vavd@gmail.com",
+  emailHref: "mailto:dream.car.vavd@gmail.com",
+  whatsappUrl: "https://wa.me/447706054203",
+  telegramUrl: "https://t.me/DREAM_CAR_VAVD",
+} as const;
 
-export function getSocialLinks(): SocialLink[] {
+/**
+ * The single source of truth for "what Telegram link does the site show":
+ * a real published/override value always wins; empty, missing, or
+ * whitespace-only falls back to the permanent handle. Used by both
+ * getSocialLinks() below and getDictionary() (src/lib/i18n/dictionaries.ts)
+ * so there is exactly one fallback rule, not two independently-maintained
+ * copies of it.
+ */
+export function resolveTelegramUrl(published?: string | null): string {
+  const trimmed = published?.trim();
+  return trimmed ? trimmed : DEFAULT_CONTACT.telegramUrl;
+}
+
+// Back-compat re-exports (still imported in a few static places).
+export const whatsappUrl = DEFAULT_CONTACT.whatsappUrl;
+export const telegramUrl = DEFAULT_CONTACT.telegramUrl;
+export const phoneHref = DEFAULT_CONTACT.phoneHref;
+export const phoneDisplay = DEFAULT_CONTACT.phoneDisplay;
+export const emailHref = DEFAULT_CONTACT.emailHref;
+export const emailDisplay = DEFAULT_CONTACT.email;
+
+/** URL builders / validators reused by getDictionary + the contact gate. */
+export function whatsappUrlFromNumber(n: string): string {
+  const digits = n.replace(/[^0-9]/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
+}
+export function telHref(e164: string): string {
+  const cleaned = e164.replace(/[^0-9+]/g, "");
+  return cleaned ? `tel:${cleaned}` : "";
+}
+
+export function getSocialLinks(from?: {
+  whatsappUrl?: string;
+  telegramUrl?: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
+  youtubeUrl?: string;
+}): SocialLink[] {
   const entries: Array<[SocialLink["name"], string | undefined]> = [
-    ["WhatsApp", whatsappUrl],
-    ["Telegram", telegramUrl],
-    ["Instagram", process.env.NEXT_PUBLIC_INSTAGRAM_URL],
-    ["Facebook", process.env.NEXT_PUBLIC_FACEBOOK_URL],
-    ["YouTube", process.env.NEXT_PUBLIC_YOUTUBE_URL],
+    ["WhatsApp", from?.whatsappUrl || DEFAULT_CONTACT.whatsappUrl],
+    ["Telegram", resolveTelegramUrl(from?.telegramUrl)],
+    ["Instagram", from?.instagramUrl || process.env.NEXT_PUBLIC_INSTAGRAM_URL],
+    ["Facebook", from?.facebookUrl || process.env.NEXT_PUBLIC_FACEBOOK_URL],
+    ["YouTube", from?.youtubeUrl || process.env.NEXT_PUBLIC_YOUTUBE_URL],
   ];
-
   return entries
-    .filter((entry): entry is [SocialLink["name"], string] => Boolean(entry[1]))
+    .filter((e): e is [SocialLink["name"], string] => Boolean(e[1]))
     .map(([name, url]) => ({ name, url }));
 }
-export const phoneHref = "tel:+447706054203";
-export const phoneDisplay = "+44 7706 054203";
-export const emailHref = "mailto:dream.car.vavd@gmail.com";
-export const emailDisplay = "dream.car.vavd@gmail.com";

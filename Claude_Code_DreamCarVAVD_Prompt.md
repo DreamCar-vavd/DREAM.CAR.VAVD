@@ -1,5 +1,10 @@
 # Готове завдання для Claude Code — сайт DREAM.CAR.VAVD
 
+> **Архів.** Це початковий промпт, яким проєкт було запущено з нуля.
+> Зберігається як історичний документ, а не як чинна інструкція — поточну
+> поведінку сайту (включно з Telegram, який тепер постійне посилання
+> `https://t.me/DREAM_CAR_VAVD`, а не env-змінна) дивись у `README.md`.
+
 Скопіюй увесь текст нижче та встав у Claude Code.
 
 ```text
@@ -229,7 +234,8 @@ Accordion має бути доступний з клавіатури і мати
 - телефон: +44 7706 054203;
 - email: dream.car.vavd@gmail.com;
 - WhatsApp;
-- Telegram, Instagram, Facebook і YouTube — тільки якщо відповідний URL заданий через environment variables.
+- Telegram — постійне посилання `https://t.me/DREAM_CAR_VAVD`, завжди;
+- Instagram, Facebook і YouTube — тільки якщо відповідний URL заданий через environment variables.
 
 WhatsApp URL:
 https://wa.me/447706054203
@@ -343,7 +349,6 @@ mailto:dream.car.vavd@gmail.com
 Створи .env.example:
 
 NEXT_PUBLIC_FORM_ENDPOINT=
-NEXT_PUBLIC_TELEGRAM_URL=
 NEXT_PUBLIC_INSTAGRAM_URL=
 NEXT_PUBLIC_FACEBOOK_URL=
 NEXT_PUBLIC_YOUTUBE_URL=
