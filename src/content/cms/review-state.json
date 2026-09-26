@@ -253,20 +253,5 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
-  },
-  "promo:test-publikatsiyi-20260926": {
-    "instance": "muigfsh4-ulhjtmgu",
-    "uk": {
-      "hash": "a660e11e0c49465cdbbdfb3bc7480f838eed777f85f97cb48ee25593d79564a1",
-      "at": "2026-09-26T14:14:01.533Z"
-    },
-    "en": {
-      "hash": "4ba6222c2ed90530057beccc7158be09f6010b48eaa96ad9088599f6a84ff9e9",
-      "at": "2026-09-26T14:16:42.943Z"
-    },
-    "ru": {
-      "hash": "9c45393c351d2e87b0711c7a7d0d4335a5af076855c1537f8c5e3436f0f3fb2a",
-      "at": "2026-09-26T14:17:48.000Z"
-    }
   }
 }
