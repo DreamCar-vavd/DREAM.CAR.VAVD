@@ -1,0 +1,23 @@
+{
+  "id": "car-sourcing-consultation",
+  "order": 10,
+  "type": "promo",
+  "visible": true,
+  "linkUrl": "#contacts",
+  "uk": {
+    "title": "Купуєте авто у Великій Британії? Підберемо й перевіримо його до покупки",
+    "summary": "Підбираємо авто за вашими критеріями, перевіряємо технічний стан та історію кожного варіанта й супроводжуємо вас під час переговорів та оформлення.",
+    "linkLabel": "Замовити консультацію"
+  },
+  "en": {
+    "title": "Buying a car in the UK? We’ll source and check it before you buy",
+    "summary": "We source cars that match your criteria, check the condition and history of each option, and support you through negotiations and paperwork.",
+    "linkLabel": "Book a Consultation"
+  },
+  "ru": {
+    "title": "Покупаете автомобиль в Великобритании? Подберём и проверим его до покупки",
+    "summary": "Подбираем автомобили по вашим критериям, проверяем техническое состояние и историю каждого варианта и сопровождаем вас на переговорах и при оформлении.",
+    "linkLabel": "Заказать консультацию"
+  },
+  "bornAt": "muitsb69-a74r3dmc"
+}

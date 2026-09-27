@@ -253,5 +253,20 @@
       "hash": "1efeb8781a32c665ffcb20d3130c2b7ad90873e51219cf5b3548ebfcf210c394",
       "at": "2026-09-06T00:00:00.000Z"
     }
+  },
+  "promo:car-sourcing-consultation": {
+    "instance": "muitsb69-a74r3dmc",
+    "uk": {
+      "hash": "6dc53e47d97ab1c50889356ac3e96e78fa585ef1e9693d04777a5bea78165004",
+      "at": "2026-09-27T14:10:54.427Z"
+    },
+    "en": {
+      "hash": "d2a28a652efbbe50f7c53b9b02807cdcb175bfa0aee0f07851b3248b9e5c377a",
+      "at": "2026-09-27T14:11:37.188Z"
+    },
+    "ru": {
+      "hash": "838d182ef2b1a316db951da35e046ed3fbc08466ecb6a50e11c10db0b52d257d",
+      "at": "2026-09-27T14:12:05.554Z"
+    }
   }
 }
