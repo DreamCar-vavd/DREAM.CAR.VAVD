@@ -106,6 +106,16 @@ function NewsModal({
   );
 }
 
+/**
+ * Grid classes by card count — full static strings so Tailwind sees them.
+ * 1 → one centred column; 2 → two centred columns; 3+ → the 2/3-column grid.
+ */
+export function promoGridClass(count: number): string {
+  if (count === 1) return "mx-auto mt-8 grid max-w-sm gap-6";
+  if (count === 2) return "mx-auto mt-8 grid max-w-3xl gap-6 sm:grid-cols-2";
+  return "mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3";
+}
+
 /** «Акції та новини» card grid. Rendered only when there is ≥1 card. */
 export function PromoSection({ cards, locale }: { cards: PromoView[]; locale: string }) {
   const labels = L[(locale as keyof typeof L) in L ? (locale as keyof typeof L) : "uk"];
@@ -121,7 +131,7 @@ export function PromoSection({ cards, locale }: { cards: PromoView[]; locale: st
         <h2 className="text-center font-heading text-3xl font-bold text-gold sm:text-4xl">
           {labels.heading}
         </h2>
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={promoGridClass(cards.length)}>
           {cards.map((c) => (
             <article
               key={c.id}
