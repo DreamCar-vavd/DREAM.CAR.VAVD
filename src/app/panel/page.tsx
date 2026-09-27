@@ -42,7 +42,7 @@ function DeployBanner({
 }) {
   if (mode === "local") {
     return (
-      <p className="mt-2 text-xs text-neutral-500">
+      <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
         Локальний режим: зміни у файлах одразу, кроку збірки немає.
       </p>
     );
@@ -51,19 +51,19 @@ function DeployBanner({
   const where = isTest ? `на тестовому сайті гілки «${branch}»` : "в ефірі (Production)";
   const map: Record<DeployStatus["state"], { text: string; cls: string }> = {
     "n/a": { text: "", cls: "" },
-    none: { text: "Деплой для поточного знімка не знайдено.", cls: "text-neutral-500" },
+    none: { text: "Деплой для поточного знімка не знайдено.", cls: "text-neutral-500 dark:text-neutral-400" },
     unknown: {
       text: `ℹ Стан збірки невідомий: ${"reason" in deploy ? deploy.reason : ""}`,
-      cls: "text-neutral-500",
+      cls: "text-neutral-500 dark:text-neutral-400",
     },
-    pending: { text: `⏳ Збірка виконується — зміни ще не ${where}.`, cls: "text-amber-700" },
+    pending: { text: `⏳ Збірка виконується — зміни ще не ${where}.`, cls: "text-amber-700 dark:text-amber-400" },
     ready: {
       text: `✅ Поточний знімок ${where}.`,
       cls: "text-green-700 dark:text-green-400",
     },
     error: {
       text: `⚠️ Збірка не вдалася — ${isTest ? "на тестовому сайті" : "в ефірі"} лишається попередня версія.`,
-      cls: "text-red-600",
+      cls: "text-red-600 dark:text-red-400",
     },
   };
   const s = map[deploy.state];
@@ -71,7 +71,7 @@ function DeployBanner({
     <p className={`mt-2 flex flex-wrap items-center gap-2 text-xs ${s.cls}`}>
       <span>{s.text}</span>
       {"environment" in deploy && deploy.environment && (
-        <span className="text-neutral-400">({deploy.environment})</span>
+        <span className="text-neutral-500 dark:text-neutral-400">({deploy.environment})</span>
       )}
       {"url" in deploy && deploy.url && (
         <a className="underline" href={deploy.url} target="_blank" rel="noreferrer">
@@ -85,14 +85,14 @@ function DeployBanner({
 
 function PublicState({ row }: { row: PanelRow }) {
   if (!row.publishedExists) {
-    return <span className="text-neutral-500">Не опубліковане (нова чернетка)</span>;
+    return <span className="text-neutral-500 dark:text-neutral-400">Не опубліковане (нова чернетка)</span>;
   }
   return (
     <span>
       {row.publiclyVisible ? (
         <span className="text-green-700 dark:text-green-400">● На сайті</span>
       ) : (
-        <span className="text-neutral-500">○ Опубліковане, приховане</span>
+        <span className="text-neutral-500 dark:text-neutral-400">○ Опубліковане, приховане</span>
       )}
       {row.publishState === "modified" && (
         <span className="ml-2 rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-900">
@@ -117,7 +117,7 @@ function OrphanRow({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <span className="font-semibold">{row.title}</span>{" "}
-          <span className="text-xs text-neutral-500">{row.subtitle}</span>
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">{row.subtitle}</span>
         </div>
       </div>
       <p className="mt-2 rounded border border-amber-400 bg-amber-100 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100">
@@ -147,10 +147,10 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <span className="font-semibold">{row.title}</span>{" "}
-          <span className="text-xs text-neutral-500">{row.subtitle}</span>
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">{row.subtitle}</span>
         </div>
         {row.editHref && (
-          <a className="inline-block py-1 text-xs underline" href={row.editHref}>
+          <a className="inline-block py-1 text-xs underline hover:decoration-2" href={row.editHref}>
             Редагувати в Keystatic →
           </a>
         )}
@@ -166,7 +166,7 @@ function Row({ row, kind, versions }: { row: PanelRow; kind: string; versions: P
           const badge = LANG_BADGE[status];
           return (
             <div key={locale} className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-neutral-500">{LANG_LABEL[locale]}</span>
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">{LANG_LABEL[locale]}</span>
               <span className={`rounded border px-1.5 py-0.5 text-xs ${badge.cls}`}>
                 {badge.text}
               </span>
@@ -232,13 +232,13 @@ function Group({ group, versions }: { group: PanelGroup; versions: PanelData["ve
         )}
       </div>
       {group.singleEntry && (
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
           Один запис на весь сайт. Дані вводяться раз, підписи — окремо трьома мовами.
         </p>
       )}
       <div className="mt-3 space-y-4">
         {group.rows.length === 0 && (
-          <p className="rounded border border-dashed border-neutral-300 p-3 text-sm text-neutral-500 dark:border-neutral-700">
+          <p className="rounded border border-dashed border-neutral-300 p-3 text-sm text-neutral-500 dark:text-neutral-400 dark:border-neutral-700">
             Матеріалів ще немає.{" "}
             {group.createHref ? (
               <a className="underline" href={group.createHref}>
@@ -462,7 +462,7 @@ export default async function PanelPage() {
           <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs dark:bg-neutral-800">
             {data.branch}
           </code>{" "}
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
             {data.branch === "main"
               ? "(Production)"
               : "(тестова гілка — не Production; редактор і перегляд чернетки відкриваються саме на ній)"}
@@ -488,7 +488,7 @@ export default async function PanelPage() {
         >
           Переглянути чернетку на сайті →
         </a>{" "}
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">
           (робоча версія на реальному макеті сайту, ще не опублікована)
         </span>
       </p>
@@ -496,13 +496,13 @@ export default async function PanelPage() {
         <Link className="inline-block py-1 underline" href="/panel/leads">
           Заявки з форми →
         </Link>{" "}
-        <span className="text-xs text-neutral-500">(перегляд; база ще не підключена — демо-дані)</span>
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">(перегляд; база ще не підключена — демо-дані)</span>
       </p>
       <p className="mt-1 text-sm">
         <Link className="inline-block py-1 underline" href="/panel/video">
           Відео авто →
         </Link>{" "}
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">
           (завантаження відеофайлів — локально; на хостингу потрібне зовнішнє сховище)
         </span>
       </p>
@@ -521,7 +521,7 @@ export default async function PanelPage() {
 
       <DeployBanner deploy={data.deploy} mode={data.mode} branch={data.branch} />
       {data.publishedAt && (
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
           Остання публікація: {new Date(data.publishedAt).toLocaleString("uk-UA")}
         </p>
       )}
@@ -540,7 +540,7 @@ export default async function PanelPage() {
       ))}
 
       <div className="mt-10 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
           Обслуговування: після кількох замін фото на сайті лишаються старі копії
           зображень (вони нічому не шкодять). Натисніть — покаже, скільки їх і на
           який обсяг; підтвердіть, щоб прибрати. Робіть це, коли ніхто нічого не

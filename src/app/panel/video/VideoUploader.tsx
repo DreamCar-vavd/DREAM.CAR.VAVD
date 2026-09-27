@@ -152,7 +152,7 @@ export function VideoUploader({ mode }: { mode: "local" | "blob" }) {
       />
 
       {file && phase !== "done" && (
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
           {file.name} · {(file.size / 1048576).toFixed(1)} МБ
         </p>
       )}
@@ -160,9 +160,9 @@ export function VideoUploader({ mode }: { mode: "local" | "blob" }) {
       {busy && (
         <div className="mt-3">
           <div className="h-2 w-full overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
-            <div className="h-full bg-amber-600 transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-amber-700 transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <div className="mt-1 flex items-center justify-between text-xs text-neutral-500">
+          <div className="mt-1 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
             <span>{phase === "creating" ? "Підготовка…" : `${progress}%`}</span>
             <button type="button" onClick={cancel} className="underline">
               Скасувати
@@ -176,7 +176,7 @@ export function VideoUploader({ mode }: { mode: "local" | "blob" }) {
           type="button"
           onClick={upload}
           disabled={!file}
-          className="mt-3 rounded border border-amber-600 bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-700 disabled:opacity-40"
+          className="mt-3 rounded border border-amber-700 bg-amber-700 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-800 disabled:opacity-40"
         >
           Завантажити
         </button>

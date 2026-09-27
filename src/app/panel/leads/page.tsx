@@ -52,20 +52,20 @@ function LeadRow({ lead }: { lead: Lead }) {
       <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
         <span>
           <span className="font-semibold">{lead.name || "—"}</span>{" "}
-          <span className="text-neutral-500">· {lead.service || "—"}</span>
+          <span className="text-neutral-500 dark:text-neutral-400">· {lead.service || "—"}</span>
         </span>
-        <span className="text-xs text-neutral-500">{fmtDate(lead.createdAt)}</span>
+        <span className="text-xs text-neutral-500 dark:text-neutral-400">{fmtDate(lead.createdAt)}</span>
       </summary>
       <dl className="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-        <dt className="text-neutral-500">Телефон</dt>
+        <dt className="text-neutral-500 dark:text-neutral-400">Телефон</dt>
         <dd>{lead.phone || "—"}</dd>
-        <dt className="text-neutral-500">Email</dt>
+        <dt className="text-neutral-500 dark:text-neutral-400">Email</dt>
         <dd>{lead.email || "—"}</dd>
-        <dt className="text-neutral-500">Послуга</dt>
+        <dt className="text-neutral-500 dark:text-neutral-400">Послуга</dt>
         <dd>{lead.service || "—"}</dd>
-        <dt className="text-neutral-500">Авто</dt>
+        <dt className="text-neutral-500 dark:text-neutral-400">Авто</dt>
         <dd>{lead.vehicle || "—"}</dd>
-        <dt className="text-neutral-500">Повідомлення</dt>
+        <dt className="text-neutral-500 dark:text-neutral-400">Повідомлення</dt>
         <dd className="whitespace-pre-line">{lead.message || "—"}</dd>
       </dl>
     </details>
@@ -174,7 +174,7 @@ export default async function LeadsPage({
 
       {page && page.leads.length > 0 && (
         <>
-          <p className="mt-4 text-xs text-neutral-500">
+          <p className="mt-4 text-xs text-neutral-500 dark:text-neutral-400">
             {page.total != null ? `Усього: ${page.total}. ` : ""}Показано {page.leads.length}.
           </p>
           <div className="mt-3 space-y-2">
