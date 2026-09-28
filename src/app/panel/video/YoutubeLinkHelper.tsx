@@ -34,7 +34,7 @@ export function YoutubeLinkHelper() {
           setValue(e.target.value);
           setCopied(false);
         }}
-        className="mt-2 block w-full rounded border border-neutral-400 bg-neutral-50 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800"
+        className="mt-2 block w-full rounded border border-neutral-400 bg-neutral-50 px-3 py-1.5 text-sm placeholder:text-neutral-600 dark:border-neutral-600 dark:bg-neutral-800 dark:placeholder:text-neutral-400"
       />
 
       <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
