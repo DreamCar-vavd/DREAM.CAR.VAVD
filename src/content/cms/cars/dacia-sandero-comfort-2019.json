@@ -41,26 +41,23 @@
     }
   ],
   "video": {
-    "mode": "legacy-file",
-    "src": "/images/cms/cars/dacia-sandero-comfort-2019/video/12-walkaround.mp4",
+    "mode": "external-link",
+    "src": "https://youtube.com/shorts/-S-RDZEOX7U",
     "posterSrc": "/images/cms/cars/dacia-sandero-comfort-2019/photos/0/image.jpeg"
   },
   "uk": {
     "title": "Dacia Sandero Comfort",
     "specLine": "1.0 Turbo • Бензин • Механічна • Сірий",
-    "description": "",
     "viewGalleryLabel": "Переглянути 11 фото і 1 відео"
   },
   "en": {
     "title": "Dacia Sandero Comfort",
     "specLine": "1.0 Turbo • Petrol • Manual • Grey",
-    "description": "",
     "viewGalleryLabel": "View 11 photos and 1 video"
   },
   "ru": {
     "title": "Dacia Sandero Comfort",
     "specLine": "1.0 Turbo • Бензин • Механическая • Серый",
-    "description": "",
     "viewGalleryLabel": "Посмотреть 11 фото и 1 видео"
   },
   "bornAt": "legacy-dacia-sandero-comfort-2019"
