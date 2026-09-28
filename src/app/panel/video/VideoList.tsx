@@ -33,7 +33,7 @@ export function VideoList({
   }
 
   if (videos.length === 0) {
-    return <p className="mt-3 text-sm text-neutral-500">Завантажених відео немає.</p>;
+    return <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Завантажених відео немає.</p>;
   }
 
   return (
@@ -47,7 +47,7 @@ export function VideoList({
           >
             <div className="min-w-0">
               <code className="block truncate text-xs">{v.key}</code>
-              <span className="text-xs text-neutral-500">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">
                 {(v.size / 1048576).toFixed(1)} МБ ·{" "}
                 {usedBy ? (
                   <span className="text-green-700 dark:text-green-400">використовує «{usedBy}»</span>
@@ -65,7 +65,7 @@ export function VideoList({
                 disabled={busy === v.key || Boolean(usedBy)}
                 title={usedBy ? "Спершу від'єднайте відео від авто в Keystatic" : undefined}
                 onClick={() => remove(v.key)}
-                className="rounded border border-red-500 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-950"
+                className="rounded border border-red-500 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950"
               >
                 {busy === v.key ? "…" : "Видалити"}
               </button>
@@ -73,7 +73,7 @@ export function VideoList({
           </div>
         );
       })}
-      {msg && <p className="text-xs text-neutral-500">{msg}</p>}
+      {msg && <p className="text-xs text-neutral-500 dark:text-neutral-400">{msg}</p>}
     </div>
   );
 }

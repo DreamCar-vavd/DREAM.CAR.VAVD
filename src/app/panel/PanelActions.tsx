@@ -115,7 +115,7 @@ function StatusLine({ msg, children }: { msg: ActionMessage; children?: React.Re
       ? "text-green-700 dark:text-green-400"
       : msg.kind === "conflict" || msg.kind === "uncertain"
         ? "text-amber-700 dark:text-amber-400"
-        : "text-red-600";
+        : "text-red-600 dark:text-red-400";
   // "uncertain" and "err" both need attention now — announce them assertively.
   const assertive = msg.kind === "err" || msg.kind === "uncertain";
   return (
@@ -229,8 +229,8 @@ export function PanelButton({
     "inline-flex min-h-[36px] items-center gap-1 rounded border px-3 py-1.5 text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed";
   const styles = {
     default: "border-neutral-400 text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800",
-    primary: "border-amber-600 bg-amber-600 text-white hover:bg-amber-700",
-    danger: "border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950",
+    primary: "border-amber-700 bg-amber-700 text-white hover:bg-amber-800",
+    danger: "border-red-500 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950",
     solid:
       "border-neutral-800 bg-neutral-800 text-white hover:bg-neutral-700 dark:border-neutral-200 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white",
   }[variant];
@@ -257,7 +257,7 @@ export function PanelButton({
       </button>
       {msg && (
         <StatusLine msg={msg}>
-          {note && <span className="ml-1 text-neutral-500">· {note}</span>}
+          {note && <span className="ml-1 text-neutral-500 dark:text-neutral-400">· {note}</span>}
           {uncertain && (
             <button
               ref={checkBtnRef}
@@ -428,7 +428,7 @@ export function CleanupFrozenMediaButton({
             disabled={working}
             aria-busy={busy || refreshing}
             onClick={() => call(true, plan.headSha)}
-            className={`${cls} border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-950`}
+            className={`${cls} border-red-500 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950`}
           >
             {confirmLabel ?? `Підтвердити — прибрати ${plan.count}`}
           </button>
@@ -457,7 +457,7 @@ export function CleanupFrozenMediaButton({
       )}
       {msg && (
         <StatusLine msg={msg}>
-          {note && <span className="ml-1 text-neutral-500">· {note}</span>}
+          {note && <span className="ml-1 text-neutral-500 dark:text-neutral-400">· {note}</span>}
           {uncertain && (
             <button
               ref={checkBtnRef}
@@ -489,7 +489,7 @@ export function RefreshButton() {
         {refreshing ? busyLabelFor("refresh") : "Оновити стан"}
       </button>
       {refreshSlow && (
-        <span className="text-[11px] text-neutral-500" role="status" aria-live="polite">
+        <span className="text-[11px] text-neutral-500 dark:text-neutral-400" role="status" aria-live="polite">
           {REFRESH_SLOW_MSG}
         </span>
       )}

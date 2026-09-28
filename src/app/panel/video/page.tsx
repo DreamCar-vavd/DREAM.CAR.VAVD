@@ -168,7 +168,7 @@ export default async function VideoPage() {
       <h3 className="mt-6 text-sm font-semibold">Завантажити відео</h3>
       <div className="mt-2">
         {notConfigured ? (
-          <p className="rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-500">
+          <p className="rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
             Завантаження недоступне, доки відеосховище не підключено.
           </p>
         ) : (
@@ -178,7 +178,7 @@ export default async function VideoPage() {
 
       <h3 className="mt-8 text-sm font-semibold">
         Завантажені відео{" "}
-        <span className="font-normal text-neutral-500">
+        <span className="font-normal text-neutral-500 dark:text-neutral-400">
           (осиротілі не видаляються автоматично)
         </span>
       </h3>

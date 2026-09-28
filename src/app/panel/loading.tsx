@@ -9,9 +9,9 @@ export default function PanelLoading() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10" aria-busy="true">
       <h1 className="text-xl font-bold">Панель публікації</h1>
-      <p className="mt-2 flex items-center gap-2 text-sm text-neutral-500">
+      <p className="mt-2 flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
         <span
-          className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent"
+          className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-neutral-500 border-t-transparent"
           aria-hidden="true"
         />
         Завантаження стану з GitHub…
@@ -21,15 +21,15 @@ export default function PanelLoading() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="animate-pulse rounded-lg border border-neutral-200 bg-white p-4"
+            className="animate-pulse rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <div className="h-4 w-1/3 rounded bg-neutral-200" />
+            <div className="h-4 w-1/3 rounded bg-neutral-200 dark:bg-neutral-800" />
             <div className="mt-3 flex gap-2">
-              <div className="h-6 w-16 rounded bg-neutral-100" />
-              <div className="h-6 w-16 rounded bg-neutral-100" />
-              <div className="h-6 w-16 rounded bg-neutral-100" />
+              <div className="h-6 w-16 rounded bg-neutral-100 dark:bg-neutral-800" />
+              <div className="h-6 w-16 rounded bg-neutral-100 dark:bg-neutral-800" />
+              <div className="h-6 w-16 rounded bg-neutral-100 dark:bg-neutral-800" />
             </div>
-            <div className="mt-3 h-8 w-40 rounded bg-neutral-100" />
+            <div className="mt-3 h-8 w-40 rounded bg-neutral-100 dark:bg-neutral-800" />
           </div>
         ))}
       </div>
