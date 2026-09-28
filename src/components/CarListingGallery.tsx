@@ -234,7 +234,7 @@ export function CarListingGallery({
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowFullScreen
                         loading="lazy"
-                        className="h-full w-full border-0"
+                        className="absolute inset-0 h-full w-full border-0"
                       />
                     ) : (
                       <video
@@ -254,9 +254,12 @@ export function CarListingGallery({
                     <button type="button" onClick={showNext} aria-label={labels.nextPhoto} className="absolute right-3 z-10 grid h-11 w-11 place-items-center rounded-full border border-gold bg-black/75 text-gold transition-colors hover:bg-gold hover:text-black">
                       <ChevronRight aria-hidden="true" />
                     </button>
-                    <span className="absolute bottom-3 left-3 border border-gold/60 bg-black/80 px-3 py-1.5 text-sm tracking-widest text-gold">
-                      {String(activeIndex + 1).padStart(2, "0")} / {String(media.length).padStart(2, "0")}
-                    </span>
+                    {activeMedia.type === "photo" && (
+                      <span className="absolute bottom-3 left-3 border border-gold/60 bg-black/80 px-3 py-1.5 text-sm tracking-widest text-gold">
+                        {String(activeIndex + 1).padStart(2, "0")} /{" "}
+                        {String(media.length).padStart(2, "0")}
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
