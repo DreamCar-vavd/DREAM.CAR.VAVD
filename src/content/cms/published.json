@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-09-27T14:48:00.699Z",
+  "publishedAt": "2026-09-28T20:16:53.114Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -120,9 +120,9 @@
         }
       ],
       "video": {
-        "mode": "legacy-file",
-        "src": "/images/cms/cars/dacia-sandero-2022/video/dacia-walkaround.mp4",
-        "posterSrc": "/images/cms/cars/dacia-sandero-2022/photos/0/image.jpg"
+        "mode": "external-link",
+        "src": "https://youtube.com/shorts/5dcXCcJHBEY",
+        "posterSrc": "/images/cms/cars/dacia-sandero-2022/_pub/56890ea5391a495c6dc81ce0.jpg"
       },
       "uk": {
         "title": "Dacia Sandero",
