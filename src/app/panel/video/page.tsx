@@ -156,12 +156,6 @@ export default async function VideoPage() {
           }
         >
           {listError}
-          {notConfigured && (
-            <>
-              {" "}
-              Перевірте <code>BLOB_READ_WRITE_TOKEN</code> (Vercel → Storage → Blob).
-            </>
-          )}
         </p>
       )}
 
