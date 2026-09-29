@@ -19,6 +19,7 @@ import {
   type GateFailure,
   type LangReviewStatus,
 } from "./carsGate";
+import { parseYoutubeUrl } from "../media/youtube";
 
 export type GalleryKind = "album" | "showcase";
 
@@ -83,6 +84,15 @@ export function getGalleryPublishBlockers(
     ? project.photos.filter((p) => p?.image?.trim())
     : [];
   if (realPhotos.length === 0) failures.push({ kind: "no-photos" });
+
+  // The optional per-project YouTube link. Empty is fine (the modal shows its
+  // disabled "video coming soon" button); a non-empty value must pass the same
+  // strict check as the car video link, so an invalid link is never published.
+  const videoUrl = (project.videoUrl ?? "").trim();
+  if (videoUrl) {
+    const parsed = parseYoutubeUrl(videoUrl);
+    if (!parsed.ok) failures.push({ kind: "video-link-invalid", reason: parsed.reason });
+  }
 
   for (const locale of LOCALES) {
     const lang = project[locale];

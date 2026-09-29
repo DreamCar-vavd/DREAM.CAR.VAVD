@@ -189,6 +189,10 @@ export interface Dictionary {
       clientRequestLabel: string;
       checkedLabel: string;
       resultLabel: string;
+      /** Active video button: the project has a valid YouTube link. */
+      watchVideoLabel: string;
+      /** Disabled video button: no (valid) YouTube link yet. */
+      videoComingSoonLabel: string;
     };
     projects: Record<string, GalleryProjectCopy>;
   };

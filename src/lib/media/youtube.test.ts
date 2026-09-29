@@ -21,6 +21,40 @@ test("parseYoutubeUrl: all four supported formats normalize to the same embed UR
   }
 });
 
+test("parseYoutubeUrl: all four supported formats give the same canonical watch URL, built only from the id", () => {
+  const expected = `https://www.youtube.com/watch?v=${ID}`;
+  for (const url of [
+    `https://www.youtube.com/watch?v=${ID}`,
+    `https://youtu.be/${ID}`,
+    `https://www.youtube.com/shorts/${ID}`,
+    `https://www.youtube.com/embed/${ID}`,
+    // Extra query params and other real hosts collapse to the same link.
+    `https://www.youtube.com/watch?list=PL123&v=${ID}&t=42s`,
+    `https://m.youtube.com/watch?v=${ID}`,
+    `https://www.youtube-nocookie.com/embed/${ID}`,
+  ]) {
+    const r = parseYoutubeUrl(url);
+    assert.equal(r.ok, true, `expected ${url} to parse`);
+    if (r.ok) assert.equal(r.watchUrl, expected);
+  }
+});
+
+test("parseYoutubeUrl: rejected links never yield a watch URL (http, javascript:, other and spoofed domains)", () => {
+  for (const bad of [
+    `http://www.youtube.com/watch?v=${ID}`,
+    "javascript:alert(1)",
+    "https://vimeo.com/12345678",
+    `https://example.com/watch?v=${ID}`,
+    `https://youtube.com.evil.example/watch?v=${ID}`,
+    `https://youtu.be.evil.example/${ID}`,
+    `https://notyoutube.com/watch?v=${ID}`,
+  ]) {
+    const r = parseYoutubeUrl(bad);
+    assert.equal(r.ok, false, `expected ${bad} to be rejected`);
+    assert.equal("watchUrl" in r, false, `no watch URL may come out of ${bad}`);
+  }
+});
+
 test("parseYoutubeUrl: watch URL with extra query params (playlist, timestamp) still extracts v=", () => {
   const r = parseYoutubeUrl(`https://www.youtube.com/watch?list=PL123&v=${ID}&t=42s`);
   assert.equal(r.ok, true);

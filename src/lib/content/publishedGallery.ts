@@ -3,6 +3,7 @@ import type { ContentLocale } from "./carsGate";
 import type { GalleryProjectCopy } from "@/content/types";
 import { readSiteContent } from "./siteContent";
 import { imageSize } from "./imageSize";
+import { parseYoutubeUrl } from "../media/youtube";
 
 export interface GalleryMediaPhoto {
   src: string;
@@ -17,6 +18,13 @@ export interface GalleryMediaEntry {
   albumNumber: number;
   showContactCta: boolean;
   images: GalleryMediaPhoto[];
+  /**
+   * `https://www.youtube.com/watch?v=<id>` built from the validated id of the
+   * project's `videoUrl`, or `null` when it is empty or not a valid YouTube
+   * link — the modal then shows its disabled "video coming soon" button. The
+   * raw content value never reaches the client.
+   */
+  youtubeWatchUrl: string | null;
 }
 
 const DEFAULT_DIM = { width: 4, height: 3 };
@@ -39,12 +47,14 @@ export async function getGalleryMedia(): Promise<GalleryMediaEntry[]> {
       images.push({ src: photo.image, width: dim.width, height: dim.height, caption: photo.caption });
     }
     if (images.length === 0) continue; // gate already blocks this; belt-and-braces
+    const video = parseYoutubeUrl(p.videoUrl);
     out.push({
       id: p.id,
       kind: p.kind,
       albumNumber: isAlbum ? albumNo : 0,
       showContactCta: p.showContactCta,
       images,
+      youtubeWatchUrl: video.ok ? video.watchUrl : null,
     });
   }
   return out;

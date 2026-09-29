@@ -1,10 +1,12 @@
 /**
  * Shared YouTube URL validation + normalization — the single place that
- * decides "is this a YouTube link" and "what is the safe embed URL for it".
- * Used by the publish gate (`carsGate.ts`, and through it `content-guard.ts`),
- * the public site's video embed (`publishedCars.ts` -> `CarListingGallery`),
- * and the panel's YouTube link helper (`/panel/video`) — one implementation,
- * not four copies that could drift.
+ * decides "is this a YouTube link" and "what are the safe embed / watch URLs
+ * for it". Used by the publish gates (`carsGate.ts`, `galleryGate.ts`, and
+ * through them `content-guard.ts`), the public site's video embed
+ * (`publishedCars.ts` -> `CarListingGallery`), the gallery's "watch on
+ * YouTube" link (`publishedGallery.ts` -> `GalleryProjectModal`), and the
+ * panel's YouTube link helper (`/panel/video`) — one implementation, not
+ * several copies that could drift.
  *
  * Pure and dependency-free (only the global `URL`), so it is safe to import
  * from server code, a plain node:test file, a "use client" component, and
@@ -25,7 +27,7 @@ const ALLOWED_HOSTS = new Set([
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
 export type YoutubeParseResult =
-  | { ok: true; videoId: string; embedUrl: string }
+  | { ok: true; videoId: string; embedUrl: string; watchUrl: string }
   | { ok: false; reason: string };
 
 /**
@@ -88,10 +90,11 @@ export function looksLikeYoutubeUrl(input: string): boolean {
  * `youtube.com.example.com`-style spoofing — hostname must match one of
  * `ALLOWED_HOSTS` exactly), and a well-formed 11-character video id from one
  * of the four supported URL shapes (`watch?v=`, `youtu.be/`, `/shorts/`,
- * `/embed/`). Never returns the caller's own URL as the embed address — it
- * always BUILDS a fresh `youtube-nocookie.com/embed/<id>` URL from the
- * validated id, so a value coming out of this function is safe to place
- * directly in an `<iframe src>` regardless of what the input looked like.
+ * `/embed/`). Never returns the caller's own URL — it always BUILDS a fresh
+ * `youtube-nocookie.com/embed/<id>` URL (`embedUrl`) and a canonical
+ * `www.youtube.com/watch?v=<id>` link (`watchUrl`) from the validated id, so
+ * a value coming out of this function is safe to place directly in an
+ * `<iframe src>` or an `<a href>` regardless of what the input looked like.
  */
 export function parseYoutubeUrl(input: string): YoutubeParseResult {
   const s = (input ?? "").trim();
@@ -128,7 +131,12 @@ export function parseYoutubeUrl(input: string): YoutubeParseResult {
     return { ok: false, reason: "не вдалося визначити коректний ID відео в посиланні" };
   }
 
-  return { ok: true, videoId, embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}` };
+  return {
+    ok: true,
+    videoId,
+    embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}`,
+    watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
+  };
 }
 
 /** `"youtube"` when `src` is a valid YouTube link, else `"file"` (direct MP4/WebM/Blob/local path — unchanged handling). */
