@@ -32,6 +32,10 @@ export interface GalleryModalProject {
  * content value: it renders an active gold link that opens YouTube in a new
  * tab. `null` (no link, or an invalid one) renders a real disabled <button>
  * in muted grey. The video itself is never embedded here.
+ *
+ * Below `sm` the label may wrap onto two centred lines — a 320 px phone can't
+ * fit «Дивитися відео на YouTube» on one — while the Play icon keeps its size;
+ * from `sm` up it stays on one line, exactly as before.
  */
 export function GalleryVideoButton({
   watchUrl,
@@ -49,9 +53,9 @@ export function GalleryVideoButton({
         target="_blank"
         rel="noopener noreferrer"
         variant="outline"
-        className="w-full whitespace-nowrap sm:w-auto"
+        className="w-full min-w-0 max-sm:text-center max-sm:leading-snug sm:w-auto sm:whitespace-nowrap"
       >
-        <Play size={16} aria-hidden="true" />
+        <Play size={16} aria-hidden="true" className="shrink-0" />
         {watchLabel}
       </GoldLink>
     );
@@ -60,9 +64,9 @@ export function GalleryVideoButton({
     <button
       type="button"
       disabled
-      className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-sm border border-muted/40 bg-surface-light px-6 py-3 text-sm font-semibold tracking-wide text-muted sm:w-auto"
+      className="inline-flex w-full min-w-0 cursor-not-allowed items-center justify-center gap-2 rounded-sm border border-muted/40 bg-surface-light px-6 py-3 text-sm font-semibold tracking-wide text-muted max-sm:text-center max-sm:leading-snug sm:w-auto sm:whitespace-nowrap"
     >
-      <Play size={16} aria-hidden="true" />
+      <Play size={16} aria-hidden="true" className="shrink-0" />
       {comingSoonLabel}
     </button>
   );
