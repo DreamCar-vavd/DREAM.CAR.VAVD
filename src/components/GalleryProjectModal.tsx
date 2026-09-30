@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Image from "next/image";
-import { Car, Check, ClipboardCheck, ShieldCheck, User, X } from "lucide-react";
+import { Car, Check, ClipboardCheck, Play, ShieldCheck, User, X } from "lucide-react";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
 import { DreamLogo } from "./DreamLogo";
@@ -21,6 +21,51 @@ import { focusContactsHeading } from "@/lib/focusContactsHeading";
 export interface GalleryModalProject {
   id: string;
   images: { src: string; width: number; height: number }[];
+  /** Normalized YouTube watch URL, or `null` for the disabled button (see GalleryVideoButton). */
+  youtubeWatchUrl: string | null;
+}
+
+/**
+ * The project's video button — always rendered, in one of two states.
+ * `watchUrl` is the normalized `https://www.youtube.com/watch?v=<id>` built
+ * server-side from a validated YouTube id (publishedGallery.ts), never the raw
+ * content value: it renders an active gold link that opens YouTube in a new
+ * tab. `null` (no link, or an invalid one) renders a real disabled <button>
+ * in muted grey. The video itself is never embedded here.
+ */
+export function GalleryVideoButton({
+  watchUrl,
+  watchLabel,
+  comingSoonLabel,
+}: {
+  watchUrl: string | null;
+  watchLabel: string;
+  comingSoonLabel: string;
+}) {
+  if (watchUrl) {
+    return (
+      <GoldLink
+        href={watchUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        variant="outline"
+        className="w-full whitespace-nowrap sm:w-auto"
+      >
+        <Play size={16} aria-hidden="true" />
+        {watchLabel}
+      </GoldLink>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled
+      className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-sm border border-muted/40 bg-surface-light px-6 py-3 text-sm font-semibold tracking-wide text-muted sm:w-auto"
+    >
+      <Play size={16} aria-hidden="true" />
+      {comingSoonLabel}
+    </button>
+  );
 }
 
 export function GalleryProjectModal({
@@ -175,6 +220,14 @@ export function GalleryProjectModal({
                 {dict.gallery.modal.resultLabel}
               </h3>
               <p className="mt-2 text-sm text-muted">{copy.result}</p>
+            </div>
+
+            <div className="mt-6">
+              <GalleryVideoButton
+                watchUrl={project.youtubeWatchUrl}
+                watchLabel={dict.gallery.modal.watchVideoLabel}
+                comingSoonLabel={dict.gallery.modal.videoComingSoonLabel}
+              />
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">

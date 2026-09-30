@@ -32,6 +32,17 @@ test("every service entry has non-empty required fields", () => {
   }
 });
 
+test("gallery modal video button labels exist in every locale (active + disabled)", () => {
+  assert.deepEqual(
+    [uk, en, ru].map((d) => [d.gallery.modal.watchVideoLabel, d.gallery.modal.videoComingSoonLabel]),
+    [
+      ["Дивитися відео на YouTube", "Відео ще не додано"],
+      ["Watch video on YouTube", "Video coming soon"],
+      ["Смотреть видео на YouTube", "Видео скоро появится"],
+    ],
+  );
+});
+
 test("faq and process step counts match across locales", () => {
   assert.equal(uk.faq.items.length, ru.faq.items.length);
   assert.equal(uk.faq.items.length, en.faq.items.length);
