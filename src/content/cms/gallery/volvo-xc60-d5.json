@@ -25,7 +25,7 @@
   "uk": {
     "title": "Volvo XC60 D5",
     "service": "Автопідбір під ключ",
-    "clientRequest": "Знайти надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
+    "clientRequest": "Знайти надійний, технічно справний і доглянутий автомобіль відповідно до побажань та бюджету клієнта.",
     "completedItems": [
       "Проведено комплексну перевірку автомобіля: комп'ютерну діагностику всіх систем і вузлів, огляд кузова, лакофарбового покриття та зазорів, перевірку рівня й стану мастил і технічних рідин, а також тест-драйв. Помилок, слідів повторного фарбування та суттєвих дефектів не виявлено."
     ],
@@ -33,21 +33,21 @@
   },
   "en": {
     "title": "Volvo XC60 D5",
-    "service": "Service to be confirmed",
-    "clientRequest": "Information to be confirmed.",
+    "service": "Complete car sourcing service",
+    "clientRequest": "Find a reliable, mechanically sound and well-kept car to suit the client's preferences and budget.",
     "completedItems": [
-      "Information to be confirmed"
+      "We carried out a comprehensive inspection of the car, including a diagnostic scan of all systems and components, checks of the bodywork, paintwork and panel gaps, checks of the levels and condition of the oil and other fluids, and a test drive. No faults, signs of respraying or significant defects were found."
     ],
-    "result": "Information to be confirmed."
+    "result": "Recommended for purchase"
   },
   "ru": {
     "title": "Volvo XC60 D5",
-    "service": "Услуга уточняется",
-    "clientRequest": "Информация уточняется.",
+    "service": "Подбор автомобиля под ключ",
+    "clientRequest": "Найти надёжный, технически исправный и ухоженный автомобиль в соответствии с пожеланиями и бюджетом клиента.",
     "completedItems": [
-      "Информация уточняется"
+      "Проведена комплексная проверка автомобиля: компьютерная диагностика всех систем и узлов, осмотр кузова, лакокрасочного покрытия и зазоров, проверка уровня и состояния масел и технических жидкостей, а также тест-драйв. Ошибок, следов повторной окраски и существенных дефектов не выявлено."
     ],
-    "result": "Информация уточняется."
+    "result": "Рекомендовано к покупке"
   },
   "bornAt": "legacy-volvo-xc60-d5"
 }
