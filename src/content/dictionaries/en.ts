@@ -247,6 +247,8 @@ const dictionary: Dictionary = {
       clientRequestLabel: "Client request",
       checkedLabel: "What we checked",
       resultLabel: "Result",
+      watchVideoLabel: "Watch video on YouTube",
+      videoComingSoonLabel: "Video coming soon",
     },
     projects: {
       "maserati-levante": {

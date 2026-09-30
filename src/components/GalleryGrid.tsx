@@ -188,6 +188,7 @@ export function GalleryGrid({
               width: i.width,
               height: i.height,
             })),
+            youtubeWatchUrl: activeProject.youtubeWatchUrl,
           }}
           onClose={closeModal}
           onNavigate={closeForNavigation}

@@ -249,6 +249,8 @@ const dictionary: Dictionary = {
       clientRequestLabel: "Запит клієнта",
       checkedLabel: "Що перевірили",
       resultLabel: "Результат",
+      watchVideoLabel: "Дивитися відео на YouTube",
+      videoComingSoonLabel: "Відео ще не додано",
     },
     projects: {
       "maserati-levante": {
