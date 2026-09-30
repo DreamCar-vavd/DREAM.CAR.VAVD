@@ -5,32 +5,25 @@
   "year": "2018",
   "photos": [
     {
-      "image": "/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg",
-      "caption": ""
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/0/image.jpg"
     },
     {
-      "image": "/images/cms/gallery/volvo-xc60-d5/photos/1/image.jpg",
-      "caption": ""
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/1/image.jpg"
     },
     {
-      "image": "/images/cms/gallery/volvo-xc60-d5/photos/2/image.jpg",
-      "caption": ""
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/2/image.jpg"
     },
     {
-      "image": "/images/cms/gallery/volvo-xc60-d5/photos/3/image.jpg",
-      "caption": ""
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/3/image.jpg"
     },
     {
-      "image": "/images/cms/gallery/volvo-xc60-d5/photos/4/image.jpg",
-      "caption": ""
+      "image": "/images/cms/gallery/volvo-xc60-d5/photos/4/image.jpg"
     }
   ],
-  "videoUrl": "",
+  "videoUrl": "https://youtu.be/CXz8AX731c0",
   "showContactCta": true,
   "uk": {
     "title": "Volvo XC60 D5",
-    "shortDescription": "",
-    "longDescription": "",
     "service": "Автопідбір під ключ",
     "clientRequest": "Знайти надійний,технічно справний ,гарний автомобіль відповідно до побажань і бюджету клієнта.",
     "completedItems": [
@@ -40,8 +33,6 @@
   },
   "en": {
     "title": "Volvo XC60 D5",
-    "shortDescription": "",
-    "longDescription": "",
     "service": "Service to be confirmed",
     "clientRequest": "Information to be confirmed.",
     "completedItems": [
@@ -51,8 +42,6 @@
   },
   "ru": {
     "title": "Volvo XC60 D5",
-    "shortDescription": "",
-    "longDescription": "",
     "service": "Услуга уточняется",
     "clientRequest": "Информация уточняется.",
     "completedItems": [
