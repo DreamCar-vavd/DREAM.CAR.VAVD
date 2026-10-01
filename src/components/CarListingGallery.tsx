@@ -9,10 +9,16 @@ import type { CarListingCopy } from "@/content/types";
 export interface CarListingMedia {
   id: string;
   photos: { src: string }[];
-  video: { kind: "youtube" | "file"; src: string; posterSrc: string } | null;
+  /**
+   * `src` drives the in-modal player (unchanged); `youtubeWatchUrl` is the
+   * normalized watch URL from carVideo.ts for the GalleryVideoButton, `null`
+   * for a non-YouTube video.
+   */
+  video: { kind: "youtube" | "file"; src: string; posterSrc: string; youtubeWatchUrl: string | null } | null;
 }
 import { setRequestedVehicle } from "@/lib/vehicleContactIntent";
 import { isModifiedClick } from "@/lib/isModifiedClick";
+import { GalleryVideoButton } from "./GalleryVideoButton";
 
 interface GalleryLabels {
   status: string;
@@ -22,6 +28,8 @@ interface GalleryLabels {
   contactCta: string;
   photoAlt: string;
   videoAlt: string;
+  watchVideo: string;
+  videoComingSoon: string;
 }
 
 type MediaItem =
@@ -311,6 +319,15 @@ export function CarListingGallery({
                     <p>{copy.mileage}</p>
                   </div>
                   <p className="my-7 font-heading text-4xl font-bold text-gold sm:text-5xl">{copy.price}</p>
+                  {/* Always shown, independent of the active slide — the same
+                      button as the gallery modal. A link only, never the player. */}
+                  <div className="mb-4 flex flex-col">
+                    <GalleryVideoButton
+                      watchUrl={listing.video?.youtubeWatchUrl ?? null}
+                      watchLabel={labels.watchVideo}
+                      comingSoonLabel={labels.videoComingSoon}
+                    />
+                  </div>
                   <Link
                     href={contactHref}
                     onClick={(event: MouseEvent<HTMLAnchorElement>) => {
