@@ -3,7 +3,7 @@ import type { ContentLocale } from "./carsGate";
 import { isRenderable, type CmsCar } from "./carsGate";
 import { formatMileage } from "./mileage";
 import { readSiteContent } from "./siteContent";
-import { resolveCarVideo } from "./carVideo";
+import { resolveCarVideo, type ResolvedCarVideo } from "./carVideo";
 
 /** Shapes the existing site components already consume. */
 export interface CarListingCopy {
@@ -17,7 +17,7 @@ export interface CarListingCopy {
 export interface CarMedia {
   id: string;
   photos: { src: string }[];
-  video: { kind: "youtube" | "file"; src: string; posterSrc: string } | null;
+  video: ResolvedCarVideo | null;
 }
 
 async function getVisibleCars(): Promise<CmsCar[]> {
