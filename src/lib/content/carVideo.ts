@@ -12,6 +12,12 @@ export interface ResolvedCarVideo {
   kind: "youtube" | "file";
   src: string;
   posterSrc: string;
+  /**
+   * Normalized `https://www.youtube.com/watch?v=<id>` for the modal's "watch
+   * on YouTube" button — built by `parseYoutubeUrl` from the validated id,
+   * never the raw content value. `null` for any non-YouTube ("file") video.
+   */
+  youtubeWatchUrl: string | null;
 }
 
 /**
@@ -37,7 +43,9 @@ export function resolveCarVideo(
   const posterSrc = toPublicImagePath(car.video.posterSrc);
   if (looksLikeYoutubeUrl(src)) {
     const parsed = parseYoutubeUrl(src);
-    if (parsed.ok) return { kind: "youtube", src: parsed.embedUrl, posterSrc };
+    if (parsed.ok) {
+      return { kind: "youtube", src: parsed.embedUrl, posterSrc, youtubeWatchUrl: parsed.watchUrl };
+    }
   }
-  return { kind: "file", src, posterSrc };
+  return { kind: "file", src, posterSrc, youtubeWatchUrl: null };
 }

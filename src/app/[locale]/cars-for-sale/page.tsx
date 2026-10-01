@@ -69,6 +69,8 @@ export default async function CarsForSalePage({
                 contactCta: dict.carsForSale.contactCta,
                 photoAlt: dict.carsForSale.photoAlt,
                 videoAlt: dict.carsForSale.videoAlt,
+                watchVideo: dict.gallery.modal.watchVideoLabel,
+                videoComingSoon: dict.gallery.modal.videoComingSoonLabel,
               }}
             />
           );

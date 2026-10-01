@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Image from "next/image";
-import { Car, Check, ClipboardCheck, Play, ShieldCheck, User, X } from "lucide-react";
+import { Car, Check, ClipboardCheck, ShieldCheck, User, X } from "lucide-react";
 import type { Dictionary } from "@/content/types";
 import type { Locale } from "@/lib/i18n/config";
 import { DreamLogo } from "./DreamLogo";
 import { GoldLink } from "./GoldButton";
+import { GalleryVideoButton } from "./GalleryVideoButton";
 import { WhatsAppIcon } from "./icons/SocialIcons";
 
 import { useDialogFocusTrap } from "@/lib/useDialogFocusTrap";
@@ -25,52 +26,8 @@ export interface GalleryModalProject {
   youtubeWatchUrl: string | null;
 }
 
-/**
- * The project's video button — always rendered, in one of two states.
- * `watchUrl` is the normalized `https://www.youtube.com/watch?v=<id>` built
- * server-side from a validated YouTube id (publishedGallery.ts), never the raw
- * content value: it renders an active gold link that opens YouTube in a new
- * tab. `null` (no link, or an invalid one) renders a real disabled <button>
- * in muted grey. The video itself is never embedded here.
- *
- * Below `sm` the label may wrap onto two centred lines — a 320 px phone can't
- * fit «Дивитися відео на YouTube» on one — while the Play icon keeps its size;
- * from `sm` up it stays on one line, exactly as before.
- */
-export function GalleryVideoButton({
-  watchUrl,
-  watchLabel,
-  comingSoonLabel,
-}: {
-  watchUrl: string | null;
-  watchLabel: string;
-  comingSoonLabel: string;
-}) {
-  if (watchUrl) {
-    return (
-      <GoldLink
-        href={watchUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        variant="outline"
-        className="w-full min-w-0 max-sm:text-center max-sm:leading-snug sm:w-auto sm:whitespace-nowrap"
-      >
-        <Play size={16} aria-hidden="true" className="shrink-0" />
-        {watchLabel}
-      </GoldLink>
-    );
-  }
-  return (
-    <button
-      type="button"
-      disabled
-      className="inline-flex w-full min-w-0 cursor-not-allowed items-center justify-center gap-2 rounded-sm border border-muted/40 bg-surface-light px-6 py-3 text-sm font-semibold tracking-wide text-muted max-sm:text-center max-sm:leading-snug sm:w-auto sm:whitespace-nowrap"
-    >
-      <Play size={16} aria-hidden="true" className="shrink-0" />
-      {comingSoonLabel}
-    </button>
-  );
-}
+// Re-exported so existing imports of the button from this module keep working.
+export { GalleryVideoButton };
 
 export function GalleryProjectModal({
   dict,
