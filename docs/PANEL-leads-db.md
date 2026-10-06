@@ -1,7 +1,40 @@
 # База заявок: підключення (тестове, для Preview)
 
-На цьому етапі — **тільки тестова база** (або окрема тестова гілка Neon-бази)
-для **Preview**. Production-змінні НЕ додаються.
+> **Поточний стан (06.10.2026) — читати першим.**
+>
+> **1. Чинний канал заявок.** Підтверджений робочий канал — **Formspree → email
+> власника** (`/api/contact` → Formspree).
+>
+> **2. Код підтримки бази заявок.** Код зберігання заявок (`src/lib/leads/*`,
+> `/panel/leads`) є в `main` з 22.09.2026 (PR #26).
+>
+> **3. Production-база.** Production-інтеграція бази заявок **проєктом не
+> активована**. Фактичний перелік змінних середовища Vercel наживо на цьому
+> документаційному етапі не перевірявся, тому цей документ **не стверджує**,
+> присутня чи відсутня конкретна env-змінна (зокрема `LEADS_DATABASE_URL`).
+> Тестовий Neon-проєкт `dream-car-leads-test` (лише синтетичні дані)
+> використовувався для перевірки на Preview 11.09.2026.
+>
+> **Перед майбутньою активацією на Production — окремі рішення:**
+> 1. хто матиме доступ до заявок і з якими правами;
+> 2. дотримання UK GDPR;
+> 3. строки зберігання (retention) — розділ 10;
+> 4. процедура видалення даних на запит клієнта;
+> 5. резервування бази (шифровані дампи / Neon PITR) — `docs/PANEL-backup-restore.md`;
+> 6. CSV-експорт заявок (коду поки немає);
+> 7. обмеження частоти заявок (rate limiting) — у коді `/api/contact` власного
+>    обмеження зараз немає;
+> 8. оновлена Privacy Policy;
+> 9. окрема Production-база, рішення про провайдера й регіон.
+>
+> - **Гілки:** усі згадки `codex/admin-panel-spike` нижче — **історія** тестового
+>   етапу Б3-preview (11.09.2026). Цю гілку злито в `main` (PR #26, 22.09.2026);
+>   для нових підключень її **не використовувати**. Гілку й середовище для
+>   майбутньої активації визначає окремий етап (Production — гілка `main`).
+
+**Історично (етап Б3-preview, 11.09.2026):** на тому етапі — **тільки тестова
+база** (або окрема тестова гілка Neon-бази) для **Preview**. Production-змінні
+НЕ додаються.
 
 ## Правило розділення тестових і робочих даних
 
@@ -94,8 +127,8 @@ Vercel-функції (`/api/contact`) → здеградована БД не з
 3. Видалити `.env.migrate` після міграції, якщо він більше не потрібен.
 
 Для Vercel — вставляти connection string **лише в поле Value змінної**
-`LEADS_DATABASE_URL` (Environment = Preview, Branch = `codex/admin-panel-spike`),
-**не** в чат / Git / звіт.
+`LEADS_DATABASE_URL` (Environment = Preview, Branch = `codex/admin-panel-spike` —
+історично, див. «Поточний стан» угорі), **не** в чат / Git / звіт.
 
 ## Перевірка міграції та повторний запуск
 
@@ -147,11 +180,11 @@ Vercel-функції (`/api/contact`) → здеградована БД не з
   другий виклик `inserted:false`, той самий `id`; інший текст → новий рядок;
   `list()` повертає обидва. Потім рядки **прибрано** (`deleted_at = now()`).
 - `LEADS_DATABASE_URL` (рядок ролі `leads_app`) додано у Vercel → **Preview
-  only**, branch **`codex/admin-panel-spike`** (Production НЕ зачеплено —
+  only**, branch **`codex/admin-panel-spike`** (історично; Production НЕ зачеплено —
   звірено в UI перед збереженням). **Redeploy зроблено на Preview-деплой
   конкретної гілки** (не через дефолтний перемикач «Choose Environment», який
   спершу підставляв Production, — його скасовано, замість цього redeploy через
-  `Deployments → codex/admin-panel-spike → ⋯ → Redeploy`, environment Preview
+  `Deployments → codex/admin-panel-spike → ⋯ → Redeploy` (історично), environment Preview
   підтверджено перед натисканням).
 - **Жива звірка на Preview:** `/panel/leads` → банер «не налаштоване» зник,
   показало «Усього: 2. Показано 2.» (реальні рядки з БД) → після soft-delete
@@ -189,7 +222,7 @@ Vercel-функції (`/api/contact`) → здеградована БД не з
 | `scripts/leads-migrate.mjs` (`npm run leads:migrate`) | застосовує `schema.sql`, наприкінці друкує колонки таблиці |
 | Тести | `src/lib/leads/{store,postgres,idempotency}.test.ts` — контракт mode/пагінації/ідемпотентності (в CI) |
 
-## 3. Що залишилося (лише інфраструктура + жива перевірка)
+## 3. Що залишилося (лише інфраструктура + жива перевірка) — історично, виконано для Preview 11.09.2026
 
 1. Створити **тестову** БД Neon (окремий проєкт `dream-car-leads-test` або гілку
    `preview`) — Production-база пізніше, окремо.
@@ -197,13 +230,14 @@ Vercel-функції (`/api/contact`) → здеградована БД не з
 3. Створити обмежену роль застосунку `leads_app` (SQL у розділі «Два набори
    прав» вище).
 4. Додати `LEADS_DATABASE_URL` (рядок ролі `leads_app`) у Vercel → Environment
-   **Preview**, Branch **`codex/admin-panel-spike`**.
+   **Preview**, Branch **`codex/admin-panel-spike`** (історично; для нової
+   активації гілку визначає окремий етап — див. «Поточний стан» угорі).
 5. Redeploy Preview; прогнати перевірку успіху (розділ 6).
 
 ## 4. Точні назви (без значень)
 
-- **Змінна середовища:** `LEADS_DATABASE_URL` (Vercel Preview, гілка
-  `codex/admin-panel-spike`). Формат: `postgresql://leads_app:PASSWORD@HOST/DB?sslmode=require`.
+- **Змінна середовища:** `LEADS_DATABASE_URL` (історично — Vercel Preview, гілка
+  `codex/admin-panel-spike`; для Production — окремим етапом). Формат: `postgresql://leads_app:PASSWORD@HOST/DB?sslmode=require`.
 - **Допоміжна (лише локально, не в Vercel):** `LEADS_DEMO_MODE=1` — вмикає
   демо-режим у dev; у hosted без `LEADS_DATABASE_URL` показує «Сховище заявок
   не налаштоване», **не** демо.
@@ -226,7 +260,7 @@ Vercel-функції (`/api/contact`) → здеградована БД не з
 | 6 | Міграція | **асистент** | `set -a; source .env.migrate; set +a; npm run leads:migrate; unset LEADS_DATABASE_URL` — звірити 10 колонок |
 | 7 | Роль `leads_app` + timeout | **асистент** | SQL з розділу «Два набори прав» (owner-рядком). Згенерувати пароль `openssl rand -base64 24`. |
 | 8 | `leads_app` рядок | **асистент → власник** | асистент складає рядок `postgresql://leads_app:<pwd>@<host>/<db>?sslmode=require` і **записує у `.env.migrate` поряд**, повідомляє власнику: «рядок у файлі, поле `LEADS_APP_URL`» — **у чат не пише** |
-| 9 | Vercel env | **власник** (значення бачить лише власник) | <https://vercel.com> → project `dream.car.vavd` → Settings → Environment Variables → **Add New**: Key `LEADS_DATABASE_URL`, Value = рядок `leads_app` з файлу, Environments = **Preview only**, ✅ "Specific Branches" → `codex/admin-panel-spike` → Save |
+| 9 | Vercel env | **власник** (значення бачить лише власник) | <https://vercel.com> → project `dream.car.vavd` → Settings → Environment Variables → **Add New**: Key `LEADS_DATABASE_URL`, Value = рядок `leads_app` з файлу, Environments = **Preview only**, ✅ "Specific Branches" → `codex/admin-panel-spike` → Save (історично; для нової активації — див. «Поточний стан» угорі) |
 | 10 | Redeploy Preview | **власник** | Vercel → Deployments → останній Preview гілки → ⋯ → **Redeploy** (без "use existing build cache") |
 | 11 | Синтетична перевірка + прибирання | **асистент** | розділ 6 (B/C/D) |
 | 12 | Прибрати `.env.migrate` | **власник або асистент** | після перевірок — `rm .env.migrate` |
@@ -382,7 +416,7 @@ $0.106/CU-година + $0.35/ГБ-місяць, без місячного мі
 Звірено з кодом (`src/app/api/contact/route.ts`, `src/lib/leads/store.ts`,
 `src/lib/leads/deliver.ts`) — без надсилання форми, без значень env.
 
-## A. Поточний Production (сайт на `main`)
+## A. Production станом на 11.09.2026 (сайт на `main`, до злиття PR #26 — історично)
 
 **Звірено на `origin/main` (задача 20:24 блок 6): у `main` НЕМАЄ жодного файлу
 панелі / Keystatic / leads.** `git ls-tree -r origin/main` — 0 збігів на
@@ -410,7 +444,7 @@ src/app/api/contact/route.ts  (версія main — БЕЗ кроку БД)
 Formspree. `LEADS_DATABASE_URL` на Production **не мав би ефекту** — код, який
 його читає, у `main` відсутній.
 
-## B. Preview після Б3 (Neon підключено ТІЛЬКИ до Preview)
+## B. Preview після Б3 (Neon підключено ТІЛЬКИ до Preview) — історично, 11.09.2026
 
 ```
 Форма на Preview-деплої
@@ -433,7 +467,7 @@ Neon (гілка preview) ──select──►  /panel/leads на Preview  (dyn
                                    за storage-session-гейтом)
 ```
 
-## Ключове питання: чи побачить панель заявки з ПОТОЧНОГО Production, якщо Neon під'єднано лише до Preview?
+## Ключове питання: чи побачить панель заявки з ПОТОЧНОГО Production, якщо Neon під'єднано лише до Preview? (аналіз від 11.09.2026, до PR #26 — історично)
 
 **Ні.** Причини, з коду `main` і з моделі Vercel:
 
@@ -442,7 +476,7 @@ Neon (гілка preview) ──select──►  /panel/leads на Preview  (dyn
    `/panel/leads`. Навіть якщо додати `LEADS_DATABASE_URL` у Production env —
    його нічим прочитати.
 2. `LEADS_DATABASE_URL` — змінна **на середовище** (зараз буде Vercel
-   Environment = Preview, Branch = `codex/admin-panel-spike`). Production-деплой
+   Environment = Preview, Branch = `codex/admin-panel-spike` — історично). Production-деплой
    `main` її не отримує, і навіть отримавши — див. п.1.
 3. Немає іншого маршруту даних: Production `/api/contact` пише лише в email;
    Formspree не має конектора до Neon; `/panel/leads` (на Preview) читає
@@ -522,7 +556,8 @@ Neon (гілка preview) ──select──►  /panel/leads на Preview  (dyn
 наявними листами.
 
 **Область змін:**
-1. **Код у `main`.** Зараз весь subsystem заявок є лише в PR #26. Варіанти:
+1. **Код у `main`.** *(Оновлено 06.10.2026: PR #26 злито 22.09.2026 — код уже в
+   `main`, цей пункт виконано; текст нижче — історія.)* Зараз весь subsystem заявок є лише в PR #26. Варіанти:
    (a) domerge PR #26 цілком (уся панель); (b) виділити мінімальний зріз
    (`src/lib/leads/*`, `/panel/leads` + гейт, крок БД у `/api/contact`,
    `keystaticEnabled`/`getStorage` залежності) в окремий PR. Оцінити разом.

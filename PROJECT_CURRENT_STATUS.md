@@ -1,6 +1,99 @@
 # DREAM.CAR.VAVD — актуальний стан проєкту
 
-Останнє оновлення: **2026-09-26**
+## ▶ Актуальний checkpoint — 06.10.2026 (після PR #43 і резервування)
+
+Останнє оновлення: **2026-10-06**. Усе нижче цього блоку — **історія** (факти
+чинні для свого моменту). Якщо старий запис суперечить цьому блоку, актуальним
+є цей блок.
+
+**Git і Production** (перевірено 06.10.2026 через GitHub API і `git ls-remote`):
+
+| Що | Значення |
+|---|---|
+| `main` | `5f575898e99e2ed900e242b72f4941fe079dc051` — squash PR #43 |
+| `panel/content` (робоча гілка CMS) | `c46079721ce10417ed769ef13dd2e820fd5555c3` — merge `main` після PR #43 |
+| Дерево обох гілок | `0bbb52ae74042d279dadd533478a1b0c65f6bb63` — `panel/content` позаду `main` на 0, файлових відмінностей немає |
+| Відкриті PR | 0 |
+| Production | deployment `6786965359`, buildId `3TF6n3brBXERlPTAAw33a` |
+| CI на `main` | Verify `36876993893` — success |
+
+**Сайт і CMS працюють:** сайт `dream-car-vavd.com` (UK/EN/RU), панель `/panel`
+і Keystatic на гілці `panel/content`. Неопублікованих змін немає.
+
+**Злито після PR #31** (продовження історії нижче):
+
+| PR | Злито (UTC) | Squash | Назва |
+|---|---|---|---|
+| #32 | 2026-09-26 | `6ca0f17` | docs: update project status after panel publication test |
+| #33 | 2026-09-27 | `6a06253` | fix(ui): centre promo grids with one or two cards |
+| #34 | 2026-09-27 | `021a5a7` | content: publish car sourcing consultation promo |
+| #35 | 2026-09-27 | `8dc18ee` | fix(panel): restore accessible dark theme contrast |
+| #36 | 2026-09-28 | `e9dc062` | fix(panel): improve video helper accessibility |
+| #37 | 2026-09-28 | `602f4ff` | fix(cars): make embedded video responsive |
+| #38 | 2026-09-28 | `4ebeab6` | content: publish YouTube walkarounds for Dacia listings |
+| #39 | 2026-09-30 | `36eba1f` | feat(gallery): add YouTube project links |
+| #40 | 2026-09-30 | `15f63b2` | fix(gallery): wrap video labels on narrow screens |
+| #41 | 2026-09-30 | `0e8132b` | content: publish Volvo YouTube video link |
+| #42 | 2026-10-01 | `e560a88` | feat(cars): add YouTube watch buttons |
+| #43 | 2026-10-01 | `5f57589` | content: publish updated Volvo XC60 D5 copy |
+
+**Відео на сайті:** «Автомобілі в продажу» — вбудований YouTube-плеєр і окрема
+кнопка «Дивитися відео на YouTube» (Dacia Sandero 2022, Dacia Sandero Comfort
+2019); авто без YouTube-посилання показує сіру неактивну кнопку. «Галерея робіт» —
+кнопка YouTube у вікні проєкту (Volvo XC60 D5; тексти UK/EN/RU опубліковано в PR #43).
+
+**Поточний цикл публікації ручний:** редагування → UK/EN/RU → Draft Preview →
+публікація в `panel/content` → PR у `main` → merge → Production → синхронізація
+`main` у `panel/content`.
+
+**Резервування — завершено** (джерела підтверджень — чотири категорії нижче;
+подробиці — `docs/PANEL-backup-restore.md`).
+
+*1. Документально підтверджено* (результат записаний у `RESTORE-TEST.txt`
+комплекту):
+- 05.10.2026 — створено комплект `DREAM.CAR.VAVD-BACKUP-2026-10-05` з `main`
+  `5f57589` / `panel/content` `c460797` (`git/`, `cms-export/`, `public/`,
+  `documentation/`, `external-resources/`, `checksums/`, `RESTORE-INSTRUCTIONS.md`,
+  `RESTORE-TEST.txt`) і проведено пробне відновлення з bundle; точні хеші й
+  результати — у `RESTORE-TEST.txt` комплекту.
+
+*2. Повідомлено у звіті Claude, повторно не перевірено:*
+- Повідомлено у звіті Claude від 06.10.2026: два зашифровані образи на
+  VOVA-VAVD були звірені з `MANIFEST.sha256` (за цим звітом — усі файли OK).
+  Цей результат не записаний у `RESTORE-TEST.txt` і повторно в ЕТАПІ 24A не
+  перевірявся.
+
+*3. Повідомлено власником, незалежно Claude не перевірено:*
+- копію записано на USB;
+- USB від'єднано;
+- копію завантажено у приватну хмару з 2FA;
+- пароль і recovery-коди зберігаються окремо;
+- VOVA-VAVD і USB-копія розташовані на різних фізичних пристроях
+  (підтвердження власника, 06.10.2026).
+
+*4. НЕ ПІДТВЕРДЖЕНО:*
+- цілісність USB-копії та копії у приватній хмарі (звірка з `MANIFEST.sha256`);
+- наявність окремої копії особистих оригіналів фото й відео.
+
+Значення секретів у документацію не записуються.
+
+**Свідомо не активовано:** Production-інтеграція бази заявок (чинний канал —
+Formspree → email), Vercel Blob (відео — через YouTube), автопублікація
+`content-guard`.
+
+**Відомі обмеження:** прямий `/keystatic` може відкрити гілку `main` — редагувати
+лише через кнопки `/panel` (`docs/PANEL-owner-guide.md`); `npm run content:check`
+показує 9 хибних попереджень «не позначено перевіреним» для 3 авто (скрипт шукає
+ключі без префікса `car:`); Privacy Policy потребує доповнення; у `/api/contact`
+немає власного обмеження частоти запитів.
+
+**Локальна робоча копія** `/Users/apple/Projects/DREAM.CAR.VAVD` (06.10.2026):
+гілка `codex/car-youtube-watch-button`, локальний `main` застарілий (`71d2d28`) —
+перед роботою звіряти remote через `git ls-remote`.
+
+---
+
+Попереднє оновлення (історичний checkpoint): **2026-09-26**
 Основна робоча копія: **`/Users/apple/Projects/DREAM.CAR.VAVD`**
 Остання функціональна контрольна точка коду (базова контрольна точка `main`
 перед документаційною правкою `2026-09-26`):
@@ -515,7 +608,7 @@ Draft/OPEN, `main` і Production не змінені; історично).**
 — перевірений code checkpoint (останній коміт із кодом/тестами) перед
 подальшими docs-комітами; `b3bb0f5a6e71663a03e8061c371b8162768c9380` —
 перший docs-checkpoint поверх нього. **Поточний head PR #26 дивитись у
-GitHub/Git** (`gh pr view 26` / `git log -1 origin/codex/admin-panel-spike`)
+GitHub/Git** (`gh pr view 26` / `git log -1 origin/codex/admin-panel-spike` — історично)
 — кожен новий docs-коміт його змінює, фіксувати конкретний SHA тут як
 «поточний head» після кожного коміту не масштабується. `main` —
 `e143b94ecf0ab09a0aff9c6d2e90c576f958860a`, PR на той момент був Draft/open
@@ -523,7 +616,7 @@ GitHub/Git** (`gh pr view 26` / `git log -1 origin/codex/admin-panel-spike`)
 checkpoint-ів. Б1 (GitHub App) і Vercel Preview env — виконані (не просто
 «оформлено запит», як раніше). `/panel`, `/panel/leads` і Keystatic
 перевірені наживо в реальній авторизованій сесії (не порожній in-app
-браузер); робоча гілка в Keystatic — `codex/admin-panel-spike`.
+браузер); робоча гілка в Keystatic на той момент — `codex/admin-panel-spike` (історично).
 Telegram-посилання сайту — `https://t.me/DREAM_CAR_VAVD` (постійна
 константа, не env). Turbopack-попередження в `LocalFsStorage` усунуто
 комітом `ffa6ee7…`. Production і `main` панеллю не змінені; синтетичних
@@ -1067,7 +1160,7 @@ tests, build)` — **`success`** для head `665d88dc37606445d540c50ca92dbd233d
   («Інформація уточнюється») — за рішенням власника поточне наповнення
   залишено **без змін**.
 - Панель керування контентом — на момент запису в роботі на гілці
-  `codex/admin-panel-spike` (PR #26, draft); **злито в `main` `2026-09-22`**
+  `codex/admin-panel-spike` (історично; PR #26, draft); **злито в `main` `2026-09-22`**
   (розділ 27). Стан і handoff:
   `PROJECT_PROGRESS.md` (розділ «Панель…») + `docs/PANEL*.md`. **Станом на
   16.09.2026 (попередня контрольна точка; поточна — розділ 24, 21.09.2026):** код перевірено наживо (`/panel`, `/panel/leads`,
@@ -1209,7 +1302,7 @@ tests, build)` — **`success`** для head `665d88dc37606445d540c50ca92dbd233d
   метадані, без значень) — 3 секрети. Невикористаний (`Never used`, створений
   `2026-09-23`) власник видалив; лишилось 2 — Production (створений
   `2026-09-25`) і Preview (створений `2026-09-07`, для гілки
-  `codex/admin-panel-spike`). Новий секрет, зміна Vercel і redeploy не
+  `codex/admin-panel-spike` — історично). Новий секрет, зміна Vercel і redeploy не
   знадобились. Видалення підтверджено звітом власника; агентом повторно не
   перевірялось.
 - **Перевірка гілки (`2026-09-26`) — PASS:** `/panel` показує «Робоча
