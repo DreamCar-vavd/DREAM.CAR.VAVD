@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
+// The Keystatic editor is an internal tool — never index it (same as /panel's layout).
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * The app's root layout (src/app/layout.tsx) is a pass-through; the public

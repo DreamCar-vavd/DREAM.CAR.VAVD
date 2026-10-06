@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { locales } from "@/lib/i18n/config";
+import { keystaticEntryRedirect } from "@/lib/panel/keystaticEntry";
 
 const SENTINEL_PATH = "/__proxy_404__/nf";
 
@@ -10,6 +11,8 @@ export function proxy(request: NextRequest) {
   if (pathname === "/") return NextResponse.next();
   if (pathname.startsWith("/api")) return NextResponse.next();
   if (pathname === "/keystatic" || pathname.startsWith("/keystatic/")) {
+    const target = keystaticEntryRedirect(pathname);
+    if (target) return NextResponse.redirect(new URL(target, request.url), 307);
     return NextResponse.next();
   }
   if (pathname === "/panel" || pathname.startsWith("/panel/")) {

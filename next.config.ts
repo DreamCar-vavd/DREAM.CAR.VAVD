@@ -106,7 +106,12 @@ const nextConfig: NextConfig = {
       ...["/keystatic/:path*", "/api/keystatic/:path*", "/panel/:path*", "/api/panel/:path*"].map(
         (source) => ({
           source,
-          headers: [...sharedHeaders, { key: "Content-Security-Policy", value: panelCsp }],
+          headers: [
+            ...sharedHeaders,
+            { key: "Content-Security-Policy", value: panelCsp },
+            // Internal tools: never index the panel, the Keystatic editor or their APIs.
+            { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          ],
         }),
       ),
     ];
