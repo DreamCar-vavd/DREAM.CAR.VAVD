@@ -6,6 +6,9 @@
    GitHub. Нижче — точна схема, хто що робить.
 2. **Картка підключення hosted-логіну** — усі значення, зібрані з коду.
 
+Окремо — §2.3: правила Production для робочої гілки, входу в Keystatic і
+`noindex` (після PR #45, 07.10.2026).
+
 Джерела GitHub (перевірено, вересень 2026):
 [About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches),
 [Available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets),
@@ -28,12 +31,45 @@
 GitHub рахує їх окремо: PR може мати всі зелені checks і все одно бути
 незмерджуваним, бо бракує approving review, і навпаки.
 
-### 1.2. Звичайні code-PR — без змін
+### 1.2. Звичайні code-PR
 
-`main` захищений ruleset-ом: **PR + `Verify` (green) + 1 approving review + гілка
-актуальна**. Помічник (роль **Write**) створює гілку й PR; змерджити його може
-лише власник, поставивши Approve. Жоден код не потрапляє в `main` без ока
-власника. Цей PR (#26) іде саме цим шляхом.
+**Фактичні правила `main`** — класичний branch protection (rulesets у
+репозиторії немає); перевірено через GitHub API лише читанням 07.10.2026
+(ЕТАП 25H-S):
+
+| Правило | Стан | Що це означає |
+|---|---|---|
+| Require a pull request before merging | увімкнено | змінити `main` можна лише через PR; прямий push у `main` GitHub відхиляє |
+| Required approvals | **0** | окремого схвалення (Approve) від рецензента GitHub не вимагає |
+| Required status check | `Verify (TypeScript, ESLint, tests, build)` | PR не змерджити, доки цей check не success |
+| Strict («гілка має бути актуальною») | **вимкнено** (`strict=false`) | GitHub не вимагає перед merge оновлювати гілку PR до найновішого `main` |
+| Застосування до адміністраторів | увімкнено (`enforce_admins=true`) | ці правила діють і для власника |
+| Force push / видалення `main` | заборонено | — |
+
+**Різниця між поняттями:**
+- **Require pull request** — *як* зміна потрапляє в `main`: лише через PR, не
+  прямим push.
+- **Required approvals** — *хто* має погодити PR у GitHub: N рецензентів із
+  правом запису натискають Approve. Тут N = 0, тож технічно PR можна злити без
+  Approve.
+- **Required status check `Verify`** — *автоматична* перевірка (TypeScript,
+  ESLint, тести, збірка) має бути зеленою. Зелений check ≠ погодження людиною
+  (див. §1.1).
+- **Strict / up-to-date branch** — чи мусить гілка PR містити найновіший `main`
+  перед merge. Вимкнено: PR, створений від старішого `main`, можна злити без
+  оновлення гілки; `Verify` при цьому перевіряє коміт PR, а не обов'язково його
+  поєднання з найновішим `main` (PR із конфліктами GitHub однаково не зіллє).
+
+**Хто вирішує про merge** — це організаційне правило, а не технічне правило
+GitHub: помічник створює гілку й PR, а merge виконується лише за явним
+дозволом власника. Колаборатор із правом запису один — власник
+(`DreamCar-vavd`, admin; перевірено через GitHub API 07.10.2026).
+
+*Історично:* до 07.10.2026 тут стояло «`main` захищений ruleset-ом: PR +
+`Verify` (green) + 1 approving review + гілка актуальна» і «змерджити його може
+лише власник, поставивши Approve» — з фактичними налаштуваннями це не
+збігається (rulesets немає, approvals 0, strict вимкнено). Шляхом PR + `Verify`
+ішов і PR #26.
 
 ### 1.3. Контент-публікація — окремий, вужчий шлях
 
@@ -90,7 +126,9 @@ GitHub рахує їх окремо: PR може мати всі зелені ch
 
 - **шлях 1.3 не існує**; публікація контенту = помічник відкриває звичайний PR
   зі зміненим `published.json`, власник дивиться diff і **Approve + Merge**
-  (це review у сенсі п.1.1 — людське рішення);
+  (це review у сенсі п.1.1 — людське рішення; уточнення 07.10.2026: required
+  approvals = 0, тож формальний Approve у GitHub не обов'язковий — людське
+  рішення тут = явний дозвіл власника на merge, див. §1.2);
 - активувати шлях 1.3 = один звичайний code-PR, який додає
   `.github/workflows/content-guard.yml` (вміст — з `workflows-proposed/`), і
   налаштування ruleset (нижче). Обидва — **рішення й дії власника**; помічник
@@ -155,8 +193,8 @@ Settings/Secrets, який поза межами дозволу. `content-guard.
 | **Дозволи App (repository permissions)** | **Contents: Read and write**, **Pull requests: Read and write**, **Deployments: Read**, **Metadata: Read** (обов'язково). Більше нічого — без Actions, Secrets, Administration, Workflows, Members. | `deployStatus()`; Keystatic PR-режим |
 | **Webhook** | **Вимкнути** (Active — off). Keystatic вебхук не використовує. | — |
 | **Where installed** | **Only select repositories → `DreamCar-vavd/DREAM.CAR.VAVD`**. Не «All repositories», не org-wide. | — |
-| **Env (точні назви, де задавати)** | **Vercel → Project → Settings → Environment Variables**, спершу **Preview**, потім Production: `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`; `KEYSTATIC_GITHUB_CLIENT_ID`; `KEYSTATIC_GITHUB_CLIENT_SECRET`; `KEYSTATIC_SECRET` — **рядок ≥ 32 символи** (Keystatic кидає помилку, якщо коротший; його власний генератор дає 80 hex — `openssl rand -hex 32` теж годиться); `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`; `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`. Необов'язково `PANEL_CONTENT_BRANCH=panel/content` (без нього — гілка деплою `VERCEL_GIT_COMMIT_REF`, ніколи не `main` на Preview). Скорочені імена (`CLIENT_ID` тощо) код **не** читає. | `keystatic-core-api-generic.js` рядки 74–76, 28; `store/index.ts` |
-| **Обмеження Preview env гілкою** | Vercel env для «Preview» застосовується до **всіх** preview-гілок. Щоб тільки ця гілка: у полі змінної Vercel вибрати **Preview → Specific Branches → `codex/admin-panel-spike`**. | Vercel env UI |
+| **Env (точні назви, де задавати)** | **Vercel → Project → Settings → Environment Variables**, спершу **Preview**, потім Production: `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`; `KEYSTATIC_GITHUB_CLIENT_ID`; `KEYSTATIC_GITHUB_CLIENT_SECRET`; `KEYSTATIC_SECRET` — **рядок ≥ 32 символи** (Keystatic кидає помилку, якщо коротший; його власний генератор дає 80 hex — `openssl rand -hex 32` теж годиться); `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`; `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`. `PANEL_CONTENT_BRANCH`: **на Production обов'язково `panel/content`** (відсутня, `main` чи інша гілка → безпечна зупинка, §2.3); на Preview необов'язково — без неї гілка деплою `VERCEL_GIT_COMMIT_REF`, але не `main`. Скорочені імена (`CLIENT_ID` тощо) код **не** читає. | `keystatic-core-api-generic.js` рядки 74–76, 28; `store/index.ts` |
+| **Обмеження Preview env гілкою** | Vercel env для «Preview» застосовується до **всіх** preview-гілок. Щоб тільки ця гілка: у полі змінної Vercel вибрати **Preview → Specific Branches → `codex/admin-panel-spike`** *(історично: гілка первинного налаштування, злита в `main` у PR #26; для нової Preview-гілки — її назва)*. | Vercel env UI |
 | **Повторний deployment після env** | **Так, обов'язково.** Vercel не застосовує нові env до вже зібраного деплою — після додавання значень зробити Redeploy гілки (Deployments → ⋯ → Redeploy) або новий push. | Vercel |
 | **Повернення після OAuth** | `/api/keystatic/github/oauth/callback` ставить cookie сесії й редіректить назад на сторінку, з якої почався вхід (Keystatic зберігає `from` у підписаному cookie `ks-<state>`). Токен GitHub — у cookie `keystatic-gh-access-token` (не httpOnly, бо його читає і панель). | код callback |
 | **Звідки власник бере кожне значення** | `CLIENT_ID` / `CLIENT_SECRET` / `KEYSTATIC_SECRET` — з локального `.env`, куди їх дописав Keystatic після «Create GitHub App» (крок вище), або: `CLIENT_ID`/`SECRET` з GitHub App settings, `KEYSTATIC_SECRET` — `openssl rand -hex 32`. Owner/Repo — вже відомі. **Значення — лише в Vercel env, не в Git, не в чат, не в звіт.** | — |
@@ -186,9 +224,43 @@ GitHub Pages з цього репо немає (не використовуєт�
 Реальні приватні матеріали (фото клієнтів, заявки) **не завантажувати**, доки
 репозиторій публічний і доки не ухвалено це рішення.
 
+### 2.3. Production: робоча гілка, вхід у Keystatic і `noindex` (після PR #45)
+
+Стан після PR #45 (squash `a2e055e`, злито 07.10.2026). Код:
+`src/lib/content/store/branch.ts` (`resolveContentBranch`),
+`src/lib/panel/keystaticEntry.ts` (`keystaticEntryRedirect`), `src/proxy.ts`,
+`next.config.ts`, `src/app/keystatic/layout.tsx`, `src/app/panel/layout.tsx`.
+Значення секретів тут не записуються.
+
+| Тема | Правило |
+|---|---|
+| GitHub-режим на Production | `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` разом зі змінними з таблиці §2. Без GitHub-режиму `/keystatic`, `/panel` і їхні API на деплої повертають 404. |
+| Робоча гілка на Production | **`PANEL_CONTENT_BRANCH=panel/content` — обов'язково.** На Production (`VERCEL_ENV=production`) код приймає лише `panel/content`. |
+| `main` | Заборонена як робоча гілка панелі в будь-якому середовищі. |
+| Гілка відсутня, дорівнює `main` або неправильна | Безпечна зупинка: `/panel` не читає й не пише контент і показує причину, а будь-який вхід `/keystatic` чи `/keystatic/branch/…` веде на `/panel`. У `main` нічого не пишеться. |
+| Preview | Може працювати на власній non-main гілці: `PANEL_CONTENT_BRANCH` (має пріоритет) або гілка деплою `VERCEL_GIT_COMMIT_REF`. |
+| Звичайний Preview без GitHub-режиму | `/keystatic*` і `/api/keystatic/*` можуть повертати 404 — це нормально. |
+| Вхід у Keystatic | `/keystatic`, `/keystatic/branch` і `/keystatic/branch/<інша гілка>` (зокрема `main`; решта шляху відкидається) → `307` на `/keystatic/branch/panel%2Fcontent`. Сама `panel/content` (як `panel%2Fcontent` чи `panel/content`, разом із підшляхами) відкривається без перенаправлення й без циклу. `/keystatic/setup` і `/keystatic/repo-not-found` не перехоплюються. `/keystatic/` спершу отримує стандартний `308` Next.js на `/keystatic`. |
+| OAuth і API Keystatic | `/api/keystatic/*` (вхід `/api/keystatic/github/login`, callback) proxy **не** перенаправляє. |
+| Межа серверного захисту | Перехоплюється лише повне завантаження сторінки. Перемикач гілок усередині Keystatic працює без запиту до сервера, тож перейти на `main` там технічно можливо (за аналізом коду; живо не перевірялось). Правило для редактора — не перемикатися (`docs/PANEL-owner-guide.md`). `main` захищена правилами GitHub (PR + `Verify`), тому прямий запис у `main` мав би бути відхилений — висновок, не перевірено. |
+| `noindex` | `/panel/:path*`, `/api/panel/:path*`, `/keystatic/:path*`, `/api/keystatic/:path*` → заголовок `X-Robots-Tag: noindex, nofollow`; HTML `/panel` і Keystatic містить `<meta name="robots" content="noindex, nofollow">`. Публічні сторінки — без `noindex`. Це не захист доступу: доступ, як і раніше, дає лише вхід через GitHub. |
+| Після squash-злиття в `main` | `main` випереджає `panel/content`: синхронізувати `main` у `panel/content` (звичайний merge-коміт, один push без force) **до** нових збережень і публікацій у CMS. |
+
+**Перевірено на Production 07.10.2026** (deployment `6907316903`): повна матриця
+маршрутів — ЕТАП 25F (*повідомлено у звіті Claude*); в ЕТАПІ 25H повторно —
+`/keystatic` → `307` на `/keystatic/branch/panel%2Fcontent` з
+`X-Robots-Tag: noindex, nofollow` (*підтверджений факт*). Значення
+`PANEL_CONTENT_BRANCH` у Vercel напряму не читалося: що воно дорівнює
+`panel/content`, — *висновок* із поведінки Production.
+
 ---
 
 ## 3. Покрокова інструкція власнику (hosted-логін для Preview)
+
+> **Історично (вересень 2026).** Цей розділ описує первинне створення GitHub
+> App і перевірку входу на Preview гілки `codex/admin-panel-spike` (її злито в
+> `main` у PR #26). Production уже налаштований і працює; чинні правила
+> Production — §2.3.
 
 Порядок важливий. Production, DNS, гілки, тарифи, **Vercel Deployment
 Protection** — на цьому кроці **не** чіпаються (питання захисту Preview — §3.5,
@@ -276,7 +348,7 @@ Protection** — на цьому кроці **не** чіпаються (пит�
 | `KEYSTATIC_GITHUB_CLIENT_ID` | з локального `.env` | **так** |
 | `KEYSTATIC_GITHUB_CLIENT_SECRET` | з локального `.env` | **так** |
 | `KEYSTATIC_SECRET` | з локального `.env` (80 hex) | **так** |
-| `PANEL_CONTENT_BRANCH` *(необов'язково)* | `panel/content` | ні |
+| `PANEL_CONTENT_BRANCH` *(необов'язково — лише для цього Preview; на Production обов'язково `panel/content`, §2.3)* | `panel/content` | ні |
 
 Секрети вставляти **лише в поле Value у Vercel**, не в чат / Git / звіт.
 

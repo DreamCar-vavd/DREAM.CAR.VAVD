@@ -1,5 +1,9 @@
 # Сценарій реального запису + тестової публікації (готовий до погодження)
 
+> **Історичний сценарій (вересень 2026, гілка `codex/admin-panel-spike`).**
+> Чинні правила робочої гілки — розділ 0.1 нижче (оновлено 07.10.2026, після
+> PR #45) і `docs/PANEL-hosting-and-approvals.md` §2.3.
+
 **Статус: НЕ виконувати.** Виконання — лише після окремого «так» власника саме
 на цей сценарій. Передумови (а) зелена Preview-збірка з github-env і
 (б) пройдений вхід/читання/чернетка/вихід на Vercel Preview — **виконані**
@@ -28,12 +32,16 @@
 
 | Обмеження | Джерело (перевірено) |
 |---|---|
-| `/panel` та посилання редагування завжди прив'язані до гілки цього deployment | `src/lib/content/panelStore.ts` — `keystaticBase(branch)` = `/keystatic/branch/<branch>`; `editHrefFor`/`createHrefFor` вживають її. На Vercel Preview `branch` = `VERCEL_GIT_COMMIT_REF` = `codex/admin-panel-spike` |
-| `/panel` не має тихого fallback на `main` | `src/lib/content/store/branch.ts` — `resolveContentBranch` повертає `{branch:null}` (→ `NotConnectedError`), якщо ні `PANEL_CONTENT_BRANCH`, ні `VERCEL_GIT_COMMIT_REF` не задані. Гілки `"main"` у коді нема |
+| `/panel` та посилання редагування завжди прив'язані до робочої гілки контенту (`resolveContentBranch`, рядок нижче) | `src/lib/content/panelStore.ts` — `keystaticBase(branch)` = `/keystatic/branch/<branch>`; `editHrefFor`/`createHrefFor` вживають її. На Vercel Preview (історично, вересень 2026) `branch` = `VERCEL_GIT_COMMIT_REF` = `codex/admin-panel-spike`; на Production — `panel/content` |
+| `/panel` ніколи не працює на `main`; без придатної гілки — fail-closed | `src/lib/content/store/branch.ts` — `resolveContentBranch` (після PR #45, 07.10.2026): `PANEL_CONTENT_BRANCH`, інакше `VERCEL_GIT_COMMIT_REF`; `main` відхиляється завжди; на Production (`VERCEL_ENV=production`) дозволено лише `panel/content`; відсутня або неправильна гілка → `{branch:null}` (→ `NotConnectedError`, а `/keystatic` веде на `/panel`) — fail-closed; Preview може працювати на власній non-main гілці. *(До PR #45 тут було: «`{branch:null}`, якщо ні `PANEL_CONTENT_BRANCH`, ні `VERCEL_GIT_COMMIT_REF` не задані; гілки `"main"` у коді нема».)* |
 | Запис контенту йде комітом у робочу гілку, без PR/merge/dispatch | `src/lib/content/store/github.ts` — `PUT /repos/{o}/{r}/contents/{file}` з полем `branch: this.cfg.branch`; інших ендпойнтів запису нема |
 | Прямий push у `main` заборонено **всім, включно з адміністраторами** | GitHub → Settings → Branches → правило `main` (`branch_protection_rules/81941201`, звірено 2026-09-08): **Require a pull request before merging** = увімкнено; **Do not allow bypassing the above settings** = увімкнено; Allow force pushes / Allow deletions = вимкнено |
 | Merge PR у `main` вимагає зеленого чеку | те саме правило: **Require status checks** → `Verify (TypeScript, ESLint, tests, build)` |
 | `content-guard.yml` (авто-перенесення published-знімка в `main`) — **не активний** | лежить у `.github/workflows-proposed/content-guard.yml`; GitHub виконує лише файли з `.github/workflows/`. У `.github/workflows/` — тільки `ci.yml` |
+
+> **Чинне правило (з 07.10.2026):** після кожного merge у `main` спершу
+> синхронізувати `main` → `panel/content` і лише потім користуватися CMS
+> (зберігати й публікувати).
 
 ### 0.2. Процедурні домовленості (не технічний бар'єр)
 

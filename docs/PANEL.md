@@ -2,7 +2,8 @@
 
 Статус: розділи **«Автомобілі», «Галерея робіт», «Послуги», «Банери,
 акції, новини», «Контакти й графік»** на спільній моделі чернеток/публікації,
-з робочим hosted-адаптером GitHub (draft PR #26, не змерджено). «Контакти й
+з робочим hosted-адаптером GitHub (на момент написання — draft PR #26; його
+злито в `main` 22.09.2026, актуальний стан — `PROJECT_CURRENT_STATUS.md`). «Контакти й
 графік» — один запис (singleton). Повний аналіз: `report/35-admin-panel-stage3.md`.
 
 ---
@@ -48,11 +49,29 @@ Vercel збирає  →  банер «✅ Поточний знімок в еф
 | | Коли | Куди пише |
 |---|---|---|
 | **local** | `next dev` | файли на диску (атомарно) |
-| **github** | деплой із `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` | комміти через GitHub API токеном користувача, у гілку деплою; оптимістична конкурентність (409 → «оновіть сторінку») |
+| **github** | деплой із `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github` | комміти через GitHub API токеном користувача, у робочу гілку контенту (див. нижче; на Production — лише `panel/content`); оптимістична конкурентність (409 → «оновіть сторінку») |
 
 `/keystatic`, `/panel`, `/api/*` → **404** на деплої без
 `NEXT_PUBLIC_KEYSTATIC_STORAGE_KIND=github`. Локальний файловий режим не має авторизації
 й не може писати на serverless FS — його не можна виставляти публічно.
+
+### Робоча гілка контенту (після PR #45, 07.10.2026)
+
+Гілку визначає `resolveContentBranch` (`src/lib/content/store/branch.ts`):
+`PANEL_CONTENT_BRANCH`, а якщо її не задано — гілка деплою
+`VERCEL_GIT_COMMIT_REF`.
+
+| Середовище | Робоча гілка |
+|---|---|
+| **Production** | **обов'язково `PANEL_CONTENT_BRANCH=panel/content`** — інші значення не приймаються |
+| **Preview** | `PANEL_CONTENT_BRANCH` (має пріоритет) або `VERCEL_GIT_COMMIT_REF`, але не `main` |
+| **Локально, github-режим** | задати явно (`PANEL_CONTENT_BRANCH` у `.env.local`) — `VERCEL_GIT_COMMIT_REF` там немає |
+| **Локально, файловий режим** | GitHub-гілка не потрібна |
+
+`main` відхиляється завжди. Відсутня, `main` або неправильна гілка →
+безпечна зупинка (fail-closed): `/panel` показує причину, а вхід у
+`/keystatic` веде на `/panel`; у `main` нічого не пишеться. Повні правила
+Production — `docs/PANEL-hosting-and-approvals.md` §2.3.
 
 ## Галерея
 
@@ -100,6 +119,10 @@ Keystatic комітить фото в гілку контенту разом і
 
 ## Увімкнення hosted-панелі (дії власника)
 
+> **Історично (вересень 2026):** кроки первинного увімкнення; Production-панель
+> налаштовано 22–26.09.2026. Чинні правила Production —
+> `docs/PANEL-hosting-and-approvals.md` §2.3.
+
 > Повна картка підключення (тип App, callback, дозволи, env, перевірка двох
 > користувачів, відкликання доступу) і **точна схема погодження публікації**
 > (успішний check ≠ approving review) — у `docs/PANEL-hosting-and-approvals.md`.
@@ -112,7 +135,9 @@ Keystatic комітить фото в гілку контенту разом і
    `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
    `KEYSTATIC_SECRET`, `KEYSTATIC_GITHUB_REPO_OWNER=DreamCar-vavd`,
    `KEYSTATIC_GITHUB_REPO_NAME=DREAM.CAR.VAVD`.
-   (опц.) `PANEL_CONTENT_BRANCH` — окрема гілка для контент-коммітів.
+   `PANEL_CONTENT_BRANCH`: на Production — **обов'язково `panel/content`**; на
+   Preview — необов'язково (без неї — гілка деплою, але не `main`); див.
+   «Робоча гілка контенту» вище.
 3. Помічник — collaborator із роллю **Write** (не Admin); 2FA обом.
 4. Рішення: приватність репозиторію (report/35 §6); гілка публікації для
    Production (§12 п.3).
@@ -120,3 +145,5 @@ Keystatic комітить фото в гілку контенту разом і
 
 > У hosted-режимі код мосту `/api/panel`→GitHub **завершений** і покритий
 > mock-тестами, але з реальним GitHub ще не перевірений — потрібен App.
+> *(Історично, вересень 2026: повний hosted-цикл публікації з реальним GitHub
+> пройдено 26.09.2026 — `PROJECT_CURRENT_STATUS.md`, розділ 29.)*
