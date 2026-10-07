@@ -182,8 +182,8 @@
   "service:car-service": {
     "instance": "legacy-car-service",
     "uk": {
-      "hash": "5bbbc9d2453b0762486eb4b7ed3eded2db1e2d204d9b43897cb5dd3a790401f6",
-      "at": "2026-09-06T00:00:00.000Z"
+      "hash": "7660b565a010084174c0d8bd32fe3ff35f8b2d46dff49bb3f068042332b651f8",
+      "at": "2026-10-07T21:49:32.664Z"
     },
     "en": {
       "hash": "6429058f60e7214329f375793291e3520c5f830b314c7bb0d83ffbf08a50cd1a",
