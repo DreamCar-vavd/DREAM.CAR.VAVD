@@ -1,5 +1,11 @@
 # Послідовність впровадження PR №26 (підготовка, 15.09.2026)
 
+> **Історичний документ (15.09.2026, до merge PR #26 і до PR #45).** План
+> лишено без змін заднім числом. Чинна поведінка (з 07.10.2026): `main`
+> заборонена як робоча гілка панелі; Production приймає лише `panel/content`;
+> `/keystatic` перенаправляє на робочу гілку. Актуальні інструкції —
+> `docs/PANEL-owner-guide.md` і `docs/PANEL-hosting-and-approvals.md` §2.3.
+
 **Це підготовка, не дозвіл на merge чи Production.** Ніякого злиття,
 активації workflow чи зміни Production ця сесія не робила. Не загальний
 аудит — лише короткий, перевірений факти-переліком план.
@@ -67,7 +73,7 @@ draft-preview, увесь функціонал самої панелі.
 
 | Налаштування | Де зараз | Що треба на Production |
 |---|---|---|
-| `PANEL_CONTENT_BRANCH` | не задано явно — Preview сам бере `VERCEL_GIT_COMMIT_REF` (гілка PR) | **На Production `VERCEL_GIT_COMMIT_REF` = `main`** → без явного `PANEL_CONTENT_BRANCH` панель писала б **напряму в `main`**, в обхід усього Б4-захисту. Окрема гілка контенту — вже частина погодженої схеми (§4), не рівноцінна альтернатива до вибору |
+| `PANEL_CONTENT_BRANCH` | не задано явно — Preview сам бере `VERCEL_GIT_COMMIT_REF` (гілка PR) | **На Production `VERCEL_GIT_COMMIT_REF` = `main`** → без явного `PANEL_CONTENT_BRANCH` панель писала б **напряму в `main`**, в обхід усього Б4-захисту. Окрема гілка контенту — вже частина погодженої схеми (§4), не рівноцінна альтернатива до вибору. *(Історичний стан до PR #45: тепер `main` відхиляється, а без `panel/content` Production-панель зупиняється безпечно — `docs/PANEL-hosting-and-approvals.md` §2.3.)* |
 | `LEADS_DATABASE_URL` | Preview-only, гілка `codex/admin-panel-spike`, тестовий Neon-проєкт `dream-car-leads-test` | **Реальних заявок Production НЕ підключає.** Окрема БД (чи той самий Neon-проєкт у Production-режимі) — рішення й дія власника |
 | Callback URL GitHub App | Preview-домен (`…vercel.app`) | Додати callback для `dream-car-vavd.com` в налаштуваннях App |
 | `KEYSTATIC_GITHUB_CLIENT_ID/_SECRET`, `KEYSTATIC_SECRET` | Vercel → Preview env | Скопіювати ті самі значення в Vercel → **Production** env (окремий scope) |
@@ -93,6 +99,10 @@ Production `LEADS_DATABASE_URL` `/panel/leads` на Production показува�
    панель писатиме напряму в `main`, **в обхід усього Б4-захисту** — це
    відхилення від погодженої схеми, а не рівноцінний варіант, і вимагає
    окремого свідомого рішення власника, якщо він все ж цього хоче.
+   *(Історичний стан до PR #45. Чинна поведінка: `main` заборонена; Production
+   приймає лише `panel/content`, без неї панель зупиняється безпечно, а
+   `/keystatic` веде на `/panel`; деталі — `docs/PANEL-hosting-and-approvals.md`
+   §2.3, інструкція власнику — `docs/PANEL-owner-guide.md`.)*
 3. Активація Б4 (Environment + `CONTENT_PUBLISH_TOKEN` + ruleset bypass) —
    `docs/PANEL-hosting-and-approvals.md` §1.5, не зроблено.
 4. Підключення реальної Production БД заявок.
