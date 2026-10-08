@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-10-01T13:52:02.576Z",
+  "publishedAt": "2026-10-08T10:40:08.173Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -717,8 +717,8 @@
       "photos": [],
       "uk": {
         "title": "Автосервіс",
-        "shortDescription": "Ремонт та обслуговування автомобілів будь-якої складності.",
-        "longDescription": "Виконуємо технічне обслуговування та ремонт із використанням якісних матеріалів і комплектуючих. Перед початком робіт узгоджуємо обсяг та вартість, щоб не було несподіванок.",
+        "shortDescription": "Технічне обслуговування та ремонт автомобілів — напрям у розвитку.",
+        "longDescription": "Ми розвиваємо напрям автосервісу. Після запуску плануємо виконувати технічне обслуговування та ремонт із використанням якісних матеріалів і комплектуючих. Обсяг і вартість робіт узгоджуватимемо до їх початку, щоб не було несподіванок.",
         "cardDescription": "",
         "bullets": [
           "Планове технічне обслуговування",
@@ -780,8 +780,8 @@
       },
       "en": {
         "title": "Car Servicing",
-        "shortDescription": "Repair and maintenance for cars of any complexity.",
-        "longDescription": "We carry out maintenance and repairs using quality parts and materials. Before any work begins, we agree the scope and cost with you, so there are no surprises.",
+        "shortDescription": "Vehicle maintenance and repairs — a service currently in development.",
+        "longDescription": "Our car servicing is currently in development. Once available, we plan to provide maintenance and repairs using quality parts and materials. We will agree the scope and cost with you before any work begins, so there are no surprises.",
         "cardDescription": "",
         "bullets": [
           "Scheduled maintenance",
@@ -843,8 +843,8 @@
       },
       "ru": {
         "title": "Автосервис",
-        "shortDescription": "Ремонт и обслуживание автомобилей любой сложности.",
-        "longDescription": "Выполняем техническое обслуживание и ремонт с использованием качественных материалов и комплектующих. Перед началом работ согласовываем объём и стоимость, чтобы не было неожиданностей.",
+        "shortDescription": "Техническое обслуживание и ремонт автомобилей — направление в развитии.",
+        "longDescription": "Мы развиваем направление автосервиса. После запуска планируем выполнять техническое обслуживание и ремонт с использованием качественных материалов и комплектующих. Объём и стоимость работ будем согласовывать до их начала, чтобы не было неожиданностей.",
         "cardDescription": "",
         "bullets": [
           "Плановое техническое обслуживание",

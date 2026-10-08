@@ -3,14 +3,12 @@
   "order": 20,
   "status": "coming-soon",
   "iconSrc": "/images/services/premium-3d/02-car-service-premium-3d.png",
-  "priceAmount": "",
   "priceCurrency": "£",
   "photos": [],
   "uk": {
     "title": "Автосервіс",
-    "shortDescription": "Ремонт та обслуговування автомобілів будь-якої складності.",
-    "longDescription": "Виконуємо технічне обслуговування та ремонт із використанням якісних матеріалів і комплектуючих. Перед початком робіт узгоджуємо обсяг та вартість, щоб не було несподіванок.",
-    "cardDescription": "",
+    "shortDescription": "Технічне обслуговування та ремонт автомобілів — напрям у розвитку.",
+    "longDescription": "Ми розвиваємо напрям автосервісу. Після запуску плануємо виконувати технічне обслуговування та ремонт із використанням якісних матеріалів і комплектуючих. Обсяг і вартість робіт узгоджуватимемо до їх початку, щоб не було несподіванок.",
     "bullets": [
       "Планове технічне обслуговування",
       "Ремонт ходової, двигуна та трансмісії",
@@ -18,7 +16,6 @@
       "Якісні матеріали та комплектуючі"
     ],
     "modalLead": "Відкриваємо незабаром",
-    "modalDescription": "",
     "modalSections": [
       {
         "heading": "Технічне обслуговування",
@@ -64,16 +61,12 @@
           "Автопідбір і пригон автомобіля під замовлення."
         ]
       }
-    ],
-    "priceNote": "",
-    "seoTitle": "",
-    "seoDescription": ""
+    ]
   },
   "en": {
     "title": "Car Servicing",
-    "shortDescription": "Repair and maintenance for cars of any complexity.",
-    "longDescription": "We carry out maintenance and repairs using quality parts and materials. Before any work begins, we agree the scope and cost with you, so there are no surprises.",
-    "cardDescription": "",
+    "shortDescription": "Vehicle maintenance and repairs — a service currently in development.",
+    "longDescription": "Our car servicing is currently in development. Once available, we plan to provide maintenance and repairs using quality parts and materials. We will agree the scope and cost with you before any work begins, so there are no surprises.",
     "bullets": [
       "Scheduled maintenance",
       "Suspension, engine and transmission repair",
@@ -81,7 +74,6 @@
       "Quality parts and materials"
     ],
     "modalLead": "Opening soon",
-    "modalDescription": "",
     "modalSections": [
       {
         "heading": "Vehicle servicing",
@@ -127,16 +119,12 @@
           "Bespoke vehicle sourcing and delivery/import."
         ]
       }
-    ],
-    "priceNote": "",
-    "seoTitle": "",
-    "seoDescription": ""
+    ]
   },
   "ru": {
     "title": "Автосервис",
-    "shortDescription": "Ремонт и обслуживание автомобилей любой сложности.",
-    "longDescription": "Выполняем техническое обслуживание и ремонт с использованием качественных материалов и комплектующих. Перед началом работ согласовываем объём и стоимость, чтобы не было неожиданностей.",
-    "cardDescription": "",
+    "shortDescription": "Техническое обслуживание и ремонт автомобилей — направление в развитии.",
+    "longDescription": "Мы развиваем направление автосервиса. После запуска планируем выполнять техническое обслуживание и ремонт с использованием качественных материалов и комплектующих. Объём и стоимость работ будем согласовывать до их начала, чтобы не было неожиданностей.",
     "bullets": [
       "Плановое техническое обслуживание",
       "Ремонт ходовой, двигателя и трансмиссии",
@@ -144,7 +132,6 @@
       "Качественные материалы и комплектующие"
     ],
     "modalLead": "Открытие в ближайшее время",
-    "modalDescription": "",
     "modalSections": [
       {
         "heading": "Техническое обслуживание",
@@ -190,10 +177,7 @@
           "Подбор и доставка автомобиля под заказ."
         ]
       }
-    ],
-    "priceNote": "",
-    "seoTitle": "",
-    "seoDescription": ""
+    ]
   },
   "bornAt": "legacy-car-service"
 }

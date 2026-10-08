@@ -65,9 +65,9 @@ const dictionary: Dictionary = {
     },
     "car-service": {
       title: "Car Servicing",
-      shortDescription: "Repair and maintenance for cars of any complexity.",
+      shortDescription: "Vehicle maintenance and repairs — a service currently in development.",
       longDescription:
-        "We carry out maintenance and repairs using quality parts and materials. Before any work begins, we agree the scope and cost with you, so there are no surprises.",
+        "Our car servicing is currently in development. Once available, we plan to provide maintenance and repairs using quality parts and materials. We will agree the scope and cost with you before any work begins, so there are no surprises.",
       bullets: [
         "Scheduled maintenance",
         "Suspension, engine and transmission repair",
