@@ -182,16 +182,16 @@
   "service:car-service": {
     "instance": "legacy-car-service",
     "uk": {
-      "hash": "5bbbc9d2453b0762486eb4b7ed3eded2db1e2d204d9b43897cb5dd3a790401f6",
-      "at": "2026-09-06T00:00:00.000Z"
+      "hash": "7660b565a010084174c0d8bd32fe3ff35f8b2d46dff49bb3f068042332b651f8",
+      "at": "2026-10-07T21:49:32.664Z"
     },
     "en": {
-      "hash": "6429058f60e7214329f375793291e3520c5f830b314c7bb0d83ffbf08a50cd1a",
-      "at": "2026-09-06T00:00:00.000Z"
+      "hash": "24dafb4b38d379dcaaa0a49a8a83465c6e4d5a4cd494bb32a3e6ded703ca1b27",
+      "at": "2026-10-07T21:50:23.859Z"
     },
     "ru": {
-      "hash": "f8ee319dc1a02330c863ef2b26594af99449683bbc54578694730c0737290903",
-      "at": "2026-09-06T00:00:00.000Z"
+      "hash": "3300843099eeaaac4995b73bf64c8228f102c527affd3c0184ee852388c708d5",
+      "at": "2026-10-07T21:51:11.626Z"
     }
   },
   "service:diagnostics": {
