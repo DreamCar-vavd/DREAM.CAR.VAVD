@@ -69,7 +69,7 @@ export class LocalFsStorage implements PanelStorage {
    *  3. the callers only ever `rm` a single file, never a directory.
    */
   private async mutablePath(repoPath: string, subtree = "public/images/cms"): Promise<string> {
-    const baseDir = path.join(this.root, subtree);
+    const baseDir = path.join(/* turbopackIgnore: true */ this.root, subtree);
     const full = path.resolve(this.root, repoPath);
     if (full !== baseDir && !full.startsWith(baseDir + path.sep)) {
       throw new Error(`LocalFsStorage: refusing to touch "${repoPath}" — outside ${subtree}`);
@@ -77,7 +77,7 @@ export class LocalFsStorage implements PanelStorage {
 
     // `this.root` always exists; resolve it once (temp dirs are often symlinks).
     const realRoot = await fs.realpath(this.root);
-    const realBase = path.join(realRoot, subtree);
+    const realBase = path.join(/* turbopackIgnore: true */ realRoot, subtree);
     let probe = full;
     // Climb to the first path that actually exists on disk.
     for (;;) {
