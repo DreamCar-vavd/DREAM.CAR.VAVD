@@ -3,7 +3,7 @@ import type { Dictionary } from "../types";
 const dictionary: Dictionary = {
   meta: {
     siteName: "DREAM.CAR.VAVD",
-    homeTitle: "DREAM.CAR.VAVD — Premium Automotive Services in the UK",
+    homeTitle: "DREAM.CAR.VAVD — Car Sourcing and Premium Full-Cycle Automotive Services in the UK",
     homeDescription:
       "Car sourcing, servicing, computer diagnostics, SRS airbag repair and detailing. An honest approach, professional diagnostics and transparent pricing agreed in advance.",
   },
