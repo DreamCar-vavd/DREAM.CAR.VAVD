@@ -100,12 +100,14 @@ test("car-service structure from PR #11 is intact (modalLead + 5 sections + 19 i
   }
 });
 
-test("services other than car-service and detailing use the plain fallback (no modal/card overrides)", () => {
+test("plain services keep modal overrides empty; only car-selection may override cardDescription", () => {
   for (const [name, dict] of Object.entries(locales)) {
     for (const slug of serviceSlugs) {
       if (slug === "car-service" || slug === "detailing") continue;
       const svc = dict.services[slug];
-      assert.equal(svc.cardDescription, undefined, `${name}/${slug}: unexpected cardDescription`);
+      if (slug !== "car-selection") {
+        assert.equal(svc.cardDescription, undefined, `${name}/${slug}: unexpected cardDescription`);
+      }
       assert.equal(svc.modalLead, undefined, `${name}/${slug}: unexpected modalLead`);
       assert.equal(svc.modalDescription, undefined, `${name}/${slug}: unexpected modalDescription`);
       assert.equal(svc.modalSections, undefined, `${name}/${slug}: unexpected modalSections`);

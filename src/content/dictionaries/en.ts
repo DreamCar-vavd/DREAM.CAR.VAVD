@@ -56,6 +56,8 @@ const dictionary: Dictionary = {
       shortDescription: "Turnkey car sourcing with a full technical and history check.",
       longDescription:
         "We help you find a car that matches your needs and budget. Every option is checked technically and legally, so your decision is based on verified facts rather than the listing alone.",
+      cardDescription:
+        "Car sourcing in London and across the UK. Turnkey car sourcing with a full technical and history check.",
       bullets: [
         "Search for options matching your criteria",
         "Technical inspection and history check",
