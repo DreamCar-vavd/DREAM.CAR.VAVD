@@ -167,8 +167,8 @@
   "service:car-selection": {
     "instance": "legacy-car-selection",
     "uk": {
-      "hash": "2edb50b83cd0ca185e56dbc440bedc6b0741928eaf159bd7a7773190b5178fae",
-      "at": "2026-09-06T00:00:00.000Z"
+      "hash": "d9e7cfc3be8c62fde2fc5ce5d9d9b52ef7e51185b93f2851429cdffd09c4ec36",
+      "at": "2026-10-09T19:31:04.633Z"
     },
     "en": {
       "hash": "a756584e9add95659174089711bf58de5d8d3bb802835eb90b976a78a5c518db",
