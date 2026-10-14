@@ -116,7 +116,7 @@ export function GalleryProjectModal({
                 fill
                 sizes="(min-width: 1024px) 60vw, 90vw"
                 className="object-contain"
-                priority
+                loading="eager"
               />
             </div>
 
