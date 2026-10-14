@@ -3,9 +3,9 @@ import type { Dictionary } from "../types";
 const dictionary: Dictionary = {
   meta: {
     siteName: "DREAM.CAR.VAVD",
-    homeTitle: "DREAM.CAR.VAVD — Car Sourcing and Premium Full-Cycle Automotive Services in the UK",
+    homeTitle: "DREAM.CAR.VAVD — Car Sourcing in London and Across the UK",
     homeDescription:
-      "Car sourcing, servicing, computer diagnostics, SRS airbag repair and detailing. An honest approach, professional diagnostics and transparent pricing agreed in advance.",
+      "Premium full-cycle automotive services in London and across the UK: car sourcing, diagnostics, SRS airbag repair, servicing and detailing.",
   },
   nav: {
     home: "Home",
