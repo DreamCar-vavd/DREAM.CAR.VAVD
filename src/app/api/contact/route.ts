@@ -12,6 +12,7 @@ import {
 } from "@/lib/contact";
 import { getWritableLeadsStore, deriveIdempotencyKeys } from "@/lib/leads/store";
 import { resolveLeadResponse, type EmailOutcome } from "@/lib/leads/deliver";
+import { contactRateLimiter, getClientIp } from "@/lib/contactRateLimit";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const UPSTREAM_TIMEOUT_MS = 10_000;
@@ -19,8 +20,8 @@ const UPSTREAM_TIMEOUT_MS = 10_000;
 // Every response from this route carries user-facing, non-idempotent
 // submission state (success/error/rate-limited) — it must never be served
 // from a cache to a different visitor or a later request.
-function jsonResponse(body: unknown, status: number) {
-  return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+function jsonResponse(body: unknown, status: number, extraHeaders: Record<string, string> = {}) {
+  return NextResponse.json(body, { status, headers: { ...extraHeaders, "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -68,6 +69,15 @@ export async function POST(request: Request) {
   const validation = validateContactPayload(normalized);
   if (!validation.valid) {
     return jsonResponse({ ok: false, code: "INVALID_PAYLOAD" }, 400);
+  }
+
+  // Only a valid, non-honeypot submission counts towards the per-IP limit,
+  // and a blocked one never reaches the database or the email provider.
+  const rateLimit = contactRateLimiter.check(getClientIp(request.headers));
+  if (!rateLimit.allowed) {
+    return jsonResponse({ ok: false, code: "RATE_LIMITED" }, 429, {
+      "Retry-After": String(rateLimit.retryAfterSeconds),
+    });
   }
 
   // Durable record (panel database) — an INDEPENDENT sink, tried BEFORE email

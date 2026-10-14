@@ -462,3 +462,135 @@ test("attribution does not change upstream failure handling", async () => {
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), { ok: false, code: "DELIVERY_FAILED" });
 });
+
+// --- per-IP rate limit ---
+// The route uses one module-level limiter, so every test below uses its own
+// IP addresses (RFC 5737 documentation ranges) to stay independent.
+
+function ipRequest(ip: string | null, body: unknown = validBody()): Request {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (ip) headers["x-vercel-forwarded-for"] = ip;
+  return jsonRequest(body, headers);
+}
+
+function countingFetch(): { fetch: typeof fetch; calls: () => number } {
+  let calls = 0;
+  const fn = (async () => {
+    calls += 1;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  return { fetch: fn, calls: () => calls };
+}
+
+test("rate limit: 5 valid submissions per IP are delivered, the 6th gets 429 and never reaches the provider", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const counter = countingFetch();
+  globalThis.fetch = counter.fetch;
+
+  for (let i = 1; i <= 5; i++) {
+    const response = await POST(ipRequest("192.0.2.11"));
+    assert.equal(response.status, 200, `submission ${i}`);
+  }
+  assert.equal(counter.calls(), 5);
+
+  const blocked = await POST(ipRequest("192.0.2.11"));
+  assert.equal(blocked.status, 429);
+  assert.deepEqual(await blocked.json(), { ok: false, code: "RATE_LIMITED" });
+  assert.equal(blocked.headers.get("Cache-Control"), "no-store");
+  const retryAfter = Number(blocked.headers.get("Retry-After"));
+  assert.ok(Number.isInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 60, `Retry-After=${retryAfter}`);
+  assert.equal(counter.calls(), 5, "the blocked submission must not call the provider");
+});
+
+test("rate limit: another IP is still allowed while one IP is blocked", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = countingFetch().fetch;
+
+  for (let i = 0; i < 5; i++) await POST(ipRequest("192.0.2.21"));
+  assert.equal((await POST(ipRequest("192.0.2.21"))).status, 429);
+  assert.equal((await POST(ipRequest("192.0.2.22"))).status, 200);
+});
+
+test("rate limit: the x-forwarded-for fallback is limited the same way (first address only)", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = countingFetch().fetch;
+  const forwarded = (first: string) =>
+    jsonRequest(validBody(), { "Content-Type": "application/json", "x-forwarded-for": `${first}, 10.0.0.1` });
+
+  for (let i = 0; i < 5; i++) assert.equal((await POST(forwarded("192.0.2.31"))).status, 200);
+  assert.equal((await POST(forwarded("192.0.2.31"))).status, 429);
+  // Same proxy hop, different client: not blocked.
+  assert.equal((await POST(forwarded("192.0.2.32"))).status, 200);
+});
+
+test("rate limit: allowed again after 60 seconds (mocked clock, no real waiting)", async (t) => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = countingFetch().fetch;
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+
+  for (let i = 0; i < 5; i++) await POST(ipRequest("192.0.2.41"));
+  assert.equal((await POST(ipRequest("192.0.2.41"))).status, 429);
+
+  t.mock.timers.tick(59_999);
+  assert.equal((await POST(ipRequest("192.0.2.41"))).status, 429);
+
+  t.mock.timers.tick(1);
+  assert.equal((await POST(ipRequest("192.0.2.41"))).status, 200);
+});
+
+test("rate limit: requests without any client IP are never blocked (fail-open)", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const counter = countingFetch();
+  globalThis.fetch = counter.fetch;
+
+  for (let i = 0; i < 8; i++) {
+    assert.equal((await POST(ipRequest(null))).status, 200, `submission ${i + 1}`);
+  }
+  assert.equal(counter.calls(), 8);
+});
+
+test("rate limit: honeypot hits and invalid payloads do not use up the limit", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = countingFetch().fetch;
+
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await POST(ipRequest("192.0.2.51", validBody({ website: "spam" })))).status, 200);
+    assert.equal((await POST(ipRequest("192.0.2.51", validBody({ message: "" })))).status, 400);
+  }
+  for (let i = 1; i <= 5; i++) {
+    assert.equal((await POST(ipRequest("192.0.2.51"))).status, 200, `valid submission ${i}`);
+  }
+  assert.equal((await POST(ipRequest("192.0.2.51"))).status, 429);
+});
+
+test("rate limit: a blocked submission never reaches the leads database or the provider", async (t) => {
+  // A fresh copy of the route with the leads store mocked, so database
+  // writes can be counted. The rate limiter module is shared (same cache).
+  let dbWrites = 0;
+  t.mock.module(new URL("../../../lib/leads/store.ts", import.meta.url).href, {
+    namedExports: {
+      getWritableLeadsStore: async () => ({
+        kind: "database",
+        create: async () => {
+          dbWrites += 1;
+          return { id: String(dbWrites), inserted: true };
+        },
+      }),
+      deriveIdempotencyKeys: async () => ({ current: "c", previous: "p" }),
+    },
+  });
+  const { POST: mockedPost } = (await import(`./route.ts?db-mock=${Date.now()}`)) as typeof import("./route");
+
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const counter = countingFetch();
+  globalThis.fetch = counter.fetch;
+
+  for (let i = 0; i < 5; i++) assert.equal((await mockedPost(ipRequest("192.0.2.61"))).status, 200);
+  assert.equal(dbWrites, 5);
+  assert.equal(counter.calls(), 5);
+
+  const blocked = await mockedPost(ipRequest("192.0.2.61"));
+  assert.equal(blocked.status, 429);
+  assert.equal(dbWrites, 5, "the blocked submission must not be written to the database");
+  assert.equal(counter.calls(), 5, "the blocked submission must not call the provider");
+});
