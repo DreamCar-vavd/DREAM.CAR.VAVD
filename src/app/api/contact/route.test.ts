@@ -316,10 +316,149 @@ test("the outgoing request to the provider excludes website and unknown fields",
     "name",
     "phone",
     "service",
+    "subject",
     "vehicle",
   ]);
+  // An old payload without attribution still gets a safe, generic subject.
+  assert.equal(forwarded.subject, "DREAM.CAR.VAVD — New enquiry");
   assert.equal("website" in forwarded, false);
   assert.equal("adminOverride" in forwarded, false);
   assert.equal("extraField" in forwarded, false);
   assert.equal(forwarded.consent, true);
+});
+
+// --- attribution metadata ---
+
+function capturingFetch(): { fetch: typeof fetch; bodies: Record<string, unknown>[] } {
+  const bodies: Record<string, unknown>[] = [];
+  const fn = (async (_url: unknown, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  return { fetch: fn, bodies };
+}
+
+test("attribution, serviceLabel and a server-built subject reach the provider; gclid/fbclid/unknown fields do not", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const captured = capturingFetch();
+  globalThis.fetch = captured.fetch;
+
+  const response = await POST(
+    jsonRequest(
+      validBody({
+        service: "car-selection",
+        locale: "uk",
+        pagePath: "/uk",
+        serviceLabel: "Автопідбір",
+        utm_source: "google",
+        utm_medium: "cpc",
+        utm_campaign: "london",
+        utm_content: "ad-1",
+        utm_term: "car sourcing",
+        gclid: "abc",
+        fbclid: "xyz",
+        subject: "Injected subject",
+      }),
+    ),
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  const [forwarded] = captured.bodies;
+  assert.deepEqual(Object.keys(forwarded).sort(), [
+    "consent",
+    "email",
+    "locale",
+    "message",
+    "name",
+    "pagePath",
+    "phone",
+    "service",
+    "serviceLabel",
+    "subject",
+    "utm_campaign",
+    "utm_content",
+    "utm_medium",
+    "utm_source",
+    "utm_term",
+    "vehicle",
+  ]);
+  assert.equal(forwarded.service, "car-selection");
+  assert.equal(forwarded.serviceLabel, "Автопідбір");
+  assert.equal(forwarded.subject, "[UK] Автопідбір — нова заявка");
+});
+
+test("empty UTM fields are not forwarded", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const captured = capturingFetch();
+  globalThis.fetch = captured.fetch;
+
+  const response = await POST(jsonRequest(validBody({ locale: "en", pagePath: "/en", utm_source: "", utm_term: "  " })));
+
+  assert.equal(response.status, 200);
+  const [forwarded] = captured.bodies;
+  assert.equal(Object.keys(forwarded).some((key) => key.startsWith("utm_")), false);
+  assert.equal(forwarded.subject, "[EN] New enquiry");
+});
+
+test("subjects are built in all three languages", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const cases = [
+    { locale: "uk", serviceLabel: "Автопідбір", subject: "[UK] Автопідбір — нова заявка" },
+    { locale: "en", serviceLabel: "Car sourcing", subject: "[EN] Car sourcing — new enquiry" },
+    { locale: "ru", serviceLabel: "Автоподбор", subject: "[RU] Автоподбор — новая заявка" },
+  ];
+  for (const c of cases) {
+    const captured = capturingFetch();
+    globalThis.fetch = captured.fetch;
+    const response = await POST(
+      jsonRequest(validBody({ service: "car-selection", locale: c.locale, serviceLabel: c.serviceLabel })),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(captured.bodies[0].subject, c.subject);
+  }
+});
+
+test("an invalid locale or an over-long UTM value is rejected with 400 before reaching fetch", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = refusingFetch();
+
+  for (const extra of [{ locale: "de" }, { utm_campaign: "a".repeat(101) }, { pagePath: "https://evil.example/" }]) {
+    const response = await POST(jsonRequest(validBody(extra)));
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { ok: false, code: "INVALID_PAYLOAD" });
+  }
+});
+
+test("CR/LF in serviceLabel never reaches the email subject", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  const captured = capturingFetch();
+  globalThis.fetch = captured.fetch;
+
+  const response = await POST(
+    jsonRequest(validBody({ service: "car-selection", locale: "en", serviceLabel: "Car sourcing\r\nBcc: x@example.com" })),
+  );
+
+  assert.equal(response.status, 200);
+  const subject = String(captured.bodies[0].subject);
+  assert.equal(/[\r\n]/.test(subject), false);
+  assert.equal(String(captured.bodies[0].serviceLabel).includes("\n"), false);
+});
+
+test("a filled honeypot with attribution still never calls fetch", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = refusingFetch();
+
+  const response = await POST(jsonRequest(validBody({ website: "spam", locale: "uk", utm_source: "x" })));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+});
+
+test("attribution does not change upstream failure handling", async () => {
+  process.env.CONTACT_FORM_ENDPOINT = "https://example.com/webhook";
+  globalThis.fetch = (async () => new Response(null, { status: 500 })) as typeof fetch;
+
+  const response = await POST(jsonRequest(validBody({ locale: "ru", pagePath: "/ru", utm_source: "google" })));
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { ok: false, code: "DELIVERY_FAILED" });
 });
