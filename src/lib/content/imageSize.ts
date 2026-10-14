@@ -8,12 +8,19 @@ import path from "node:path";
  * extra CMS field the editor would have to fill; works for uploads too.
  * Returns null when the file is missing or not a recognised format — callers
  * fall back to a default box.
+ *
+ * The public pages are prerendered, so this runs at build time with the whole
+ * `public/` tree on disk. `turbopackIgnore` keeps that tree (~128 MB of
+ * photos) out of every server function's file trace. At runtime (only a
+ * Draft Mode preview re-renders these pages) the files are not in the
+ * function, so the reader returns null and the caller's default box is used
+ * — the same as for a draft photo that was never deployed.
  */
 export async function imageSize(
   publicPath: string,
 ): Promise<{ width: number; height: number } | null> {
   if (!publicPath || !publicPath.startsWith("/")) return null;
-  const file = path.join(process.cwd(), "public", publicPath.replace(/^\//, ""));
+  const file = path.join(/* turbopackIgnore: true */ process.cwd(), "public", publicPath.replace(/^\//, ""));
   let buf: Buffer;
   try {
     const fd = await fs.open(file, "r");

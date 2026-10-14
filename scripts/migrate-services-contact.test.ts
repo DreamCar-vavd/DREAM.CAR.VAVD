@@ -1,103 +1,80 @@
 /**
- * Migration integrity: the 5 committed service files + the contact record must
- * still match the source dictionaries verbatim (no structured block dropped,
- * no availability flipped, no price invented). Run: npm test
+ * Structural integrity of the committed service files + the contact record.
+ *
+ * The one-off migration (dictionaries -> CMS) is long done and the panel is
+ * now the source of truth for these texts: `getDictionary` overlays the
+ * published CMS copy on top of the static dictionaries everywhere on the
+ * site. So this test no longer pins any text, price, status or contact value
+ * to the dictionaries — editing them in the panel must not require a code PR.
+ * It only guards the shape the site relies on. Run: npm test
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import ukDict from "../src/content/dictionaries/uk";
-import enDict from "../src/content/dictionaries/en";
-import ruDict from "../src/content/dictionaries/ru";
 import { coerceService } from "../src/lib/content/coerce";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const readSvc = (slug: string) =>
-  coerceService(
-    slug,
-    JSON.parse(readFileSync(path.join(ROOT, `src/content/cms/services/${slug}.json`), "utf8")),
-  );
-const DICTS = { uk: ukDict, en: enDict, ru: ruDict } as const;
+const readRaw = (rel: string) => JSON.parse(readFileSync(path.join(ROOT, rel), "utf8"));
+const readSvc = (slug: string) => coerceService(slug, readRaw(`src/content/cms/services/${slug}.json`));
 const SLUGS = ["car-selection", "car-service", "diagnostics", "srs-airbag", "detailing"];
-const COMING_SOON = new Set(["car-service", "detailing"]);
+const LOCALES = ["uk", "en", "ru"] as const;
 
-test("all 5 services are present with their original ids and order", () => {
+test("all 5 services are present with their original ids and distinct numeric order", () => {
   const seen = SLUGS.map(readSvc);
-  assert.deepEqual(seen.map((s) => s.id), SLUGS);
   assert.deepEqual(
-    seen.map((s) => s.order),
-    [10, 20, 30, 40, 50],
+    seen.map((s) => s.id),
+    SLUGS,
   );
+  for (const slug of SLUGS) {
+    assert.equal(readRaw(`src/content/cms/services/${slug}.json`).id, slug, `${slug} file id`);
+  }
+  const orders = seen.map((s) => s.order);
+  assert.ok(orders.every((o) => Number.isFinite(o)), "every order is a number");
+  assert.equal(new Set(orders).size, orders.length, "orders are distinct");
 });
 
-test("availability is preserved verbatim — exactly car-service + detailing are «coming soon»", () => {
+test("every service has a known status and a currency", () => {
   for (const slug of SLUGS) {
-    const s = readSvc(slug);
-    assert.equal(
-      s.status,
-      COMING_SOON.has(slug) ? "coming-soon" : "available",
-      `${slug} status`,
-    );
+    const raw = readRaw(`src/content/cms/services/${slug}.json`);
+    assert.ok(["available", "coming-soon"].includes(raw.status), `${slug} status ${raw.status}`);
+    assert.ok(readSvc(slug).priceCurrency.trim(), `${slug} currency`);
   }
 });
 
-test("no invented prices — every amount empty, currency defaulted, every note empty", () => {
+test("every service has a non-empty title and card text in every language", () => {
   for (const slug of SLUGS) {
     const s = readSvc(slug);
-    assert.equal(s.priceAmount, "");
-    assert.equal(s.priceCurrency, "£");
-    for (const l of ["uk", "en", "ru"] as const) assert.equal(s[l].priceNote, "");
-  }
-});
-
-test("every language text matches the source dictionary verbatim", () => {
-  for (const slug of SLUGS) {
-    const s = readSvc(slug);
-    for (const l of ["uk", "en", "ru"] as const) {
-      const src = (DICTS[l].services as unknown as Record<string, Record<string, unknown>>)[slug];
-      assert.equal(s[l].title, src.title, `${slug}/${l} title`);
-      assert.equal(s[l].shortDescription, src.shortDescription, `${slug}/${l} shortDescription`);
-      assert.equal(s[l].longDescription, src.longDescription, `${slug}/${l} longDescription`);
-      assert.deepEqual(s[l].bullets, src.bullets ?? [], `${slug}/${l} bullets`);
-      assert.equal(s[l].cardDescription, src.cardDescription ?? "", `${slug}/${l} cardDescription`);
-      assert.equal(s[l].modalLead, src.modalLead ?? "", `${slug}/${l} modalLead`);
-      assert.equal(
-        s[l].modalDescription,
-        src.modalDescription ?? "",
-        `${slug}/${l} modalDescription`,
-      );
-      assert.deepEqual(
-        s[l].modalSections,
-        (src.modalSections as unknown[]) ?? [],
-        `${slug}/${l} modalSections`,
-      );
+    for (const l of LOCALES) {
+      assert.ok(s[l].title.trim(), `${slug}/${l} title`);
+      assert.ok((s[l].cardDescription || s[l].shortDescription).trim(), `${slug}/${l} card text`);
     }
   }
 });
 
-test("car-service keeps all 5 structured modal blocks in every language", () => {
-  const s = readSvc("car-service");
-  for (const l of ["uk", "en", "ru"] as const) {
-    assert.equal(s[l].modalSections.length, 5, `car-service/${l} block count`);
-    assert.ok(s[l].modalSections.every((b) => b.heading && b.items.length > 0));
+test("structured modal blocks, when present, each have a heading and items", () => {
+  for (const slug of SLUGS) {
+    const s = readSvc(slug);
+    for (const l of LOCALES) {
+      for (const block of s[l].modalSections) {
+        assert.ok(block.heading.trim(), `${slug}/${l} block heading`);
+        assert.ok(block.items.length > 0, `${slug}/${l} block "${block.heading}" items`);
+      }
+    }
   }
 });
 
-test("contact record: shared facts migrated, nothing invented", () => {
-  const c = JSON.parse(
-    readFileSync(path.join(ROOT, "src/content/cms/contact/site.json"), "utf8"),
-  );
+test("contact record: id, phone, email and WhatsApp are well-formed; headings present", () => {
+  const c = readRaw("src/content/cms/contact/site.json");
   assert.equal(c.id, "site");
-  assert.equal(c.phoneE164, "+447706054203");
-  assert.equal(c.email, "dream.car.vavd@gmail.com");
-  assert.equal(c.whatsappNumber, "447706054203");
-  // Not invented:
+  assert.match(c.phoneE164, /^\+\d{7,15}$/);
+  assert.match(c.email, /^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+  assert.match(c.whatsappNumber, /^\d{7,15}$/);
   for (const f of ["telegramUrl", "instagramUrl", "facebookUrl", "youtubeUrl", "addressText", "mapsUrl", "hours"]) {
-    assert.equal(c[f], "", `${f} must stay empty`);
+    assert.equal(typeof (c[f] ?? ""), "string", `${f} is text when present`);
   }
-  for (const l of ["uk", "en", "ru"] as const) {
-    assert.equal(c[l].heading, DICTS[l].contact.heading, `${l} heading`);
-    assert.equal(c[l].subheading, DICTS[l].contact.subheading, `${l} subheading`);
+  for (const l of LOCALES) {
+    assert.ok(String(c[l]?.heading ?? "").trim(), `${l} heading`);
+    assert.ok(String(c[l]?.subheading ?? "").trim(), `${l} subheading`);
   }
 });
