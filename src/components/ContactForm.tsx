@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { Dictionary } from "@/content/types";
+import type { Locale } from "@/lib/i18n/config";
 
+import { extractContactAttribution, type ContactAttributionFields } from "@/lib/contactAttribution";
 import { classifyContactErrorKind, type ContactErrorKind } from "@/lib/contactErrorKind";
 import { CONTACT_MAX_LENGTHS } from "@/lib/contactLimits";
 import { consumeRequestedService, onServiceRequested } from "@/lib/serviceContactIntent";
@@ -29,7 +31,7 @@ const SUBMIT_TIMEOUT_MS = 15_000;
 // the fields' visual/tab order in the form.
 const FIELD_ORDER = ["name", "phone", "email", "message", "consent"] as const;
 
-export function ContactForm({ dict }: { dict: Dictionary }) {
+export function ContactForm({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Errors>({});
   const [errorKind, setErrorKind] = useState<ErrorKind>(null);
@@ -44,6 +46,15 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
   });
   const serviceSelectRef = useRef<HTMLSelectElement>(null);
   const vehicleInputRef = useRef<HTMLInputElement>(null);
+  // Page path + UTM tags of the URL the visitor landed on, captured once on
+  // first mount and kept only in memory (no cookies, no browser storage).
+  const attributionRef = useRef<ContactAttributionFields | null>(null);
+
+  useEffect(() => {
+    if (!attributionRef.current) {
+      attributionRef.current = extractContactAttribution(window.location.href);
+    }
+  }, []);
 
   // Applies a requested service slug to the <select> — used both for a
   // value already waiting in sessionStorage at mount time, and for a live
@@ -189,6 +200,11 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
 
+    const service = String(formData.get("service") ?? "");
+    // The visible, localized option text — `service` itself stays the slug.
+    const serviceLabel = service ? (serviceSelectRef.current?.selectedOptions[0]?.text.trim() ?? "") : "";
+    const attribution = attributionRef.current ?? extractContactAttribution(window.location.href);
+
     try {
       const response = await fetch("/api/contact", {
         method: "POST",
@@ -197,11 +213,14 @@ export function ContactForm({ dict }: { dict: Dictionary }) {
           name: String(formData.get("name") ?? ""),
           phone: String(formData.get("phone") ?? ""),
           email: String(formData.get("email") ?? ""),
-          service: String(formData.get("service") ?? ""),
+          service,
           vehicle: String(formData.get("vehicle") ?? ""),
           message: String(formData.get("message") ?? ""),
           consent: formData.get("consent") === "on",
           website: String(formData.get("website") ?? ""),
+          locale,
+          ...(serviceLabel ? { serviceLabel } : {}),
+          ...attribution,
         }),
         signal: controller.signal,
       });

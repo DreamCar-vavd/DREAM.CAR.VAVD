@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import {
+  buildEmailPayload,
   evaluateRequestOrigin,
   isHoneypotTriggered,
   isJsonContentType,
   normalizeContactInput,
   readLimitedBody,
   resolveAllowedEndpoint,
+  toLeadInput,
   validateContactPayload,
 } from "@/lib/contact";
-import { getWritableLeadsStore, deriveIdempotencyKeys, type LeadInput } from "@/lib/leads/store";
+import { getWritableLeadsStore, deriveIdempotencyKeys } from "@/lib/leads/store";
 import { resolveLeadResponse, type EmailOutcome } from "@/lib/leads/deliver";
 
 const MAX_BODY_BYTES = 32 * 1024;
@@ -76,8 +78,10 @@ export async function POST(request: Request) {
   let savedToDb = false;
   if (leadsStore) {
     try {
-      const keys = await deriveIdempotencyKeys(validation.payload as LeadInput);
-      await leadsStore.create(validation.payload as LeadInput, keys);
+      // Only the lead itself is stored — attribution goes to the email only.
+      const leadInput = toLeadInput(validation.payload);
+      const keys = await deriveIdempotencyKeys(leadInput);
+      await leadsStore.create(leadInput, keys);
       savedToDb = true;
     } catch {
       console.warn("[contact] lead DB write failed; continuing with email only");
@@ -106,7 +110,7 @@ export async function POST(request: Request) {
       // which would otherwise conflict with `redirect: "error"` below
       // and turn a successful submission into a reported failure.
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(validation.payload),
+      body: JSON.stringify(buildEmailPayload(validation.payload, validation.attribution)),
       signal: controller.signal,
       // Never silently follow a redirect away from the configured
       // endpoint: if it ever redirected (misconfiguration or a
