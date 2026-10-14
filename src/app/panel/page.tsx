@@ -465,7 +465,7 @@ export default async function PanelPage() {
           <span className="text-xs text-neutral-500 dark:text-neutral-400">
             {data.branch === "main"
               ? "(Production)"
-              : "(тестова гілка — не Production; редактор і перегляд чернетки відкриваються саме на ній)"}
+              : "(гілка чернеток панелі — редактор і перегляд чернетки відкриваються саме на ній; на сайт зміни потрапляють після перенесення в main)"}
           </span>
         </p>
       )}

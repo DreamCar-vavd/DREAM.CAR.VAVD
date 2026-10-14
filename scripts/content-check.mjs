@@ -121,7 +121,9 @@ async function main() {
       const filled =
         String(car[l]?.title ?? "").trim() && String(car[l]?.specLine ?? "").trim();
       if (!filled) continue;
-      const rec = review[id]?.[l];
+      // The panel stores review rows under "car:<id>" (see panelStore);
+      // a bare "<id>" row is the pre-prefix legacy format.
+      const rec = (review[`car:${id}`] ?? review[id])?.[l];
       if (!rec) warnings.push(`${id} / ${l.toUpperCase()}: не позначено перевіреним`);
       else if (rec.hash !== hash(confirmedText(car[l]))) {
         warnings.push(`${id} / ${l.toUpperCase()}: текст змінено після перевірки`);

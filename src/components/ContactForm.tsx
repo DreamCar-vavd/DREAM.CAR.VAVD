@@ -420,7 +420,19 @@ export function ContactForm({ dict, locale }: { dict: Dictionary; locale: Locale
             aria-invalid={Boolean(errors.consent)}
             aria-describedby={errors.consent ? errorId("consent") : undefined}
           />
-          {dict.contact.form.consent}
+          <span>
+            {dict.contact.form.consent}{" "}
+            (
+            <a
+              href={`/${locale}/privacy-policy`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gold"
+            >
+              {dict.footer.privacy}
+            </a>
+            )
+          </span>
         </label>
         {errors.consent && (
           <p id={errorId("consent")} className="mt-1 text-xs text-gold-light">

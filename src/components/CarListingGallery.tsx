@@ -232,7 +232,7 @@ export function CarListingGallery({
                         fill
                         sizes="(min-width: 1024px) 70vw, 100vw"
                         className="object-contain"
-                        priority
+                        loading="eager"
                       />
                     ) : activeMedia.kind === "youtube" ? (
                       <iframe
