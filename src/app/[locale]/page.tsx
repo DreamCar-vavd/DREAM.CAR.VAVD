@@ -116,7 +116,7 @@ export default async function LocaleHomePage({
           </div>
 
           <div className="rounded-sm border border-border-gold/60 bg-surface p-6 sm:p-8">
-            <ContactForm dict={dict} />
+            <ContactForm dict={dict} locale={locale} />
           </div>
         </div>
       </section>

@@ -1,4 +1,5 @@
 import { CONTACT_MAX_LENGTHS } from "./contactLimits";
+import { UTM_KEYS, isSafePagePath, isSafeUtmValue, type UtmKey } from "./contactAttribution";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^[+\d][\d\s()-]{6,}$/;
@@ -14,6 +15,14 @@ export interface NormalizedContactInput {
   message: string;
   consent: boolean;
   website: string;
+  locale: string;
+  pagePath: string;
+  serviceLabel: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_content: string;
+  utm_term: string;
 }
 
 export interface ContactPayload {
@@ -26,8 +35,22 @@ export interface ContactPayload {
   consent: true;
 }
 
+export const CONTACT_LOCALES = ["uk", "en", "ru"] as const;
+export type ContactLocale = (typeof CONTACT_LOCALES)[number];
+
+/**
+ * Optional metadata about where an enquiry came from. Every field is
+ * optional so an older payload without it stays valid. It goes to the
+ * email only — never to the leads database (see `toLeadInput`).
+ */
+export type ContactAttribution = {
+  locale?: ContactLocale;
+  pagePath?: string;
+  serviceLabel?: string;
+} & Partial<Record<UtmKey, string>>;
+
 export type ContactValidationResult =
-  | { valid: true; payload: ContactPayload }
+  | { valid: true; payload: ContactPayload; attribution: ContactAttribution }
   | { valid: false; reason: string };
 
 function readString(value: unknown): string {
@@ -157,6 +180,14 @@ export function normalizeContactInput(raw: unknown): NormalizedContactInput {
     message: readString(source.message),
     consent: source.consent === true,
     website: readString(source.website),
+    locale: readString(source.locale),
+    pagePath: readString(source.pagePath),
+    serviceLabel: readString(source.serviceLabel),
+    utm_source: readString(source.utm_source),
+    utm_medium: readString(source.utm_medium),
+    utm_campaign: readString(source.utm_campaign),
+    utm_content: readString(source.utm_content),
+    utm_term: readString(source.utm_term),
   };
 }
 
@@ -192,6 +223,36 @@ export function validateContactPayload(input: NormalizedContactInput): ContactVa
 
   if (input.consent !== true) return { valid: false, reason: "consent is required" };
 
+  const attribution: ContactAttribution = {};
+
+  if (input.locale) {
+    if (!(CONTACT_LOCALES as readonly string[]).includes(input.locale)) {
+      return { valid: false, reason: "locale is invalid" };
+    }
+    attribution.locale = input.locale as ContactLocale;
+  }
+
+  if (input.pagePath) {
+    if (!isSafePagePath(input.pagePath)) return { valid: false, reason: "pagePath is invalid" };
+    attribution.pagePath = input.pagePath;
+  }
+
+  // The label is the visible option text, so it only means something next
+  // to a chosen service. Line breaks and other control characters are
+  // flattened to spaces: it ends up in the email subject.
+  const serviceLabel = input.service ? sanitizeSingleLine(input.serviceLabel) : "";
+  if (serviceLabel.length > CONTACT_MAX_LENGTHS.serviceLabel) {
+    return { valid: false, reason: "serviceLabel too long" };
+  }
+  if (serviceLabel) attribution.serviceLabel = serviceLabel;
+
+  for (const key of UTM_KEYS) {
+    const value = input[key];
+    if (!value) continue;
+    if (!isSafeUtmValue(value)) return { valid: false, reason: `${key} is invalid` };
+    attribution[key] = value;
+  }
+
   return {
     valid: true,
     payload: {
@@ -203,5 +264,55 @@ export function validateContactPayload(input: NormalizedContactInput): ContactVa
       message: input.message,
       consent: true,
     },
+    attribution,
   };
+}
+
+function sanitizeSingleLine(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+const SUBJECT_TEXT: Record<ContactLocale, { tag: string; withService: string; plain: string }> = {
+  uk: { tag: "[UK]", withService: "нова заявка", plain: "Нова заявка" },
+  en: { tag: "[EN]", withService: "new enquiry", plain: "New enquiry" },
+  ru: { tag: "[RU]", withService: "новая заявка", plain: "Новая заявка" },
+};
+
+/**
+ * The email subject is always built here on the server from validated
+ * fields — a subject sent by the browser is never trusted.
+ */
+export function buildContactSubject(attribution: ContactAttribution): string {
+  if (!attribution.locale) return "DREAM.CAR.VAVD — New enquiry";
+  const text = SUBJECT_TEXT[attribution.locale];
+  const subject = attribution.serviceLabel
+    ? `${text.tag} ${attribution.serviceLabel} — ${text.withService}`
+    : `${text.tag} ${text.plain}`;
+  return subject.slice(0, CONTACT_MAX_LENGTHS.subject);
+}
+
+/** Exactly the fields the leads database stores — no attribution. */
+export function toLeadInput(payload: ContactPayload) {
+  return {
+    name: payload.name,
+    phone: payload.phone,
+    email: payload.email,
+    service: payload.service,
+    vehicle: payload.vehicle,
+    message: payload.message,
+  };
+}
+
+/** The JSON sent to the email provider: the lead, its attribution and the subject. */
+export function buildEmailPayload(payload: ContactPayload, attribution: ContactAttribution) {
+  const email: Record<string, string | boolean> = { ...payload };
+  if (attribution.locale) email.locale = attribution.locale;
+  if (attribution.pagePath) email.pagePath = attribution.pagePath;
+  if (attribution.serviceLabel) email.serviceLabel = attribution.serviceLabel;
+  for (const key of UTM_KEYS) {
+    const value = attribution[key];
+    if (value) email[key] = value;
+  }
+  email.subject = buildContactSubject(attribution);
+  return email;
 }

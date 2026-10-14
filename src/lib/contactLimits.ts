@@ -11,4 +11,11 @@ export const CONTACT_MAX_LENGTHS = {
   service: 100,
   vehicle: 200,
   message: 5000,
+  // Attribution metadata — never typed by the visitor; see contactAttribution.ts.
+  locale: 2,
+  pagePath: 200,
+  serviceLabel: 100,
+  utm: 100,
+  // Server-built email subject: "[UK] " + serviceLabel + " — нова заявка" fits.
+  subject: 160,
 } as const;
