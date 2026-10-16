@@ -137,6 +137,60 @@ body {
   }
 }
 
+/* Gold shimmer over the sign on the hero photo. The mask is a full-frame
+   alpha cut-out of the sign's gold (crown, lettering, ornaments, frame) for
+   the photo shown at that width; breakpoints match HERO_PHOTOS in
+   HeroSection.tsx and the photo box's sm/lg aspect classes. */
+.hero-sign-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgba(242, 215, 124, 0.1) 43%,
+    rgba(255, 241, 174, 0.55) 50%,
+    rgba(242, 215, 124, 0.1) 57%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  background-position: 120% 0;
+
+  -webkit-mask-image: url("/images/hero/hero-workshop-mobile-mask.png");
+  mask-image: url("/images/hero/hero-workshop-mobile-mask.png");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+
+  opacity: 0;
+  animation: dream-logo-shimmer 11s ease-in-out infinite;
+}
+
+@media (min-width: 640px) {
+  .hero-sign-shimmer {
+    -webkit-mask-image: url("/images/hero/hero-workshop-tablet-mask.png");
+    mask-image: url("/images/hero/hero-workshop-tablet-mask.png");
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero-sign-shimmer {
+    -webkit-mask-image: url("/images/hero/hero-workshop-desktop-mask.png");
+    mask-image: url("/images/hero/hero-workshop-desktop-mask.png");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-sign-shimmer {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 .social-icon-link,
 .whatsapp-cta {
   transition: transform 240ms ease-out, filter 240ms ease-out, box-shadow 240ms ease-out;
