@@ -148,11 +148,11 @@ body {
 
   background: linear-gradient(
     110deg,
-    transparent 35%,
-    rgba(242, 215, 124, 0.1) 43%,
-    rgba(255, 241, 174, 0.55) 50%,
-    rgba(242, 215, 124, 0.1) 57%,
-    transparent 65%
+    transparent 33%,
+    rgba(242, 215, 124, 0.12) 42%,
+    rgba(255, 241, 174, 0.68) 50%,
+    rgba(242, 215, 124, 0.12) 58%,
+    transparent 67%
   );
   background-size: 250% 100%;
   background-position: 120% 0;
