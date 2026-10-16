@@ -132,18 +132,18 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
                     rel="noopener noreferrer"
                     variant="outline"
                     size="md"
-                    className="whatsapp-cta w-full bg-background/85 max-md:gap-1.5 max-md:px-3 max-sm:px-2 xl:px-7 xl:py-3.5 xl:text-base"
+                    className="whatsapp-cta w-full whitespace-nowrap bg-background/85 max-[400px]:col-span-2 max-md:gap-1.5 max-md:px-3 max-sm:px-1.5 max-sm:text-[13px] max-[400px]:text-sm xl:px-7 xl:py-3.5 xl:text-base [&>svg]:shrink-0"
                   >
-                    <MessageCircle size={18} aria-hidden="true" />
+                    <MessageCircle size={17} aria-hidden="true" />
                     {dict.hero.ctaSecondary}
                   </GoldLink>
                   <GoldLink
                     href={dict.contact.phoneHref}
                     variant="outline"
                     size="md"
-                    className="whatsapp-cta w-full bg-background/85 max-md:gap-1.5 max-md:px-3 max-sm:px-2 xl:px-7 xl:py-3.5 xl:text-base"
+                    className="whatsapp-cta w-full whitespace-nowrap bg-background/85 max-[400px]:col-span-2 max-md:gap-1.5 max-md:px-3 max-sm:px-1.5 max-sm:text-[13px] max-[400px]:text-sm xl:px-7 xl:py-3.5 xl:text-base [&>svg]:shrink-0"
                   >
-                    <Phone size={18} aria-hidden="true" />
+                    <Phone size={17} aria-hidden="true" />
                     {dict.hero.ctaCall}
                   </GoldLink>
                 </div>
