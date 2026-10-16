@@ -148,11 +148,11 @@ body {
 
   background: linear-gradient(
     110deg,
-    transparent 35%,
-    rgba(242, 215, 124, 0.1) 43%,
-    rgba(255, 241, 174, 0.55) 50%,
-    rgba(242, 215, 124, 0.1) 57%,
-    transparent 65%
+    transparent 36%,
+    rgba(212, 175, 55, 0.14) 43%,
+    rgba(255, 242, 176, 0.78) 50%,
+    rgba(240, 210, 122, 0.2) 56%,
+    transparent 64%
   );
   background-size: 250% 100%;
   background-position: 120% 0;
@@ -167,7 +167,26 @@ body {
   mask-mode: alpha;
 
   opacity: 0;
-  animation: dream-logo-shimmer 11s ease-in-out infinite;
+  animation: hero-sign-shimmer 11s ease-in-out infinite;
+}
+
+/* Hero-only cycle: rest until 30%, then a ~3s sweep (30%-57% of 11s) that
+   fades in and out at the edges; the rest of the cycle is a calm pause. */
+@keyframes hero-sign-shimmer {
+  0%,
+  30% {
+    background-position: 120% 0;
+    opacity: 0;
+  }
+  34%,
+  53% {
+    opacity: 0.85;
+  }
+  57%,
+  100% {
+    background-position: -120% 0;
+    opacity: 0;
+  }
 }
 
 @media (min-width: 640px) {
@@ -212,6 +231,76 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .social-icon-link:hover,
   .whatsapp-cta:hover {
+    transform: none;
+  }
+}
+
+/* Soft gold glow on the three hero banner buttons only. The secondary ones
+   also carry .whatsapp-cta; the combined selectors keep its hover scale and
+   only replace its glow and brightness. */
+.hero-cta-primary {
+  transition: transform 300ms ease-out, scale 300ms ease-out, box-shadow 260ms ease-out, filter 260ms ease-out;
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.17);
+}
+
+.whatsapp-cta.hero-cta-secondary {
+  transition: transform 240ms ease-out, box-shadow 260ms ease-out, filter 260ms ease-out;
+}
+
+@media (min-width: 768px) {
+  .hero-cta-primary {
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.2);
+  }
+
+  .whatsapp-cta.hero-cta-secondary {
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.12);
+  }
+}
+
+.hero-cta-primary:focus-visible {
+  box-shadow: 0 0 22px rgba(212, 175, 55, 0.36);
+  filter: brightness(1.04);
+}
+
+.whatsapp-cta.hero-cta-secondary:focus-visible {
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.3);
+  filter: brightness(1.06);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-cta-primary:hover {
+    box-shadow: 0 0 22px rgba(212, 175, 55, 0.36);
+    filter: brightness(1.04);
+  }
+
+  .whatsapp-cta.hero-cta-secondary:hover {
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.3);
+    filter: brightness(1.06);
+  }
+}
+
+@media (max-width: 767.98px), (hover: none) {
+  .hero-cta-primary:active {
+    transition-duration: 150ms;
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.38);
+  }
+
+  .whatsapp-cta.hero-cta-secondary:active {
+    transition-duration: 150ms;
+    box-shadow: 0 0 14px rgba(212, 175, 55, 0.34);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cta-primary,
+  .whatsapp-cta.hero-cta-secondary {
+    transition: none;
+  }
+
+  .hero-cta-primary:hover,
+  .hero-cta-primary:active,
+  .whatsapp-cta.hero-cta-secondary:hover,
+  .whatsapp-cta.hero-cta-secondary:active {
     transform: none;
   }
 }
