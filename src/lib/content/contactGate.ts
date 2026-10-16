@@ -14,12 +14,16 @@ import {
   type GateFailure,
   type LangReviewStatus,
 } from "./carsGate";
+import { hoursFieldErrors, type HoursField, type SundayMode } from "./businessHours";
 
 export interface CmsContactLanguage {
   heading: string;
   subheading: string;
+  /** Historical, unused by the current layout. Kept so no data is lost. */
   hoursLabel: string;
   addressLabel: string;
+  /** Service-area line under the slogan, e.g. "London and across the UK". */
+  serviceArea?: string;
 }
 export interface CmsContact {
   id: string; // always "site"
@@ -34,13 +38,28 @@ export interface CmsContact {
   youtubeUrl: string;
   addressText: string;
   mapsUrl: string;
+  /** Historical free-text schedule, unused by the current layout. */
   hours: string;
+  // Structured schedule — entered once for every language (see businessHours.ts).
+  weekdayOpen?: string;
+  weekdayClose?: string;
+  saturdayOpen?: string;
+  saturdayClose?: string;
+  sundayMode?: SundayMode;
   uk: CmsContactLanguage;
   en: CmsContactLanguage;
   ru: CmsContactLanguage;
 }
 
 const REQUIRED_LANG = ["heading", "subheading"] as const;
+
+/** Owner-facing names for schedule blockers (shown as-is in the panel). */
+export const HOURS_FIELD_LABELS: Record<HoursField, string> = {
+  weekdayOpen: "графік: Пн–Пт відкриття (ГГ:ХХ)",
+  weekdayClose: "графік: Пн–Пт закриття (ГГ:ХХ)",
+  saturdayOpen: "графік: субота відкриття (ГГ:ХХ)",
+  saturdayClose: "графік: субота закриття (ГГ:ХХ)",
+};
 
 /** Allowed hosts for each social / map URL field. */
 const URL_HOSTS: Record<string, RegExp> = {
@@ -81,6 +100,7 @@ export function contactConfirmedText(l: CmsContactLanguage): string {
     subheading: (l?.subheading ?? "").trim(),
     hoursLabel: (l?.hoursLabel ?? "").trim(),
     addressLabel: (l?.addressLabel ?? "").trim(),
+    serviceArea: (l?.serviceArea ?? "").trim(),
   });
 }
 
@@ -118,6 +138,16 @@ export function getContactPublishBlockers(c: CmsContact, ctx: GateContext = {}):
     if (!isSafeUrl(field, String(c[field as keyof CmsContact] ?? ""))) {
       failures.push({ kind: "missing-field", locale: "uk", field });
     }
+  }
+  // A partly filled or malformed schedule must never reach the site or Google.
+  for (const field of hoursFieldErrors({
+    weekdayOpen: c.weekdayOpen ?? "",
+    weekdayClose: c.weekdayClose ?? "",
+    saturdayOpen: c.saturdayOpen ?? "",
+    saturdayClose: c.saturdayClose ?? "",
+    sundayMode: c.sundayMode ?? "byAppointment",
+  })) {
+    failures.push({ kind: "missing-field", locale: "uk", field: HOURS_FIELD_LABELS[field] });
   }
   for (const locale of LOCALES) {
     for (const field of REQUIRED_LANG) {

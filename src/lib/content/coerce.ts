@@ -2,6 +2,7 @@ import type { CmsCar } from "./carsGate";
 import type { CmsGalleryProject, CmsGalleryLanguage } from "./galleryGate";
 import type { CmsService, CmsServiceLanguage } from "./serviceGate";
 import type { CmsContact, CmsContactLanguage } from "./contactGate";
+import { toSundayMode } from "./businessHours";
 import type { CmsPromo, CmsPromoLanguage, PromoType } from "./promoGate";
 
 const str = (v: unknown) => String(v ?? "");
@@ -128,6 +129,7 @@ function contactLang(x: unknown): CmsContactLanguage {
     subheading: str(o.subheading),
     hoursLabel: str(o.hoursLabel),
     addressLabel: str(o.addressLabel),
+    serviceArea: str(o.serviceArea),
   };
 }
 
@@ -146,6 +148,11 @@ export function coerceContact(id: string, raw: Record<string, unknown>): CmsCont
     addressText: str(raw.addressText),
     mapsUrl: str(raw.mapsUrl),
     hours: str(raw.hours),
+    weekdayOpen: str(raw.weekdayOpen).trim(),
+    weekdayClose: str(raw.weekdayClose).trim(),
+    saturdayOpen: str(raw.saturdayOpen).trim(),
+    saturdayClose: str(raw.saturdayClose).trim(),
+    sundayMode: toSundayMode(raw.sundayMode),
     uk: contactLang(raw.uk),
     en: contactLang(raw.en),
     ru: contactLang(raw.ru),

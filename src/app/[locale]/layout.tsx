@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { locales, isLocale, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { openingHoursSpecification } from "@/lib/content/businessHours";
 import { siteUrl } from "@/lib/site";
 
 import { getSocialLinks } from "@/lib/social";
@@ -88,6 +89,8 @@ export default async function LocaleLayout({
   const social = getSocialLinks(dict.contact);
   const inDraftMode = (await draftMode()).isEnabled;
   const site = inDraftMode ? await readSiteContent() : null;
+  // Same structured schedule the Contacts block renders (one source for both).
+  const openingHours = openingHoursSpecification(dict.contact.businessHours);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -98,6 +101,7 @@ export default async function LocaleLayout({
     telephone: dict.contact.phone,
     email: dict.contact.email,
     areaServed: "GB",
+    ...(openingHours.length > 0 ? { openingHoursSpecification: openingHours } : {}),
     ...(dict.contact.addressText ? { address: dict.contact.addressText } : {}),
     ...(social.length > 0 ? { sameAs: social.map((s) => s.url) } : {}),
   };

@@ -61,6 +61,10 @@ export async function getDictionary(locale: Locale): Promise<Dictionary> {
       mapsUrl: (contact.present && contact.mapsUrl) || process.env.NEXT_PUBLIC_GOOGLE_MAPS_URL || "",
       hours: (contact.present && contact.hours) || "",
       hoursLabel: (contact.present && contact.hoursLabel) || "",
+      // Optional fields: once a contact record is published, an empty value
+      // hides the line (the dictionary text is only the no-record fallback).
+      serviceArea: contact.present ? contact.serviceArea : base.contact.serviceArea,
+      businessHours: contact.present ? contact.businessHours : base.contact.businessHours,
       addressLabel: (contact.present && contact.addressLabel) || "",
     },
   };

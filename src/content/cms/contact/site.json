@@ -12,21 +12,29 @@
   "addressText": "",
   "mapsUrl": "",
   "hours": "",
+  "weekdayOpen": "09:00",
+  "weekdayClose": "18:00",
+  "saturdayOpen": "10:00",
+  "saturdayClose": "14:00",
+  "sundayMode": "byAppointment",
   "uk": {
     "heading": "Контакти",
-    "subheading": "Залишились питання? Зв'яжіться з нами будь-яким зручним способом",
+    "subheading": "ПРЕМІАЛЬНІ АВТОМОБІЛЬНІ ПОСЛУГИ",
+    "serviceArea": "Лондон та вся Велика Британія",
     "hoursLabel": "",
     "addressLabel": ""
   },
   "en": {
     "heading": "Contact",
-    "subheading": "Any questions? Get in touch in whichever way suits you",
+    "subheading": "PREMIUM AUTOMOTIVE SERVICES",
+    "serviceArea": "London and across the UK",
     "hoursLabel": "",
     "addressLabel": ""
   },
   "ru": {
     "heading": "Контакты",
-    "subheading": "Остались вопросы? Свяжитесь с нами любым удобным способом",
+    "subheading": "ПРЕМИАЛЬНЫЕ АВТОМОБИЛЬНЫЕ УСЛУГИ",
+    "serviceArea": "Лондон и вся Великобритания",
     "hoursLabel": "",
     "addressLabel": ""
   },

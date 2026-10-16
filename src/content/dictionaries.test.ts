@@ -51,3 +51,29 @@ test("faq and process step counts match across locales", () => {
   assert.equal(uk.benefits.items.length, ru.benefits.items.length);
   assert.equal(uk.benefits.items.length, en.benefits.items.length);
 });
+
+test("contacts block: slogan, service area and fixed labels exist in every locale", () => {
+  assert.deepEqual(
+    [uk, en, ru].map((d) => [d.contact.subheading, d.contact.serviceArea]),
+    [
+      ["ПРЕМІАЛЬНІ АВТОМОБІЛЬНІ ПОСЛУГИ", "Лондон та вся Велика Британія"],
+      ["PREMIUM AUTOMOTIVE SERVICES", "London and across the UK"],
+      ["ПРЕМИАЛЬНЫЕ АВТОМОБИЛЬНЫЕ УСЛУГИ", "Лондон и вся Великобритания"],
+    ],
+  );
+  assert.deepEqual(
+    [uk, en, ru].map((d) => d.contact.labels),
+    [
+      { phone: "Телефон", email: "Email", hoursHeading: "Графік роботи", weekdays: "Пн–Пт", saturday: "Субота", sunday: "Неділя", byAppointment: "за попереднім записом", closed: "вихідний" },
+      { phone: "Phone", email: "Email", hoursHeading: "Opening hours", weekdays: "Mon–Fri", saturday: "Saturday", sunday: "Sunday", byAppointment: "by appointment", closed: "closed" },
+      { phone: "Телефон", email: "Email", hoursHeading: "График работы", weekdays: "Пн–Пт", saturday: "Суббота", sunday: "Воскресенье", byAppointment: "по предварительной записи", closed: "выходной" },
+    ],
+  );
+});
+
+test("the dictionary fallback never invents opening hours (those come only from the panel)", () => {
+  for (const d of [uk, en, ru]) {
+    const h = d.contact.businessHours;
+    assert.deepEqual([h.weekdayOpen, h.weekdayClose, h.saturdayOpen, h.saturdayClose], ["", "", "", ""]);
+  }
+});
