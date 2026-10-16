@@ -364,7 +364,7 @@ const dictionary: Dictionary = {
   },
   contact: {
     heading: "Contact",
-    subheading: "Any questions? Get in touch in whichever way suits you",
+    subheading: "PREMIUM AUTOMOTIVE SERVICES",
     phone: "+44 7706 054203",
     email: "dream.car.vavd@gmail.com",
     // Filled at build time by getDictionary() from the panel contact record.
@@ -380,6 +380,19 @@ const dictionary: Dictionary = {
     hours: "",
     hoursLabel: "",
     addressLabel: "",
+    serviceArea: "London and across the UK",
+    // Fallback only (no published contact record): the panel's shared hours win.
+    businessHours: { weekdayOpen: "", weekdayClose: "", saturdayOpen: "", saturdayClose: "", sundayMode: "byAppointment" },
+    labels: {
+      phone: "Phone",
+      email: "Email",
+      hoursHeading: "Opening hours",
+      weekdays: "Mon–Fri",
+      saturday: "Saturday",
+      sunday: "Sunday",
+      byAppointment: "by appointment",
+      closed: "closed",
+    },
     form: {
       name: "Name",
       phone: "Phone",

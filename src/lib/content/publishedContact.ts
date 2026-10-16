@@ -1,6 +1,7 @@
 import "server-only";
 import type { ContentLocale } from "./carsGate";
 import type { CmsContact } from "./contactGate";
+import { EMPTY_HOURS, type BusinessHours } from "./businessHours";
 import { readSiteContent } from "./siteContent";
 
 export interface SiteContactData {
@@ -16,14 +17,23 @@ export interface SiteContactData {
   addressText: string;
   mapsUrl: string;
   hours: string;
+  /** Structured schedule, shared by every locale (page + JSON-LD). */
+  businessHours: BusinessHours;
   /** localized labels for the current locale */
   heading: string;
   subheading: string;
   hoursLabel: string;
   addressLabel: string;
+  serviceArea: string;
 }
 
-const EMPTY: CmsContact["uk"] = { heading: "", subheading: "", hoursLabel: "", addressLabel: "" };
+const EMPTY: CmsContact["uk"] = {
+  heading: "",
+  subheading: "",
+  hoursLabel: "",
+  addressLabel: "",
+  serviceArea: "",
+};
 
 /**
  * The published site contact block for one locale. `present: false` means the
@@ -50,7 +60,9 @@ export async function getContactData(locale: ContentLocale): Promise<SiteContact
       addressText: "",
       mapsUrl: "",
       hours: "",
+      businessHours: EMPTY_HOURS,
       ...EMPTY,
+      serviceArea: "",
     };
   }
   const l = c[locale] ?? EMPTY;
@@ -67,9 +79,17 @@ export async function getContactData(locale: ContentLocale): Promise<SiteContact
     addressText: c.addressText,
     mapsUrl: c.mapsUrl,
     hours: c.hours,
+    businessHours: {
+      weekdayOpen: c.weekdayOpen ?? "",
+      weekdayClose: c.weekdayClose ?? "",
+      saturdayOpen: c.saturdayOpen ?? "",
+      saturdayClose: c.saturdayClose ?? "",
+      sundayMode: c.sundayMode ?? EMPTY_HOURS.sundayMode,
+    },
     heading: l.heading,
     subheading: l.subheading,
     hoursLabel: l.hoursLabel,
     addressLabel: l.addressLabel,
+    serviceArea: l.serviceArea ?? "",
   };
 }
