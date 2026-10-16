@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  HOURS_FIELD_LABELS,
   contactConfirmedText,
   getContactLangStatus,
   getContactPublishBlockers,
@@ -144,5 +145,67 @@ test("editing a localized label after review re-opens only that language", () =>
   const review = reviewedAll(original);
   const edited = contact({ uk: lang({ subheading: "ЗМІНЕНО" }) });
   assert.equal(getContactLangStatus(edited, "uk", { review, sha256 }), "needs-review");
+  assert.equal(getContactLangStatus(edited, "en", { review, sha256 }), "reviewed");
+});
+
+const HOURS = {
+  weekdayOpen: "09:00",
+  weekdayClose: "18:00",
+  saturdayOpen: "10:00",
+  saturdayClose: "14:00",
+  sundayMode: "byAppointment" as const,
+};
+
+function blockerFields(c: CmsContact): string[] {
+  return getContactPublishBlockers(c, { review: reviewedAll(c), sha256 }).flatMap((f) =>
+    "field" in f ? [f.field] : [],
+  );
+}
+
+test("a valid structured schedule publishes", () => {
+  assert.deepEqual(getContactPublishBlockers(contact(HOURS), { review: reviewedAll(contact(HOURS)), sha256 }), []);
+});
+
+test("a fully empty schedule publishes (the block is just hidden)", () => {
+  assert.deepEqual(blockerFields(contact({ weekdayOpen: "", weekdayClose: "", saturdayOpen: "", saturdayClose: "" })), []);
+});
+
+test("25:00 blocks publishing and names the field for the owner", () => {
+  assert.deepEqual(blockerFields(contact({ ...HOURS, weekdayClose: "25:00" })), [HOURS_FIELD_LABELS.weekdayClose]);
+});
+
+test("closing before opening blocks publishing", () => {
+  assert.deepEqual(blockerFields(contact({ ...HOURS, saturdayClose: "09:30" })), [HOURS_FIELD_LABELS.saturdayClose]);
+});
+
+test("an incomplete time pair blocks publishing", () => {
+  assert.deepEqual(blockerFields(contact({ ...HOURS, weekdayClose: "" })), [
+    HOURS_FIELD_LABELS.weekdayOpen,
+    HOURS_FIELD_LABELS.weekdayClose,
+  ]);
+});
+
+test("changing the shared hours does not re-open any language review", () => {
+  const review = reviewedAll(contact(HOURS));
+  const edited = contact({ ...HOURS, weekdayClose: "19:00" });
+  for (const l of ["uk", "en", "ru"] as const) {
+    assert.equal(getContactLangStatus(edited, l, { review, sha256 }), "reviewed", l);
+  }
+});
+
+test("the service area is part of the review hash: editing it re-opens only that language", () => {
+  const original = contact({ uk: lang({ serviceArea: "Лондон" }), en: lang({ serviceArea: "London" }) });
+  const review = reviewedAll(original);
+  const edited = contact({ uk: lang({ serviceArea: "Лондон та вся Велика Британія" }), en: lang({ serviceArea: "London" }) });
+  assert.equal(getContactLangStatus(edited, "uk", { review, sha256 }), "needs-review");
+  assert.equal(getContactLangStatus(edited, "en", { review, sha256 }), "reviewed");
+  assert.equal(getContactLangStatus(edited, "ru", { review, sha256 }), "reviewed");
+});
+
+test("editing the slogan (subheading) re-opens only that language", () => {
+  const review = reviewedAll(contact());
+  const edited = contact({ ru: lang({ subheading: "ПРЕМИАЛЬНЫЕ АВТОМОБИЛЬНЫЕ УСЛУГИ" }) });
+  assert.equal(getContactLangStatus(edited, "ru", { review, sha256 }), "needs-review");
+  assert.equal(getContactLangStatus(edited, "uk", { review, sha256 }), "reviewed");
   assert.equal(getContactLangStatus(edited, "en", { review, sha256 }), "reviewed");
 });

@@ -1,5 +1,5 @@
 {
-  "publishedAt": "2026-10-09T19:32:43.724Z",
+  "publishedAt": "2026-10-16T21:23:06.329Z",
   "cars": [
     {
       "id": "suzuki-sx4-s-cross",
@@ -1110,23 +1110,31 @@
       "addressText": "",
       "mapsUrl": "",
       "hours": "",
+      "weekdayOpen": "09:00",
+      "weekdayClose": "18:00",
+      "saturdayOpen": "10:00",
+      "saturdayClose": "14:00",
+      "sundayMode": "byAppointment",
       "uk": {
         "heading": "Контакти",
-        "subheading": "Залишились питання? Зв'яжіться з нами будь-яким зручним способом",
+        "subheading": "ПРЕМІАЛЬНІ АВТОМОБІЛЬНІ ПОСЛУГИ",
         "hoursLabel": "",
-        "addressLabel": ""
+        "addressLabel": "",
+        "serviceArea": "Лондон та вся Велика Британія"
       },
       "en": {
         "heading": "Contact",
-        "subheading": "Any questions? Get in touch in whichever way suits you",
+        "subheading": "PREMIUM AUTOMOTIVE SERVICES",
         "hoursLabel": "",
-        "addressLabel": ""
+        "addressLabel": "",
+        "serviceArea": "London and across the UK"
       },
       "ru": {
         "heading": "Контакты",
-        "subheading": "Остались вопросы? Свяжитесь с нами любым удобным способом",
+        "subheading": "ПРЕМИАЛЬНЫЕ АВТОМОБИЛЬНЫЕ УСЛУГИ",
         "hoursLabel": "",
-        "addressLabel": ""
+        "addressLabel": "",
+        "serviceArea": "Лондон и вся Великобритания"
       }
     }
   ],

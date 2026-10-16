@@ -366,7 +366,7 @@ const dictionary: Dictionary = {
   },
   contact: {
     heading: "Контакты",
-    subheading: "Остались вопросы? Свяжитесь с нами любым удобным способом",
+    subheading: "ПРЕМИАЛЬНЫЕ АВТОМОБИЛЬНЫЕ УСЛУГИ",
     phone: "+44 7706 054203",
     email: "dream.car.vavd@gmail.com",
     // Filled at build time by getDictionary() from the panel contact record.
@@ -382,6 +382,19 @@ const dictionary: Dictionary = {
     hours: "",
     hoursLabel: "",
     addressLabel: "",
+    serviceArea: "Лондон и вся Великобритания",
+    // Fallback only (no published contact record): the panel's shared hours win.
+    businessHours: { weekdayOpen: "", weekdayClose: "", saturdayOpen: "", saturdayClose: "", sundayMode: "byAppointment" },
+    labels: {
+      phone: "Телефон",
+      email: "Email",
+      hoursHeading: "График работы",
+      weekdays: "Пн–Пт",
+      saturday: "Суббота",
+      sunday: "Воскресенье",
+      byAppointment: "по предварительной записи",
+      closed: "выходной",
+    },
     form: {
       name: "Имя",
       phone: "Телефон",

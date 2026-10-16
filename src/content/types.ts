@@ -1,3 +1,5 @@
+import type { BusinessHours } from "@/lib/content/businessHours";
+
 export type ServiceSlug =
   | "car-selection"
   | "car-service"
@@ -226,9 +228,25 @@ export interface Dictionary {
     youtubeUrl: string;
     addressText: string;
     mapsUrl: string;
+    /** Historical free-text schedule fields — not rendered any more. */
     hours: string;
     hoursLabel: string;
     addressLabel: string;
+    /** Service-area line under the slogan (from the panel; dictionary = fallback). */
+    serviceArea: string;
+    /** Structured schedule shared by all locales; empty times hide the block. */
+    businessHours: BusinessHours;
+    /** Fixed labels of the Contacts info block (translated here, not in the panel). */
+    labels: {
+      phone: string;
+      email: string;
+      hoursHeading: string;
+      weekdays: string;
+      saturday: string;
+      sunday: string;
+      byAppointment: string;
+      closed: string;
+    };
     form: {
       name: string;
       phone: string;

@@ -127,8 +127,19 @@ const contactLanguage = (label: string) =>
   fields.object(
     {
       heading: fields.text({ label: `${label} — заголовок розділу` }),
-      subheading: fields.text({ label: `${label} — підзаголовок`, multiline: true }),
-      hoursLabel: fields.text({ label: `${label} — підпис «Графік роботи» (необов'язково)` }),
+      subheading: fields.text({
+        label: `${label} — слоган (золотим, під заголовком)`,
+        description: "Напр. «Преміальні автомобільні послуги». Показується великими літерами.",
+        multiline: true,
+      }),
+      serviceArea: fields.text({
+        label: `${label} — регіон обслуговування (необов'язково)`,
+        description: "Рядок під слоганом, напр. «Лондон та вся Велика Британія». Порожньо — рядок прихований.",
+      }),
+      hoursLabel: fields.text({
+        label: `${label} — ІСТОРИЧНЕ: підпис старого графіка (не використовується)`,
+        description: "Залишено лише для збереження даних. На сайті не показується.",
+      }),
       addressLabel: fields.text({ label: `${label} — підпис «Адреса» (необов'язково)` }),
     },
     { label },
@@ -528,9 +539,37 @@ export default config({
         }),
         mapsUrl: fields.text({ label: "Посилання на карту (Google Maps, необов'язково)" }),
         hours: fields.text({
-          label: "Графік роботи (необов'язково)",
-          description: "Вільний текст, напр. «Пн–Пт 9:00–18:00». Порожньо — блок прихований.",
+          label: "ІСТОРИЧНЕ: старий графік вільним текстом (не використовується)",
+          description:
+            "Залишено лише для збереження даних. На сайті не показується — графік задається полями нижче.",
           multiline: true,
+        }),
+
+        // ---- Графік роботи: один раз для всіх мов (сайт + Google) ----
+        weekdayOpen: fields.text({
+          label: "Графік: Пн–Пт — відкриття",
+          description: "Формат ГГ:ХХ, напр. «09:00». Обидва поля Пн–Пт порожні — рядок прихований.",
+        }),
+        weekdayClose: fields.text({
+          label: "Графік: Пн–Пт — закриття",
+          description: "Формат ГГ:ХХ, напр. «18:00». Має бути пізніше за відкриття.",
+        }),
+        saturdayOpen: fields.text({
+          label: "Графік: субота — відкриття",
+          description: "Формат ГГ:ХХ, напр. «10:00». Обидва поля суботи порожні — рядок прихований.",
+        }),
+        saturdayClose: fields.text({
+          label: "Графік: субота — закриття",
+          description: "Формат ГГ:ХХ, напр. «14:00». Має бути пізніше за відкриття.",
+        }),
+        sundayMode: fields.select({
+          label: "Графік: неділя",
+          description: "У Google неділя не передається (немає фіксованих годин).",
+          options: [
+            { label: "За попереднім записом", value: "byAppointment" },
+            { label: "Вихідний", value: "closed" },
+          ],
+          defaultValue: "byAppointment",
         }),
 
         uk: contactLanguage("Українська"),

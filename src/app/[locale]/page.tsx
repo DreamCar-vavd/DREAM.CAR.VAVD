@@ -4,6 +4,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getGalleryMedia } from "@/lib/content/publishedGallery";
 import { getServicesMeta } from "@/lib/content/publishedServices";
 import { getPromoSlots } from "@/lib/content/publishedPromos";
+import { hoursRows } from "@/lib/content/businessHours";
 import { notFound } from "next/navigation";
 import { HeroSection } from "@/components/HeroSection";
 import { ServicesGrid } from "@/components/ServicesGrid";
@@ -27,6 +28,7 @@ export default async function LocaleHomePage({
   if (!isLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const dict = await getDictionary(locale);
+  const hours = hoursRows(dict.contact.businessHours);
   const [galleryMedia, serviceMeta, promos] = await Promise.all([
     getGalleryMedia(),
     getServicesMeta(locale),
@@ -56,31 +58,68 @@ export default async function LocaleHomePage({
             >
               {dict.contact.heading}
             </h2>
-            <p className="mt-3 max-w-md text-muted">{dict.contact.subheading}</p>
+            {dict.contact.subheading && (
+              <p className="mt-3 text-sm font-semibold uppercase tracking-[0.14em] text-gold sm:text-base">
+                {dict.contact.subheading}
+              </p>
+            )}
+            {dict.contact.serviceArea && <p className="mt-1.5 text-text">{dict.contact.serviceArea}</p>}
 
-            <div className="mt-8 flex flex-col gap-4">
-              <a
-                href={dict.contact.phoneHref}
-                className="flex items-center gap-3 text-text transition-colors hover:text-gold"
-              >
-                <Phone size={18} className="text-gold" aria-hidden="true" />
-                {dict.contact.phone}
-              </a>
-              <a
-                href={dict.contact.emailHref}
-                className="flex items-center gap-3 text-text transition-colors hover:text-gold"
-              >
-                <Mail size={18} className="text-gold" aria-hidden="true" />
-                {dict.contact.email}
-              </a>
-              {dict.contact.hours && (
-                <p className="flex items-start gap-3 text-sm text-muted">
-                  <span className="font-semibold text-gold">
-                    {dict.contact.hoursLabel || "Графік"}:
-                  </span>
-                  <span className="whitespace-pre-line">{dict.contact.hours}</span>
-                </p>
+            <div className="mt-6 max-w-md">
+              <hr className="border-border-gold/50" />
+              <dl className="my-5 grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-3">
+                <dt className="flex items-center gap-3 text-gold">
+                  <Phone size={18} aria-hidden="true" />
+                  {dict.contact.labels.phone}
+                </dt>
+                <dd>
+                  <a href={dict.contact.phoneHref} className="text-text transition-colors hover:text-gold">
+                    {dict.contact.phone}
+                  </a>
+                </dd>
+                <dt className="flex items-center gap-3 text-gold">
+                  <Mail size={18} aria-hidden="true" />
+                  {dict.contact.labels.email}
+                </dt>
+                <dd className="min-w-0 break-words">
+                  <a href={dict.contact.emailHref} className="text-text transition-colors hover:text-gold">
+                    {dict.contact.email}
+                  </a>
+                </dd>
+              </dl>
+              <hr className="border-border-gold/50" />
+
+              {hours.length > 0 && (
+                <>
+                  <h3 className="mt-5 text-sm font-semibold uppercase tracking-[0.14em] text-gold sm:text-base">
+                    {dict.contact.labels.hoursHeading}
+                  </h3>
+                  <dl className="my-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
+                    {hours.map((row) => (
+                      <div key={row.day} className="contents">
+                        <dt className="text-gold">
+                          {row.day === "weekdays"
+                            ? dict.contact.labels.weekdays
+                            : row.day === "saturday"
+                              ? dict.contact.labels.saturday
+                              : dict.contact.labels.sunday}
+                        </dt>
+                        <dd className="text-text">
+                          {typeof row.time === "string"
+                            ? row.time === "closed"
+                              ? dict.contact.labels.closed
+                              : dict.contact.labels.byAppointment
+                            : `${row.time.open}–${row.time.close}`}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <hr className="border-border-gold/50" />
+                </>
               )}
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4">
               {dict.contact.addressText && (
                 <p className="flex items-start gap-3 text-sm text-muted">
                   <span className="font-semibold text-gold">
