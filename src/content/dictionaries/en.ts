@@ -39,6 +39,7 @@ const dictionary: Dictionary = {
     thanksLine: "Thank you for your trust",
     ctaPrimary: "Book a Consultation",
     ctaSecondary: "WhatsApp",
+    ctaCall: "Call Us",
   },
   servicesSection: {
     heading: "Services",

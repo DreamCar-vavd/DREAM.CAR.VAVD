@@ -129,6 +129,8 @@ export interface Dictionary {
     thanksLine: string;
     ctaPrimary: string;
     ctaSecondary: string;
+    /** Hero phone button (tel: link from the CMS contact number). */
+    ctaCall: string;
   };
   servicesSection: {
     heading: string;
