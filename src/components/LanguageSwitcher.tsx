@@ -45,10 +45,10 @@ export function LanguageSwitcher({
             key={locale}
             href={pathForLocale(pathname, locale)}
             aria-current={active ? "true" : undefined}
-            className={`flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-sm border px-2 py-1.5 text-[10px] font-bold transition-colors duration-300 ${
+            className={`premium-frame premium-frame--compact flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 border px-2 py-1.5 text-[10px] font-bold ${
               active
                 ? "border-gold bg-gold/10 text-gold"
-                : "border-border-gold text-text hover:bg-gold/10"
+                : "border-border-gold text-text"
             }`}
           >
             <span className="text-base leading-none" aria-hidden="true">
@@ -122,7 +122,7 @@ function CompactLanguageSwitcher({
         aria-expanded={open}
         aria-label={label}
         onClick={() => setOpen((value) => !value)}
-        className="flex h-11 min-w-11 items-center justify-center gap-1 rounded-sm border border-border-gold px-2 text-xs font-bold text-text transition-colors duration-300 hover:bg-gold/10"
+        className="premium-frame premium-frame--compact flex h-11 min-w-11 items-center justify-center gap-1 border border-border-gold px-2 text-xs font-bold text-text"
       >
         <span className="text-base leading-none" aria-hidden="true">
           {current.flag}
@@ -138,7 +138,7 @@ function CompactLanguageSwitcher({
       {open && (
         <ul
           aria-label={label}
-          className="absolute right-0 top-[calc(100%+8px)] z-50 flex flex-col gap-1 whitespace-nowrap rounded-sm border border-border-gold bg-background p-1.5 shadow-lg"
+          className="premium-frame premium-frame--compact premium-frame--static absolute right-0 top-[calc(100%+8px)] z-50 flex flex-col gap-1 whitespace-nowrap border border-border-gold bg-background p-1.5 shadow-lg"
         >
           {otherLocales.map((locale, index) => {
             const { flag, code } = labels[locale];

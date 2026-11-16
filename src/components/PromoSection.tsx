@@ -99,7 +99,7 @@ function NewsModal({
         <PromoLink
           url={promo.linkUrl}
           label={promo.linkLabel}
-          className="mt-6 inline-flex rounded-sm border border-gold px-4 py-2 text-sm font-semibold text-gold hover:bg-gold/10"
+          className="premium-frame premium-frame--outline mt-6 inline-flex border border-gold px-4 py-2 text-sm font-semibold text-gold"
         />
       </div>
     </div>
@@ -135,7 +135,7 @@ export function PromoSection({ cards, locale }: { cards: PromoView[]; locale: st
           {cards.map((c) => (
             <article
               key={c.id}
-              className="flex flex-col overflow-hidden rounded-sm border border-border-gold/40 bg-surface"
+              className="premium-card flex flex-col overflow-hidden border border-border-gold/40 bg-surface"
             >
               {c.image && (
                 <div
