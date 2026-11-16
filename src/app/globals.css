@@ -441,7 +441,7 @@ body {
 
 /* --- Shadows / transitions -------------------------------------------- */
 .premium-frame {
-  transition: scale 280ms ease-out, transform 280ms ease-out, box-shadow 280ms ease-out, filter 280ms ease-out;
+  transition: transform 280ms ease-out, box-shadow 280ms ease-out, filter 280ms ease-out;
 }
 .premium-frame:not(.hero-cta-primary):not(.hero-cta-secondary) {
   box-shadow: var(--pf-contour), 0 0 10px rgba(236, 153, 30, 0.26);
@@ -456,7 +456,7 @@ body {
 }
 .premium-card,
 .premium-gallery-card {
-  transition: scale 280ms ease-out, box-shadow 280ms ease-out;
+  transition: transform 280ms ease-out, box-shadow 280ms ease-out;
 }
 @media (max-width: 1023.98px) {
   .premium-gallery-card { box-shadow: var(--pf-card-shadow); }
@@ -466,7 +466,7 @@ body {
 .premium-frame.hero-cta-primary { box-shadow: var(--pf-contour), 0 0 12px rgba(212, 175, 55, 0.17); }
 .premium-frame.whatsapp-cta.hero-cta-secondary {
   box-shadow: var(--pf-contour);
-  transition: scale 240ms ease-out, transform 240ms ease-out, box-shadow 260ms ease-out, filter 260ms ease-out;
+  transition: transform 240ms ease-out, box-shadow 260ms ease-out, filter 260ms ease-out;
 }
 @media (min-width: 768px) {
   .premium-frame.hero-cta-primary { box-shadow: var(--pf-contour), 0 0 16px rgba(212, 175, 55, 0.2); }
@@ -477,9 +477,10 @@ body {
 
 /* --- Hover (mouse / trackpad only) ------------------------------------- */
 @media (hover: hover) and (pointer: fine) {
+  /* Growth is a single transform (never the separate `scale` property, which the
+     CSS optimizer dropped when paired with `transform` in one rule). */
   .premium-frame:not(.premium-frame--static):not(:disabled):hover {
-    scale: 1.04;
-    transform: none;
+    transform: scale(1.04);
   }
   .premium-frame:not(.premium-frame--static):not(:disabled):not(.hero-cta-primary):not(.hero-cta-secondary):hover {
     filter: none;
@@ -489,7 +490,7 @@ body {
   .premium-frame.whatsapp-cta.hero-cta-secondary:hover { box-shadow: var(--pf-contour), 0 0 16px rgba(212, 175, 55, 0.3); }
 
   .premium-card:hover {
-    scale: 1.04;
+    transform: scale(1.04);
     z-index: 10;
     box-shadow: var(--pf-card-shadow-hi);
   }
@@ -510,8 +511,7 @@ body {
   .premium-frame:not(.premium-frame--static):not(:disabled):active,
   .premium-card:active,
   .premium-gallery-card:active {
-    scale: 1.04;
-    transform: none;
+    transform: scale(1.04);
     transition-duration: 120ms;
   }
   .premium-card:active { z-index: 10; box-shadow: var(--pf-card-shadow-hi); }
@@ -531,9 +531,17 @@ body {
   .premium-card:hover,
   .premium-card:active,
   .premium-gallery-card,
+  .premium-gallery-card:hover,
+  .premium-gallery-card:active {
+    transform: none !important;
+  }
+}
+/* The gallery card's desktop hover growth is Tailwind's `lg:hover:scale-[1.04]`
+   (the `scale` property) — switched off in its own rule. */
+@media (prefers-reduced-motion: reduce) {
+  .premium-gallery-card:hover,
   .premium-gallery-card:active {
     scale: none !important;
-    transform: none !important;
   }
 }
 
