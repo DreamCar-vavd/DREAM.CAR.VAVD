@@ -44,7 +44,7 @@ export function GalleryVideoButton({
     <button
       type="button"
       disabled
-      className="inline-flex w-full min-w-0 cursor-not-allowed items-center justify-center gap-2 rounded-sm border border-muted/40 bg-surface-light px-6 py-3 text-sm font-semibold tracking-wide text-muted max-sm:text-center max-sm:leading-snug sm:w-auto sm:whitespace-nowrap"
+      className="inline-flex w-full min-w-0 cursor-not-allowed items-center justify-center gap-2 rounded-sm border border-[#b8b0a3]/40 bg-surface-light px-6 py-3 text-sm font-semibold tracking-wide text-[#b8b0a3] max-sm:text-center max-sm:leading-snug sm:w-auto sm:whitespace-nowrap"
     >
       <Play size={16} aria-hidden="true" className="shrink-0" />
       {comingSoonLabel}

@@ -11,8 +11,10 @@ interface BaseProps {
   className?: string;
 }
 
+// `premium-frame` (globals.css) draws the approved «Рамка 1 — Подвійна класична»
+// and owns the hover / touch-active / reduced-motion states for every gold button.
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-sm text-sm font-semibold tracking-wide transition-transform duration-300 ease-out hover:scale-[1.02] focus-visible:outline-offset-4 motion-reduce:transition-none motion-reduce:hover:scale-100 disabled:pointer-events-none disabled:opacity-60 disabled:hover:scale-100";
+  "premium-frame inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide focus-visible:outline-offset-4 disabled:pointer-events-none disabled:opacity-60";
 
 const sizes: Record<Size, string> = {
   md: "px-6 py-3 text-sm gap-2",
@@ -20,8 +22,8 @@ const sizes: Record<Size, string> = {
 };
 
 const variants: Record<Variant, string> = {
-  solid: "bg-gold text-[#0a0a0a] hover:bg-gold-light",
-  outline: "border border-gold text-gold hover:bg-gold/10",
+  solid: "bg-gold text-[#0a0a0a]",
+  outline: "premium-frame--outline border border-gold text-gold",
 };
 
 type LinkProps = BaseProps & ComponentPropsWithoutRef<typeof Link>;

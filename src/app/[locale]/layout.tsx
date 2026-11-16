@@ -20,13 +20,12 @@ import "../globals.css";
 const heading = Playfair_Display({
   variable: "--font-heading-src",
   subsets: ["latin", "latin-ext", "cyrillic"],
-  weight: ["600", "700"],
+  weight: ["600", "700", "800"],
 });
 
 const body = Manrope({
   variable: "--font-body-src",
   subsets: ["latin", "latin-ext", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
 });
 
 export function generateStaticParams() {

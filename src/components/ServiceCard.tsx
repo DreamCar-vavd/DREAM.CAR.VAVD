@@ -35,11 +35,11 @@ export function ServiceCard({
       aria-haspopup="dialog"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className="group relative cursor-pointer rounded-sm border border-border-gold/50 p-[3px] transition-all duration-[280ms] ease-out hover:-translate-y-1 hover:border-gold motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+      className="premium-card group relative cursor-pointer border border-border-gold/50 p-[3px]"
     >
-      <div className="relative flex h-full min-h-[300px] flex-col items-start gap-4 rounded-sm border border-border-gold/30 bg-surface p-6 shadow-[0_0_0_rgba(212,175,55,0)] transition-shadow duration-[280ms] ease-out group-hover:scale-[1.015] group-hover:shadow-[0_10px_28px_rgba(212,175,55,0.16)] motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+      <div className="premium-card-inner relative flex h-full min-h-[300px] flex-col items-start gap-4 border border-border-gold/30 bg-surface p-6">
         {statusBadge && (
-          <span className="absolute right-3 top-3 rounded-sm border border-gold/60 bg-background/85 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-gold">
+          <span className="premium-badge absolute right-3 top-3 border border-gold/60 bg-background/85 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-gold">
             {statusBadge}
           </span>
         )}
