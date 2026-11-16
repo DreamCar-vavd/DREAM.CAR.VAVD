@@ -51,7 +51,7 @@ function GalleryCardFrame() {
 }
 
 const cardButtonClass =
-  "premium-gallery-card group relative flex flex-col border border-border-gold/40 transition-opacity duration-300 hover:opacity-90 focus-visible:outline-offset-4 lg:border-0 lg:bg-gradient-to-b lg:from-gold/[0.06] lg:to-transparent lg:transition-transform lg:duration-[280ms] lg:ease-out lg:hover:z-10 lg:hover:scale-[1.04] lg:hover:opacity-100 lg:hover:shadow-[0_10px_30px_rgba(212,175,55,0.22)] lg:focus-visible:z-10";
+  "premium-gallery-card group relative flex flex-col border border-border-gold/40 transition-opacity duration-300 hover:opacity-90 focus-visible:outline-offset-4 lg:border-0 lg:bg-gradient-to-b lg:from-gold/[0.06] lg:to-transparent lg:hover:z-10 lg:hover:opacity-100 lg:hover:shadow-[0_10px_30px_rgba(212,175,55,0.22)] lg:focus-visible:z-10";
 
 export function GalleryGrid({
   dict,
