@@ -50,7 +50,7 @@ export function MobileMenu({
         aria-expanded={open}
         aria-controls="mobile-drawer"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-11 items-center justify-center rounded-sm border border-border-gold text-gold"
+        className="premium-frame premium-frame--compact flex h-11 w-11 items-center justify-center border border-border-gold text-gold"
       >
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
