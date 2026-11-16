@@ -32,9 +32,9 @@ export function SpecialOrderServiceCard({
       aria-haspopup="dialog"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className="group relative cursor-pointer rounded-sm border border-border-gold/50 p-[3px] transition-all duration-[280ms] ease-out hover:-translate-y-1 hover:border-gold motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+      className="premium-card group relative cursor-pointer border border-border-gold/50 p-[3px]"
     >
-      <div className="relative flex h-full min-h-[300px] cursor-pointer flex-col items-start gap-4 rounded-sm border border-border-gold/30 bg-surface p-6 transition-shadow duration-[280ms] ease-out group-hover:scale-[1.015] group-hover:shadow-[0_10px_28px_rgba(212,175,55,0.16)] motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+      <div className="premium-card-inner relative flex h-full min-h-[300px] cursor-pointer flex-col items-start gap-4 border border-border-gold/30 bg-surface p-6">
         <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center">
           <Image src={ICON_SRC} alt={title} width={72} height={72} quality={90} className="h-[72px] w-[72px] object-contain" />
         </span>

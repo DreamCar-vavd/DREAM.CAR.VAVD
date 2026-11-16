@@ -7,8 +7,8 @@
   --gold: #d4af37;
   --gold-light: #f3d675;
   --gold-dark: #8a6418;
-  --text: #f7f3ea;
-  --muted: #b8b0a3;
+  --text: #ffffff;
+  --muted: #ededed;
   --border-gold: rgba(212, 175, 55, 0.6);
 }
 
@@ -302,5 +302,320 @@ body {
   .whatsapp-cta.hero-cta-secondary:hover,
   .whatsapp-cta.hero-cta-secondary:active {
     transform: none;
+  }
+}
+
+/* ==========================================================================
+   ЕТАП 25BE — approved premium style (owner, 16.11.2026).
+   Source of truth: site sample «варіант 2» + button sample «Рамка 1 — Подвійна
+   класична». Values below are the approved ones; do not restyle them.
+   Scope: only elements carrying the premium-* classes plus the class-combined
+   text selectors below — /panel uses none of them.
+   ========================================================================== */
+
+:root {
+  --pf-frame: linear-gradient(105deg, #6d3908 0%, #c08522 12%, #fff0aa 26%, #d28b23 40%, #8c4b0b 55%, #f9cf67 73%, #d28c25 88%, #6d3908 100%);
+  --pf-frame-hi: linear-gradient(105deg, #a8650f 0%, #f0b940 12%, #fffbe0 26%, #ffc24a 40%, #c97a16 55%, #ffe79a 73%, #f5b53c 88%, #a8650f 100%);
+  --pf-fallback: #c08522;
+  --pf-contour: 0 0 0 1px rgba(110, 60, 8, 0.9);
+  --pf-card-shadow: 0 0 0 1px #583507, 0 0 12px rgba(217, 141, 36, 0.22);
+  --pf-card-shadow-hi: 0 0 0 1px #9a5e12, 0 0 14px rgba(255, 196, 80, 0.65), 0 0 34px rgba(236, 153, 30, 0.32);
+  --gold-text-small: linear-gradient(180deg, #fff6d2 0%, #ffe7a0 22%, #ffd97f 40%, #e6b85c 58%, #c88a2e 78%, #f3c96c 100%);
+  --gold-text-heading: linear-gradient(180deg, #4b2504 0%, #d9a03a 11%, #fffbe6 18%, #fffef8 23%, #e6b85c 29%, #bf7a26 43%, #f3c96c 54%, #ffedbc 63%, #c0802c 73%, #7a4410 80%, #ffd97f 88%, #fff3c2 93%, #683709 100%);
+  --gold-text-highlight: linear-gradient(180deg, transparent 0%, transparent 17%, rgba(255, 248, 205, 0.15) 19%, rgba(255, 253, 228, 0.83) 21%, rgba(255, 253, 228, 0.25) 24%, transparent 27%, transparent 86%, rgba(255, 226, 136, 0.55) 90%, transparent 95%);
+}
+
+/* --- Geometry of every framed element ---------------------------------- */
+.premium-frame,
+.premium-card,
+.premium-block,
+.premium-gallery-frame,
+.premium-gallery-card,
+#contacts > div > div.border.bg-surface {
+  --pf-w: 2px;  /* gold ring width */
+  --pf-bw: 0px; /* width of the element's own (now transparent) border */
+  --pf-r: 10px;
+  border-radius: var(--pf-r);
+}
+/* Anchor for the ring pseudo-elements (absolutely positioned hosts keep theirs). */
+.premium-frame:not(.premium-frame--static),
+.premium-card,
+#contacts > div > div.border.bg-surface {
+  position: relative;
+}
+.premium-frame { --pf-r: 9px; --pf-gap: 3px; }
+.premium-frame--compact { --pf-w: 1.5px; --pf-r: 6px; --pf-gap: 2px; }
+/* Service-card status badge («Незабаром»): single compact gold ring, no states. */
+.premium-badge {
+  --pf-w: 1.5px;
+  --pf-bw: 1px;
+  --pf-r: 5px;
+  border-radius: var(--pf-r);
+  border-color: var(--pf-fallback);
+  color: #ffd97f;
+  text-shadow: 0 1px 0 rgba(75, 32, 0, 0.85), 0 0 5px rgba(228, 143, 27, 0.35);
+}
+.premium-frame.border,
+.premium-card.border,
+.premium-block.border,
+.premium-gallery-card.border,
+#contacts > div > div.border.bg-surface { --pf-bw: 1px; }
+.premium-gallery-frame { --pf-bw: 2px; }
+.premium-block-inner,
+.premium-card-inner { border-radius: 6px; }
+.premium-block-inner,
+.premium-card-inner { border-color: rgba(224, 160, 48, 0.9); }
+
+/* Fallback: a solid gold border where mask compositing is unsupported. */
+.premium-frame,
+.premium-card,
+.premium-block,
+.premium-gallery-frame,
+#contacts > div > div.border.bg-surface {
+  border-color: var(--pf-fallback);
+}
+@media (max-width: 1023.98px) {
+  .premium-gallery-card { border-color: var(--pf-fallback); }
+}
+
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .premium-frame,
+  .premium-card,
+  .premium-block,
+  .premium-gallery-frame,
+  .premium-badge,
+  #contacts > div > div.border.bg-surface {
+    border-color: transparent;
+  }
+
+  /* Outer gold line: a ring drawn over the element's own border box. */
+  .premium-frame::before,
+  .premium-card::before,
+  .premium-block::before,
+  .premium-gallery-frame::before,
+  .premium-badge::before,
+  #contacts > div > div.border.bg-surface::before {
+    content: "";
+    position: absolute;
+    inset: calc(var(--pf-bw) * -1);
+    padding: var(--pf-w);
+    border-radius: var(--pf-r);
+    background: var(--pf-frame);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  @media (max-width: 1023.98px) {
+    .premium-gallery-card { border-color: transparent; }
+    .premium-gallery-card::before {
+      content: "";
+      position: absolute;
+      inset: calc(var(--pf-bw) * -1);
+      padding: var(--pf-w);
+      border-radius: var(--pf-r);
+      background: var(--pf-frame);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      pointer-events: none;
+      z-index: 1;
+    }
+  }
+
+  /* «Рамка 1»: dark gap + thin inner gold line. */
+  .premium-frame::after {
+    content: "";
+    position: absolute;
+    inset: calc(var(--pf-w) - var(--pf-bw));
+    border-radius: calc(var(--pf-r) - var(--pf-w));
+    box-shadow:
+      inset 0 0 0 var(--pf-gap) #050403,
+      inset 0 0 0 calc(var(--pf-gap) + 1px) rgba(255, 218, 131, 0.6);
+    pointer-events: none;
+  }
+}
+
+/* --- Shadows / transitions -------------------------------------------- */
+.premium-frame {
+  transition: transform 280ms ease-out, box-shadow 280ms ease-out, filter 280ms ease-out;
+}
+.premium-frame:not(.hero-cta-primary):not(.hero-cta-secondary) {
+  box-shadow: var(--pf-contour), 0 0 10px rgba(236, 153, 30, 0.26);
+}
+.premium-frame--static:not(.hero-cta-primary) {
+  box-shadow: var(--pf-contour), 0 0 10px rgba(236, 153, 30, 0.26), 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+.premium-card,
+.premium-block,
+#contacts > div > div.border.bg-surface {
+  box-shadow: var(--pf-card-shadow);
+}
+.premium-card,
+.premium-gallery-card {
+  transition: transform 280ms ease-out, box-shadow 280ms ease-out;
+}
+@media (max-width: 1023.98px) {
+  .premium-gallery-card { box-shadow: var(--pf-card-shadow); }
+}
+
+/* Hero buttons keep their approved glow; only the dark contour is added. */
+.premium-frame.hero-cta-primary { box-shadow: var(--pf-contour), 0 0 12px rgba(212, 175, 55, 0.17); }
+.premium-frame.whatsapp-cta.hero-cta-secondary {
+  box-shadow: var(--pf-contour);
+  transition: transform 240ms ease-out, box-shadow 260ms ease-out, filter 260ms ease-out;
+}
+@media (min-width: 768px) {
+  .premium-frame.hero-cta-primary { box-shadow: var(--pf-contour), 0 0 16px rgba(212, 175, 55, 0.2); }
+  .premium-frame.whatsapp-cta.hero-cta-secondary { box-shadow: var(--pf-contour), 0 0 10px rgba(212, 175, 55, 0.12); }
+}
+.premium-frame.hero-cta-primary:focus-visible { box-shadow: var(--pf-contour), 0 0 22px rgba(212, 175, 55, 0.36); }
+.premium-frame.whatsapp-cta.hero-cta-secondary:focus-visible { box-shadow: var(--pf-contour), 0 0 16px rgba(212, 175, 55, 0.3); }
+
+/* --- Hover (mouse / trackpad only) ------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  /* Growth is a single transform (never the separate `scale` property, which the
+     CSS optimizer dropped when paired with `transform` in one rule). */
+  .premium-frame:not(.premium-frame--static):not(:disabled):hover {
+    transform: scale(1.04);
+  }
+  .premium-frame:not(.premium-frame--static):not(:disabled):not(.hero-cta-primary):not(.hero-cta-secondary):hover {
+    filter: none;
+    box-shadow: 0 0 0 1px #9a5e12, 0 0 14px rgba(255, 196, 80, 0.5);
+  }
+  .premium-frame.hero-cta-primary:hover { box-shadow: var(--pf-contour), 0 0 22px rgba(212, 175, 55, 0.36); }
+  .premium-frame.whatsapp-cta.hero-cta-secondary:hover { box-shadow: var(--pf-contour), 0 0 16px rgba(212, 175, 55, 0.3); }
+
+  .premium-card:hover {
+    transform: scale(1.04);
+    z-index: 10;
+    box-shadow: var(--pf-card-shadow-hi);
+  }
+  .premium-block--hover:hover {
+    box-shadow: 0 0 0 1px #9a5e12, 0 0 50px rgba(212, 175, 55, 0.4);
+  }
+
+  .premium-frame:not(.premium-frame--static):not(:disabled):hover::before,
+  .premium-card:hover::before,
+  .premium-block--hover:hover::before,
+  .group:hover .premium-gallery-frame::before {
+    background: var(--pf-frame-hi);
+  }
+}
+
+/* --- Touch: grows only while the finger is down ------------------------- */
+@media (hover: none), (pointer: coarse) {
+  .premium-frame:not(.premium-frame--static):not(:disabled):active,
+  .premium-card:active,
+  .premium-gallery-card:active {
+    transform: scale(1.04);
+    transition-duration: 120ms;
+  }
+  .premium-card:active { z-index: 10; box-shadow: var(--pf-card-shadow-hi); }
+  .premium-gallery-card:active { z-index: 10; box-shadow: var(--pf-card-shadow-hi); }
+  .premium-frame:not(.premium-frame--static):not(:disabled):active::before,
+  .premium-card:active::before,
+  .premium-gallery-card:active::before {
+    background: var(--pf-frame-hi);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-frame,
+  .premium-frame:hover,
+  .premium-frame:active,
+  .premium-card,
+  .premium-card:hover,
+  .premium-card:active,
+  .premium-gallery-card,
+  .premium-gallery-card:hover,
+  .premium-gallery-card:active {
+    transform: none !important;
+  }
+}
+/* The gallery card's desktop hover growth is Tailwind's `lg:hover:scale-[1.04]`
+   (the `scale` property) — switched off in its own rule. */
+@media (prefers-reduced-motion: reduce) {
+  .premium-gallery-card:hover,
+  .premium-gallery-card:active {
+    scale: none !important;
+  }
+}
+
+/* --- Text: approved white -------------------------------------------- */
+:where(.text-text, .text-muted):not(.font-heading) { font-weight: 470; }
+:where(.text-text, .text-muted):is(.text-xs, .text-sm):not(.font-heading) { font-weight: 540; }
+:where(.text-text, .text-muted).font-medium:not(.font-heading) { font-weight: 620; }
+:where(.text-text, .text-muted).font-semibold:not(.font-heading) { font-weight: 660; }
+:where(.text-text, .text-muted).font-bold:not(.font-heading) { font-weight: 740; }
+
+:where(.text-text, .text-muted):not(.font-heading):not([class*=":text-"]).text-xs { font-size: clamp(12.5px, 0.74rem + 0.12vw, 13px); letter-spacing: 0.012em; }
+:where(.text-text, .text-muted):not(.font-heading):not([class*=":text-"]).text-sm { font-size: clamp(14px, 0.84rem + 0.18vw, 15px); letter-spacing: 0.006em; }
+:where(.text-text, .text-muted):not(.font-heading):not([class*=":text-"]).text-base { font-size: clamp(16px, 0.96rem + 0.22vw, 17px); }
+:where(.text-text, .text-muted):not(.font-heading):not([class*=":text-"]).text-lg { font-size: clamp(18px, 1.06rem + 0.3vw, 19.5px); }
+:where(.text-text, .text-muted):not(.font-heading):not([class*=":text-"]).text-xl { font-size: clamp(20px, 1.16rem + 0.4vw, 22px); }
+
+/* --- Text: approved gold («Варіант 3») -------------------------------- */
+/* Icons keep their current gold; only text receives the gradient. */
+.text-gold svg,
+header nav a svg,
+.premium-frame--outline svg {
+  color: var(--gold);
+}
+
+/* Text of outline (dark) buttons: solid light gold. */
+.premium-frame--outline {
+  color: #ffd97f;
+  -webkit-text-fill-color: #ffd97f;
+  text-shadow: 0 1px 0 rgba(75, 32, 0, 0.85), 0 0 5px rgba(228, 143, 27, 0.35);
+}
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  /* Small gold text (labels, links, prices, nav). */
+  .text-gold:not(h2):not(h3):not(svg):not(.premium-frame):not([class*="bg-"]):not(:has(> svg:only-child)),
+  header nav a {
+    font-weight: 700;
+    background-image: var(--gold-text-small);
+    background-size: 100% 1lh;
+    background-repeat: repeat-y;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 1px 0 rgba(75, 32, 0, 0.85)) drop-shadow(0 0 4px rgba(228, 143, 27, 0.28));
+  }
+
+  /* Large gold headings: Playfair Display 800, metallic gradient + highlight. */
+  h2.font-heading.text-gold,
+  h3.font-heading.text-gold,
+  #how-we-work h3.font-heading {
+    font-weight: 800;
+    letter-spacing: 0.008em;
+    background-image: var(--gold-text-highlight), var(--gold-text-heading);
+    background-size: 100% 1lh;
+    background-repeat: repeat-y;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0.6px rgba(255, 214, 113, 0.57);
+    filter:
+      drop-shadow(0 1px 0 rgba(100, 48, 5, 0.9))
+      drop-shadow(0 2px 0 rgba(75, 32, 0, 0.95))
+      drop-shadow(0 3px 1px rgba(28, 14, 2, 0.94))
+      drop-shadow(0 4px 4px rgba(0, 0, 0, 0.8))
+      drop-shadow(0 0 5px rgba(228, 143, 27, 0.32));
+  }
+  h3.font-heading.text-gold,
+  #how-we-work h3.font-heading {
+    -webkit-text-stroke: 0.35px rgba(255, 214, 113, 0.5);
+    filter:
+      drop-shadow(0 1px 0 rgba(100, 48, 5, 0.9))
+      drop-shadow(0 2px 1px rgba(28, 14, 2, 0.9))
+      drop-shadow(0 3px 3px rgba(0, 0, 0, 0.7))
+      drop-shadow(0 0 4px rgba(228, 143, 27, 0.3));
   }
 }

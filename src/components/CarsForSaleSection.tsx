@@ -35,8 +35,8 @@ export function CarsForSaleSection({ dict, locale }: { dict: Dictionary; locale:
   return (
     <section className="bg-background">
       <div className="mx-auto max-w-[1760px] px-6 py-4 sm:px-8 lg:px-10 lg:py-3">
-        <div className="group relative border border-border-gold p-[3px] shadow-[0_0_0_rgba(212,175,55,0)] transition-[transform,box-shadow] duration-[280ms] ease-out hover:scale-[1.015] hover:shadow-[0_0_50px_rgba(212,175,55,0.4)] motion-reduce:transition-none motion-reduce:hover:scale-100">
-          <div className="relative overflow-hidden border border-border-gold/70 bg-gradient-to-br from-gold/[0.05] via-background to-background transition-colors duration-[280ms] ease-out group-hover:border-gold group-hover:from-gold/[0.09]">
+        <div className="premium-block premium-block--hover group relative border border-border-gold p-[3px] shadow-[0_0_0_rgba(212,175,55,0)] transition-[transform,box-shadow] duration-[280ms] ease-out hover:scale-[1.015] hover:shadow-[0_0_50px_rgba(212,175,55,0.4)] motion-reduce:transition-none motion-reduce:hover:scale-100">
+          <div className="premium-block-inner relative overflow-hidden border border-border-gold/70 bg-gradient-to-br from-gold/[0.05] via-background to-background transition-colors duration-[280ms] ease-out group-hover:border-gold group-hover:from-gold/[0.09]">
             <CassetteCorner className="-left-2 -top-2 lg:-left-2.5 lg:-top-2.5" />
             <CassetteCorner className="-right-2 -top-2 rotate-90 lg:-right-2.5 lg:-top-2.5" />
             <CassetteCorner className="-bottom-2 -right-2 rotate-180 lg:-bottom-2.5 lg:-right-2.5" />

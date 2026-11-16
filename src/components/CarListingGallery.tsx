@@ -347,7 +347,7 @@ export function CarListingGallery({
                       setRequestedVehicle(listing.id);
                       closeForNavigation();
                     }}
-                    className="inline-flex min-h-12 items-center justify-center border border-gold bg-gradient-to-b from-[#e2c35b] to-[#a9780b] px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-black transition-[filter,transform] hover:brightness-110 active:scale-[0.99]"
+                    className="premium-frame inline-flex min-h-12 items-center justify-center border border-gold bg-gradient-to-b from-[#e2c35b] to-[#a9780b] px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-black"
                   >
                     {labels.contactCta}
                   </Link>

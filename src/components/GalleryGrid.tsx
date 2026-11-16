@@ -40,7 +40,7 @@ function GalleryCardFrame() {
     <div className="hidden lg:block">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-sm border-2 border-border-gold/50 transition-colors duration-300 group-hover:border-border-gold/80"
+        className="premium-gallery-frame pointer-events-none absolute inset-0 border-2 border-border-gold/50"
       />
       <GalleryCardCorner className="-left-1 -top-1" />
       <GalleryCardCorner className="-right-1 -top-1 rotate-90" />
@@ -51,7 +51,7 @@ function GalleryCardFrame() {
 }
 
 const cardButtonClass =
-  "group relative flex flex-col border border-border-gold/40 transition-opacity duration-300 hover:opacity-90 focus-visible:outline-offset-4 lg:border-0 lg:bg-gradient-to-b lg:from-gold/[0.06] lg:to-transparent lg:transition-transform lg:duration-[280ms] lg:ease-out lg:hover:z-10 lg:hover:scale-[1.04] lg:hover:opacity-100 lg:hover:shadow-[0_10px_30px_rgba(212,175,55,0.22)] lg:focus-visible:z-10";
+  "premium-gallery-card group relative flex flex-col border border-border-gold/40 transition-opacity duration-300 hover:opacity-90 focus-visible:outline-offset-4 lg:border-0 lg:bg-gradient-to-b lg:from-gold/[0.06] lg:to-transparent lg:transition-transform lg:duration-[280ms] lg:ease-out lg:hover:z-10 lg:hover:scale-[1.04] lg:hover:opacity-100 lg:hover:shadow-[0_10px_30px_rgba(212,175,55,0.22)] lg:focus-visible:z-10";
 
 export function GalleryGrid({
   dict,
