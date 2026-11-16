@@ -45,7 +45,7 @@ export function LanguageSwitcher({
             key={locale}
             href={pathForLocale(pathname, locale)}
             aria-current={active ? "true" : undefined}
-            className={`premium-frame premium-frame--compact flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 border px-2 py-1.5 text-[10px] font-bold ${
+            className={`premium-frame premium-frame--compact flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 border px-2 py-1.5 text-[12px] font-bold ${
               active
                 ? "border-gold bg-gold/10 text-gold"
                 : "border-border-gold text-text"

@@ -95,7 +95,7 @@ export function HeroSection({ dict, locale }: { dict: Dictionary; locale: Locale
     <section className="relative bg-background">
       <h1 className="sr-only">{dict.meta.homeTitle}</h1>
       <div className="mx-auto max-w-[1760px] px-6 py-4 sm:px-8 lg:px-10 lg:py-3">
-        <div className="premium-block relative border border-border-gold lg:p-[3px]">
+        <div className="premium-block premium-block--hero relative border border-border-gold lg:p-[3px]">
           <div className="premium-block-inner relative lg:border lg:border-border-gold/70">
             <CornerOrnament className="-left-2.5 -top-2.5 lg:-left-3.5 lg:-top-3.5" />
             <CornerOrnament className="-right-2.5 -top-2.5 rotate-90 lg:-right-3.5 lg:-top-3.5" />
