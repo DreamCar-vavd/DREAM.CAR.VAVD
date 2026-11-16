@@ -440,8 +440,13 @@ body {
 }
 
 /* --- Shadows / transitions -------------------------------------------- */
+/* ЕТАП 25BH — fast reaction on every device: ONLY `transform` is animated (the
+   GPU scales the already-painted element). Glow / shadow / filter / ring colour
+   switch instantly — animating them repainted the gold on every frame, which an
+   older or busy Mac could not keep up with. Buttons & languages 160ms, cards and
+   blocks 180ms, touch press 120ms. */
 .premium-frame {
-  transition: transform 280ms ease-out, box-shadow 280ms ease-out, filter 280ms ease-out;
+  transition: transform 160ms ease-out;
 }
 .premium-frame:not(.hero-cta-primary):not(.hero-cta-secondary) {
   box-shadow: var(--pf-contour), 0 0 10px rgba(236, 153, 30, 0.26);
@@ -455,8 +460,9 @@ body {
   box-shadow: var(--pf-card-shadow);
 }
 .premium-card,
-.premium-gallery-card {
-  transition: transform 280ms ease-out, box-shadow 280ms ease-out;
+.premium-gallery-card,
+.premium-block--hover {
+  transition: transform 180ms ease-out;
 }
 @media (max-width: 1023.98px) {
   .premium-gallery-card { box-shadow: var(--pf-card-shadow); }
@@ -466,7 +472,7 @@ body {
 .premium-frame.hero-cta-primary { box-shadow: var(--pf-contour), 0 0 12px rgba(212, 175, 55, 0.17); }
 .premium-frame.whatsapp-cta.hero-cta-secondary {
   box-shadow: var(--pf-contour);
-  transition: transform 240ms ease-out, box-shadow 260ms ease-out, filter 260ms ease-out;
+  transition: transform 160ms ease-out;
 }
 @media (min-width: 768px) {
   .premium-frame.hero-cta-primary { box-shadow: var(--pf-contour), 0 0 16px rgba(212, 175, 55, 0.2); }
@@ -495,12 +501,24 @@ body {
     box-shadow: var(--pf-card-shadow-hi);
   }
   .premium-block--hover:hover {
+    transform: scale(1.015);
     box-shadow: 0 0 0 1px #9a5e12, 0 0 50px rgba(212, 175, 55, 0.4);
+  }
+  /* Gallery card: desktop-only growth (was Tailwind's `lg:hover:scale-[1.04]`,
+     the separate `scale` property that jumped without animation). */
+  @media (min-width: 1024px) {
+    .premium-gallery-card:hover { transform: scale(1.04); }
+  }
+  /* Main banner (owner's choice «А»): only its frame brightens and glows; the
+     banner itself never grows. Instant switch, no animation. */
+  .premium-block--hero:hover {
+    box-shadow: 0 0 0 1px #9a5e12, 0 0 28px rgba(212, 175, 55, 0.32);
   }
 
   .premium-frame:not(.premium-frame--static):not(:disabled):hover::before,
   .premium-card:hover::before,
   .premium-block--hover:hover::before,
+  .premium-block--hero:hover::before,
   .group:hover .premium-gallery-frame::before {
     background: var(--pf-frame-hi);
   }
@@ -514,6 +532,12 @@ body {
     transform: scale(1.04);
     transition-duration: 120ms;
   }
+  .premium-block--hover:active {
+    transform: scale(1.015);
+    transition-duration: 120ms;
+    box-shadow: 0 0 0 1px #9a5e12, 0 0 50px rgba(212, 175, 55, 0.4);
+  }
+  .premium-block--hover:active::before { background: var(--pf-frame-hi); }
   .premium-card:active { z-index: 10; box-shadow: var(--pf-card-shadow-hi); }
   .premium-gallery-card:active { z-index: 10; box-shadow: var(--pf-card-shadow-hi); }
   .premium-frame:not(.premium-frame--static):not(:disabled):active::before,
@@ -532,16 +556,11 @@ body {
   .premium-card:active,
   .premium-gallery-card,
   .premium-gallery-card:hover,
-  .premium-gallery-card:active {
+  .premium-gallery-card:active,
+  .premium-block--hover,
+  .premium-block--hover:hover,
+  .premium-block--hover:active {
     transform: none !important;
-  }
-}
-/* The gallery card's desktop hover growth is Tailwind's `lg:hover:scale-[1.04]`
-   (the `scale` property) — switched off in its own rule. */
-@media (prefers-reduced-motion: reduce) {
-  .premium-gallery-card:hover,
-  .premium-gallery-card:active {
-    scale: none !important;
   }
 }
 
