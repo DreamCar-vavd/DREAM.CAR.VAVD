@@ -400,7 +400,7 @@ const dictionary: Dictionary = {
       service: "Service",
       vehicle: "Make / model / year (optional)",
       message: "Message",
-      consent: "I agree to the processing of my personal data",
+      consent: "I have read how my personal data is handled",
       submit: "Send",
       sending: "Sending…",
       selectService: "Select a service",
